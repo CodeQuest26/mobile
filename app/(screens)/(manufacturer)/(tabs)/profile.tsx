@@ -1,6 +1,6 @@
 import { FadeIn } from "@/components/FadeIn";
+import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { useState } from "react";
 import {
   Alert,
@@ -14,7 +14,8 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import Colors from "../../../../constants/colors";
+
+import { BlurView } from "expo-blur";
 
 // Mock data for the manufacturer profile
 const MANUFACTURER_PROFILE = {
