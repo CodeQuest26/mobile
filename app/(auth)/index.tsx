@@ -1,6 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
+  Dimensions,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -8,13 +13,12 @@ import {
   View,
 } from "react-native";
 
-import { ThemedText } from "@/components/themed-text";
-import { router } from "expo-router";
 import MainContainer from "../../components/MainContainer";
-import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
 
-// --- Role Card ---
+const { width, height } = Dimensions.get("window");
+
+// --- Role Card (redesigned) ---
 const RoleCard = ({
   roleKey,
   title,
@@ -23,226 +27,278 @@ const RoleCard = ({
   selectedRole,
   setRole,
   theme,
+}: {
+  roleKey: string;
+  title: string;
+  description: string;
+  icon: any;
+  selectedRole: string;
+  setRole: (role: string) => void;
+  theme: any;
 }) => {
   const isSelected = selectedRole === roleKey;
 
+  const handlePress = () => {
+    if (Platform.OS !== "web")
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRole(roleKey);
+  };
+
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => setRole(roleKey)}
+      activeOpacity={0.9}
+      onPress={handlePress}
       style={[
         styles.card,
         {
-          backgroundColor: theme.cardBackground,
+          backgroundColor: isSelected
+            ? theme.primary + "12"
+            : theme.cardBackground + "CC",
           borderColor: isSelected ? theme.primary : theme.border,
+          transform: [{ scale: isSelected ? 1.02 : 1 }],
         },
       ]}
     >
-      {/* Left Icon */}
       <View
         style={[
-          styles.iconContainer,
+          styles.iconWrapper,
           {
-            backgroundColor: isSelected
-              ? theme.primary + "15"
-              : theme.iconBackground,
+            backgroundColor: isSelected ? theme.primary : theme.iconBackground,
           },
         ]}
       >
         <Ionicons
           name={icon}
-          size={24}
-          color={isSelected ? theme.primary : theme.icon}
+          size={32}
+          color={isSelected ? "#fff" : theme.primary}
         />
       </View>
-
-      {/* Text */}
-      <View style={styles.textContainer}>
-        <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-        <Text style={[styles.description, { color: theme.textSecondary }]}>
+      <View style={styles.cardText}>
+        <Text
+          style={[
+            styles.cardTitle,
+            { color: isSelected ? theme.primary : theme.text },
+          ]}
+        >
+          {title}
+        </Text>
+        <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>
           {description}
         </Text>
       </View>
-
-      {/* Selection Indicator */}
-      <Ionicons
-        name={isSelected ? "radio-button-on" : "radio-button-off"}
-        size={22}
-        color={isSelected ? theme.primary : theme.border}
-      />
+      {isSelected && (
+        <View style={styles.checkmark}>
+          <Ionicons name="checkmark-circle" size={28} color={theme.primary} />
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
 
-// --- Screen ---
-const RoleSelection = () => {
+// --- Main Screen ---
+export default function RoleSelection() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
-
+  const isDark = colorScheme === "dark";
   const [role, setRole] = useState("");
+
+  const handleContinue = () => {
+    if (!role) return;
+    if (Platform.OS !== "web")
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    router.push({ pathname: "/(onboarding)", params: { role } });
+  };
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
-      {/* Header */}
+      {/* Hero gradient + abstract shapes */}
+      <LinearGradient
+        colors={
+          isDark
+            ? [theme.primary + "40", theme.background]
+            : [theme.primary + "20", theme.background + "00"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradientBg}
+      />
+
       <View style={styles.header}>
         <View
-          style={[{ backgroundColor: theme.primary }, styles.logoContainer]}
+          style={[styles.logoGlow, { backgroundColor: theme.primary + "20" }]}
         >
-          <Ionicons name="paper-plane-outline" size={45} color={"white"} />
+          <LinearGradient
+            colors={[theme.primary, theme.primary + "CC"]}
+            style={styles.logoGradient}
+          >
+            <Ionicons name="rocket-outline" size={48} color="#fff" />
+          </LinearGradient>
         </View>
-
-        <Spacer />
-
-        <ThemedText style={{ fontSize: 27, fontWeight: "regular" }}>
+        <Text style={[styles.welcome, { color: theme.text }]}>
           Welcome to{" "}
-          <Text style={{ color: theme.primary, fontWeight: "bold" }}>
+          <Text style={{ color: theme.primary, fontWeight: "800" }}>
             MakersHub
           </Text>
-        </ThemedText>
-
-        <ThemedText style={{ fontSize: 15, color: theme.textSecondary }}>
-          <Text style={{ fontWeight: "bold" }}>Produce</Text> on the go.{" "}
-          <Text style={{ fontWeight: "bold" }}>Grow </Text>
-          your business.
-        </ThemedText>
+        </Text>
+        <Text style={[styles.tagline, { color: theme.textSecondary }]}>
+          Choose your path to collaborate, produce and grow.
+        </Text>
       </View>
 
-      {/* Cards */}
-      <View style={styles.content}>
+      <View style={styles.cardsContainer}>
         <RoleCard
           roleKey="sme"
           title="Business Owner (SME)"
-          description="Collaborate with manufactureres, track operations and grow your business."
-          icon="briefcase-outline"
+          description="Partner with manufacturers, track orders, and scale your business."
+          icon="business-outline"
           selectedRole={role}
           setRole={setRole}
           theme={theme}
         />
-
-        <Spacer height={16} />
-
+        <View style={{ height: 20 }} />
         <RoleCard
           roleKey="manufacturer"
           title="Manufacturer"
-          description="Oversee production, inventory and supply chain."
-          icon="settings-outline"
+          description="Manage production, inventory, and connect with SMEs."
+          icon="build-outline"
           selectedRole={role}
           setRole={setRole}
           theme={theme}
         />
       </View>
 
-      {/* Bottom CTA */}
       <View style={styles.footer}>
         <TouchableOpacity
           disabled={!role}
-          activeOpacity={0.9}
+          activeOpacity={0.8}
+          onPress={handleContinue}
           style={[
             styles.button,
             {
               backgroundColor: role ? theme.primary : theme.border,
+              opacity: role ? 1 : 0.7,
             },
           ]}
-          onPress={() =>
-            router.push({ pathname: "/(onboarding)", params: { role } })
-          }
         >
-          <Text
-            style={[
-              styles.buttonText,
-              { color: role ? theme.onPrimary : theme.textSecondary },
-            ]}
-          >
+          <Text style={[styles.buttonText, { color: theme.onPrimary }]}>
             Continue
           </Text>
         </TouchableOpacity>
       </View>
     </MainContainer>
   );
-};
+}
 
-export default RoleSelection;
-
-// --- Styles ---
 const styles = StyleSheet.create({
+  gradientBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: height * 0.6,
+  },
   header: {
-    flex: 1.5,
+    alignItems: "center",
+    paddingTop: 60,
     paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 24,
+    marginBottom: 32,
+  },
+  logoGlow: {
+    width: 100,
+    height: 100,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  logoGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
   },
-  logoContainer: {
-    height: 70,
-    width: 70,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heading: {
-    fontSize: 26,
+  welcome: {
+    fontSize: 28,
     fontWeight: "700",
-    marginBottom: 6,
+    textAlign: "center",
+    letterSpacing: -0.5,
+    marginBottom: 8,
   },
-  subheading: {
+  tagline: {
     fontSize: 15,
+    textAlign: "center",
     lineHeight: 22,
+    paddingHorizontal: 20,
   },
-
-  content: {
+  cardsContainer: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingVertical: 12,
   },
-
   card: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 18,
-    borderRadius: 14,
-    borderWidth: 1,
+    padding: 20,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
-
-  iconContainer: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
+  iconWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 14,
+    marginRight: 16,
   },
-
-  textContainer: {
+  cardText: {
     flex: 1,
   },
-
-  title: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
-
-  description: {
-    fontSize: 13.5,
-    lineHeight: 20,
+  cardDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+    opacity: 0.8,
   },
-
+  checkmark: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+  },
   footer: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === "ios" ? 34 : 24,
     paddingTop: 12,
-    marginBottom: 25,
   },
-
   button: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 40,
     alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-
   buttonText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });

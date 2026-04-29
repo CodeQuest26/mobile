@@ -1,12 +1,9 @@
+import MainContainer from "@/components/MainContainer";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet } from "react-native";
 
 const SMEHome = () => {
-  return (
-    <View>
-      <Text>SMEHome</Text>
-    </View>
-  );
+  return <MainContainer safe></MainContainer>;
 };
 
 export default SMEHome;
