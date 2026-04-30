@@ -115,10 +115,10 @@ const LoginScreen = () => {
             onPress={() => router.back()}
             style={[styles.backBtn, { backgroundColor: theme.cardBackground }]}
           >
-            <Ionicons name="arrow-back" size={20} color={theme.text} />
+            <Ionicons name="chevron-back" size={20} color={theme.text} />
           </TouchableOpacity>
 
-          <Spacer height={24} />
+          <Spacer style={{ height: 24 }} />
 
           {/* Role badge */}
           <View
@@ -133,12 +133,12 @@ const LoginScreen = () => {
             </Text>
           </View>
 
-          <Spacer height={12} />
+          <Spacer style={{ height: 12 }} />
 
           <ThemedText style={{ fontSize: 28, fontWeight: "bold" }}>
             Welcome back 👋
           </ThemedText>
-          <Spacer height={6} />
+          <Spacer style={{ height: 6 }} />
           <ThemedText style={{ fontSize: 14, color: theme.textSecondary }}>
             {roleMeta.tagline}
           </ThemedText>
@@ -155,7 +155,7 @@ const LoginScreen = () => {
             theme={theme}
           />
 
-          <Spacer height={16} />
+          <Spacer style={{ height: 16 }} />
 
           <InputField
             label="Password"
@@ -175,11 +175,11 @@ const LoginScreen = () => {
             }
           />
 
-          <Spacer height={10} />
+          <Spacer style={{ height: 10 }} />
 
           {/* Forgot */}
           <TouchableOpacity
-            onPress={() => router.push("/forgot-password")}
+            onPress={() => router.push("/forgotPassword")}
             style={styles.forgotRow}
           >
             <Text style={[styles.forgotText, { color: theme.primary }]}>
@@ -221,7 +221,7 @@ const LoginScreen = () => {
             )}
           </TouchableOpacity>
 
-          <Spacer height={20} />
+          <Spacer style={{ height: 20 }} />
 
           {/* Divider */}
           <View style={styles.dividerRow}>
@@ -232,7 +232,7 @@ const LoginScreen = () => {
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
           </View>
 
-          <Spacer height={20} />
+          <Spacer style={{ height: 20 }} />
 
           {/* Google */}
           <TouchableOpacity
@@ -251,7 +251,7 @@ const LoginScreen = () => {
             </Text>
           </TouchableOpacity>
 
-          <Spacer height={12} />
+          <Spacer style={{ height: 12 }} />
 
           {/* Apple */}
           <TouchableOpacity
@@ -270,7 +270,7 @@ const LoginScreen = () => {
             </Text>
           </TouchableOpacity>
 
-          <Spacer height={28} />
+          <Spacer style={{ heigh: 28 }} />
 
           {/* Sign up */}
           <View style={styles.signupRow}>

@@ -1,14 +1,14 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-const Orders = () => {
+const Bids = () => {
   return (
     <View>
-      <Text>Orders</Text>
+      <Text>Bids</Text>
     </View>
   );
 };
 
-export default Orders;
+export default Bids;
 
 const styles = StyleSheet.create({});

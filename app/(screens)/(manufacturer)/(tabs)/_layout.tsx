@@ -5,8 +5,8 @@ const TabsLayout = () => {
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="order" options={{ title: "Order" }} />
-      <Tabs.Screen name="chat" options={{ title: "Chat" }} />
+      <Tabs.Screen name="bids" options={{ title: "Bid" }} />
+      <Tabs.Screen name="orders" options={{ title: "Order" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );

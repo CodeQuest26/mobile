@@ -1,14 +1,14 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-const Chat = () => {
+const filterScreen = () => {
   return (
     <View>
-      <Text>Chat</Text>
+      <Text>filterScreen</Text>
     </View>
   );
 };
 
-export default Chat;
+export default filterScreen;
 
 const styles = StyleSheet.create({});

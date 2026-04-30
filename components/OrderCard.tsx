@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
@@ -113,7 +114,14 @@ const OrderCard = ({
         <Text style={[styles.progressPct, { color: theme.textSecondary }]}>
           {Math.round(order.progress * 100)}% complete
         </Text>
-        <TouchableOpacity>
+        <TouchableOpacity
+          onPress={() =>
+            router.push({
+              pathname: "../../(screens)/orderDetails",
+              params: { id: order.id },
+            })
+          }
+        >
           <Text style={[styles.viewLink, { color: theme.primary }]}>
             View →
           </Text>

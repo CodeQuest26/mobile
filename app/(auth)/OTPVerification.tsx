@@ -262,7 +262,7 @@ export default function OtpVerifyScreen() {
             onPress={() => router.back()}
             style={[styles.backBtn, { backgroundColor: theme.cardBackground }]}
           >
-            <Ionicons name="arrow-back" size={20} color={theme.text} />
+            <Ionicons name="chevron-back" size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -282,12 +282,12 @@ export default function OtpVerifyScreen() {
             />
           </View>
 
-          <Spacer height={24} />
+          <Spacer style={{ height: 24 }} />
 
           <ThemedText style={styles.heading}>
             Verify your {isPhone ? "number" : "email"}
           </ThemedText>
-          <Spacer height={8} />
+          <Spacer style={{ height: 8 }} />
           <ThemedText
             style={[styles.subheading, { color: theme.textSecondary }]}
           >
@@ -297,7 +297,7 @@ export default function OtpVerifyScreen() {
             </Text>
           </ThemedText>
 
-          <Spacer height={44} />
+          <Spacer style={{ height: 44 }} />
 
           {/* OTP boxes + hidden input */}
           <TouchableOpacity
@@ -332,7 +332,7 @@ export default function OtpVerifyScreen() {
             onBlur={() => setFocusedIndex(-1)}
           />
 
-          <Spacer height={16} />
+          <Spacer style={{ heigth: 16 }} />
 
           {/* Error / loading hint */}
           {hasError && (
@@ -346,7 +346,7 @@ export default function OtpVerifyScreen() {
             </Text>
           )}
 
-          <Spacer height={36} />
+          <Spacer style={{ height: 36 }} />
 
           {/* Resend */}
           <View style={styles.resendRow}>

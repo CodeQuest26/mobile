@@ -287,7 +287,14 @@ const OnboardingScreen = () => {
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={goNext}
-          style={[styles.nextBtn, { backgroundColor: theme.primary }]}
+          style={[
+            styles.nextBtn,
+            {
+              backgroundColor: theme.primary,
+              width: isLast ? 130 : 56,
+              height: 56,
+            },
+          ]}
         >
           {isLast ? (
             <Text style={[styles.nextBtnText, { color: theme.onPrimary }]}>
@@ -440,8 +447,6 @@ const styles = StyleSheet.create({
   },
 
   nextBtn: {
-    width: 56,
-    height: 56,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",

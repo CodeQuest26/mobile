@@ -25,6 +25,7 @@ import {
 } from "@/constants/manufacturerData";
 
 import { USER } from "@/constants/manufacturerData";
+import { router } from "expo-router";
 
 const time = new Date().getHours();
 const greeting = `Good ${time < 12 ? "morning" : time < 18 ? "afternoon" : "evening"}`;
@@ -308,7 +309,7 @@ export default function ManufacturerHome() {
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   Active Orders
                 </Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.replace("/orders")}>
                   <Text style={[styles.seeAll, { color: theme.primary }]}>
                     See all
                   </Text>
