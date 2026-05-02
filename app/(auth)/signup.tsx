@@ -180,7 +180,7 @@ const SignupScreen = () => {
             <Ionicons name="arrow-back" size={20} color={theme.text} />
           </TouchableOpacity>
 
-          <Spacer height={24} />
+          <Spacer style={{ height: 24 }} />
 
           {/* Role badge */}
           <View
@@ -199,12 +199,14 @@ const SignupScreen = () => {
             </Text>
           </View>
 
-          <Spacer height={12} />
+          <Spacer style={{ height: 12 }} />
 
           <ThemedText style={{ fontSize: 28, fontWeight: "bold" }}>
             Create account ✨
           </ThemedText>
-          <Spacer height={6} />
+
+          <Spacer style={{ height: 6 }} />
+
           <ThemedText style={{ fontSize: 14, color: theme.textSecondary }}>
             {roleMeta.tagline}
           </ThemedText>
@@ -221,7 +223,7 @@ const SignupScreen = () => {
             theme={theme}
           />
 
-          <Spacer height={16} />
+          <Spacer style={{ height: 16 }} />
 
           <InputField
             label="Phone Number (optional)"
@@ -232,7 +234,7 @@ const SignupScreen = () => {
             theme={theme}
           />
 
-          <Spacer height={16} />
+          <Spacer style={{ height: 16 }} />
 
           <InputField
             label="Password"
@@ -252,7 +254,7 @@ const SignupScreen = () => {
             }
           />
 
-          <Spacer height={8} />
+          <Spacer style={{ height: 8 }} />
           <PasswordStrength password={password} theme={theme} />
         </View>
 
@@ -278,7 +280,7 @@ const SignupScreen = () => {
             </Text>
           </TouchableOpacity>
 
-          <Spacer height={20} />
+          <Spacer style={{ height: 20 }} />
 
           {/* Divider */}
           <View style={styles.dividerRow}>
@@ -289,7 +291,7 @@ const SignupScreen = () => {
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
           </View>
 
-          <Spacer height={16} />
+          <Spacer style={{ height: 16 }} />
 
           {/* Google */}
           <TouchableOpacity
@@ -308,7 +310,7 @@ const SignupScreen = () => {
             </Text>
           </TouchableOpacity>
 
-          <Spacer height={12} />
+          <Spacer style={{ height: 12 }} />
 
           {/* Apple */}
           <TouchableOpacity
@@ -327,7 +329,7 @@ const SignupScreen = () => {
             </Text>
           </TouchableOpacity>
 
-          <Spacer height={24} />
+          <Spacer style={{ height: 24 }} />
 
           {/* Sign in link */}
           <View style={styles.loginRow}>
@@ -345,7 +347,7 @@ const SignupScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <Spacer height={24} />
+          <Spacer style={{ height: 24 }} />
         </View>
       </KeyboardAvoidingView>
     </MainContainer>

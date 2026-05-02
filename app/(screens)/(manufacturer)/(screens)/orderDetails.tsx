@@ -1,12 +1,11 @@
-// src/app/(screens)/(manufacturer)/(screens)/OrderDetailScreen.tsx
+// src/app/(screens)/(manufacturer)/(screens)/orderDetails.tsx
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  Dimensions,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -16,66 +15,42 @@ import {
   View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
-
-// Mock function to fetch order details by ID
-const getOrderDetails = (id: string) => {
-  // In real app, fetch from API
-  const orders = {
-    o1: {
-      id: "o1",
-      job: "Aluminium Cans",
-      sme: "AfroDrinks Ltd",
-      smeLogo: null,
-      amount: "GH₵ 52,000",
-      milestone: 2,
-      milestoneLabel: "Quality Check",
-      dueIn: "3 days",
-      progress: 0.65,
-      urgent: true,
-      description:
-        "Production of 10,000 aluminium beverage cans with custom branding.",
-      specifications:
-        "Material: 3004 aluminium, thickness 0.25mm, diameter 66mm, height 115mm",
-      quantity: "10,000 units",
-      deliveryAddress: "AfroDrinks Factory, Spintex Road, Accra",
-      timeline: [
-        { stage: "Order Confirmed", date: "2025-04-01", completed: true },
-        { stage: "Raw Materials", date: "2025-04-05", completed: true },
-        { stage: "Production", date: "2025-04-10", completed: true },
-        { stage: "Quality Check", date: "2025-04-15", completed: false },
-        { stage: "Delivery", date: "2025-04-20", completed: false },
-      ],
-      messages: [
-        {
-          from: "SME",
-          message: "Can we speed up delivery?",
-          timestamp: "2025-04-12 10:23",
-        },
-        {
-          from: "Manufacturer",
-          message: "We're on track for quality check.",
-          timestamp: "2025-04-12 14:15",
-        },
-      ],
-    },
-    o2: {
-      /* similar structure */
-    },
-    c1: {
-      /* completed order structure */
-    },
-  };
-  return orders[id as keyof typeof orders] || null;
-};
+import { getOrderById } from "@/constants/manufacturerData";
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
-  const theme = Colors[colorScheme] || Colors.light;
-  const isDark = colorScheme === "dark";
+  const theme = Colors[colorScheme ?? "light"] || Colors.light;
 
-  const [order, setOrder] = useState(() => getOrderDetails(id));
+  const [order, setOrder] = useState(() => getOrderById(id));
+
+  const markNextMilestone = useCallback(() => {
+    if (!order) return;
+
+    const timeline = [...order.timeline];
+    const nextIdx = timeline.findIndex((item) => !item.completed);
+
+    // All stages already done — nothing to mark
+    if (nextIdx === -1) return;
+
+    // Mark the next incomplete stage as done
+    timeline[nextIdx] = { ...timeline[nextIdx], completed: true };
+
+    const completedCount = timeline.filter((t) => t.completed).length;
+    const progress = completedCount / timeline.length;
+
+    // Label becomes the next still-incomplete stage, or "Completed" if all done
+    const nextIncomplete = timeline.find((t) => !t.completed);
+    const milestoneLabel = nextIncomplete ? nextIncomplete.stage : "Completed";
+
+    setOrder({
+      ...order,
+      timeline,
+      progress,
+      milestoneLabel,
+      urgent: progress < 1 ? order.urgent : false,
+    });
+  }, [order]);
 
   if (!order) {
     return (
@@ -94,13 +69,13 @@ export default function OrderDetailScreen() {
 
   return (
     <>
-      <StatusBar barStyle={"default"} />
+      <StatusBar barStyle="default" />
       <MainContainer safe>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Header with back button */}
+          {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
               onPress={() => router.back()}
@@ -185,7 +160,7 @@ export default function OrderDetailScreen() {
             </View>
           </FadeIn>
 
-          {/* Progress Section */}
+          {/* Progress */}
           <FadeIn delay={80}>
             <View
               style={[
@@ -244,12 +219,14 @@ export default function OrderDetailScreen() {
                         item.completed ? theme.primary : theme.textSecondary
                       }
                     />
-                    <View
-                      style={[
-                        styles.timelineLine,
-                        { backgroundColor: theme.border },
-                      ]}
-                    />
+                    {idx < order.timeline.length - 1 && (
+                      <View
+                        style={[
+                          styles.timelineLine,
+                          { backgroundColor: theme.border },
+                        ]}
+                      />
+                    )}
                   </View>
                   <View style={styles.timelineContent}>
                     <Text style={[styles.timelineStage, { color: theme.text }]}>
@@ -269,7 +246,7 @@ export default function OrderDetailScreen() {
             </View>
           </FadeIn>
 
-          {/* Order Details */}
+          {/* Job Specifications */}
           <FadeIn delay={160}>
             <View
               style={[
@@ -336,7 +313,7 @@ export default function OrderDetailScreen() {
             </View>
           </FadeIn>
 
-          {/* Messages */}
+          {/* Conversation */}
           <FadeIn delay={240}>
             <View
               style={[
@@ -369,7 +346,7 @@ export default function OrderDetailScreen() {
               ))}
               <TouchableOpacity
                 style={[styles.chatBtn, { borderColor: theme.primary }]}
-                onPress={() => router.push(`/chat/${order.sme}` as any)} // adjust route
+                onPress={() => router.push(`/chat/${order.sme}` as any)}
               >
                 <Text style={[styles.chatBtnText, { color: theme.primary }]}>
                   Open Chat
@@ -378,13 +355,13 @@ export default function OrderDetailScreen() {
             </View>
           </FadeIn>
 
-          {/* Action Buttons (if active) */}
+          {/* Action Buttons */}
           {!isCompleted && (
             <FadeIn delay={280}>
               <View style={styles.actionButtons}>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: theme.primary }]}
-                  onPress={() => console.log("Update milestone")}
+                  onPress={markNextMilestone}
                 >
                   <Text style={styles.actionBtnText}>Mark Next Milestone</Text>
                 </TouchableOpacity>
@@ -407,6 +384,7 @@ export default function OrderDetailScreen() {
               </View>
             </FadeIn>
           )}
+
           <View style={{ height: 40 }} />
         </ScrollView>
       </MainContainer>
@@ -471,36 +449,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 8,
   },
-  amountLabel: {
-    fontSize: 14,
-  },
-  amountValue: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  amountLabel: { fontSize: 14 },
+  amountValue: { fontSize: 16, fontWeight: "700" },
   milestoneRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 8,
   },
-  milestoneLabel: {
-    fontSize: 14,
-  },
-  milestoneValue: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  milestoneLabel: { fontSize: 14 },
+  milestoneValue: { fontSize: 14, fontWeight: "600" },
   dueRow: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  dueLabel: {
-    fontSize: 14,
-  },
-  dueValue: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  dueLabel: { fontSize: 14 },
+  dueValue: { fontSize: 14, fontWeight: "600" },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -533,6 +496,7 @@ const styles = StyleSheet.create({
     width: 2,
     flex: 1,
     marginTop: 4,
+    minHeight: 20,
   },
   timelineContent: {
     flex: 1,
@@ -585,9 +549,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 4,
   },
-  messageText: {
-    fontSize: 14,
-  },
+  messageText: { fontSize: 14 },
   messageTime: {
     fontSize: 10,
     textAlign: "right",

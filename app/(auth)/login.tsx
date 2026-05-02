@@ -98,7 +98,7 @@ const LoginScreen = () => {
     setTimeout(() => {
       setLoading(false);
 
-      router.push({ pathname: "/OTPVerification", params: { role } });
+      router.replace({ pathname: "/OTPVerification", params: { role } });
     }, 1500);
   };
 
@@ -112,7 +112,7 @@ const LoginScreen = () => {
         <View style={styles.header}>
           {/* Back */}
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => router.replace("/(onboarding)")}
             style={[styles.backBtn, { backgroundColor: theme.cardBackground }]}
           >
             <Ionicons name="chevron-back" size={20} color={theme.text} />

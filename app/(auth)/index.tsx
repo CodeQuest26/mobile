@@ -18,7 +18,6 @@ import Colors from "../../constants/colors";
 
 const { width, height } = Dimensions.get("window");
 
-// --- Role Card (redesigned) ---
 const RoleCard = ({
   roleKey,
   title,
@@ -73,6 +72,7 @@ const RoleCard = ({
           color={isSelected ? "#fff" : theme.primary}
         />
       </View>
+
       <View style={styles.cardText}>
         <Text
           style={[
@@ -95,7 +95,6 @@ const RoleCard = ({
   );
 };
 
-// --- Main Screen ---
 export default function RoleSelection() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
@@ -106,7 +105,7 @@ export default function RoleSelection() {
     if (!role) return;
     if (Platform.OS !== "web")
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.push({ pathname: "/(onboarding)", params: { role } });
+    router.replace({ pathname: "/(onboarding)", params: { role } });
   };
 
   return (
@@ -119,7 +118,7 @@ export default function RoleSelection() {
             : [theme.primary + "20", theme.background + "00"]
         }
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
         style={styles.gradientBg}
       />
 
@@ -134,12 +133,14 @@ export default function RoleSelection() {
             <Ionicons name="rocket-outline" size={48} color="#fff" />
           </LinearGradient>
         </View>
+
         <Text style={[styles.welcome, { color: theme.text }]}>
           Welcome to{" "}
           <Text style={{ color: theme.primary, fontWeight: "800" }}>
             MakersHub
           </Text>
         </Text>
+
         <Text style={[styles.tagline, { color: theme.textSecondary }]}>
           Choose your path to collaborate, produce and grow.
         </Text>
@@ -155,7 +156,9 @@ export default function RoleSelection() {
           setRole={setRole}
           theme={theme}
         />
+
         <View style={{ height: 20 }} />
+
         <RoleCard
           roleKey="manufacturer"
           title="Manufacturer"
@@ -276,9 +279,9 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   checkmark: {
-    position: "absolute",
-    top: 12,
-    right: 12,
+    // position: "absolute",
+    // top: 12,
+    // right: 12,
   },
   footer: {
     paddingHorizontal: 20,

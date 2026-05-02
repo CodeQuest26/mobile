@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -24,21 +24,18 @@ const ONBOARDING_CONTENT = {
   sme: [
     {
       icon: "storefront-outline",
-      emoji: "🏪",
       title: "Your business,\nall in one place.",
       body: "Manage orders, track deliveries, and oversee your operations from a single dashboard built for business owners like you.",
       highlight: "orders & deliveries",
     },
     {
       icon: "people-outline",
-      emoji: "🤝",
       title: "Connect with\ntop manufacturers.",
       body: "Browse verified manufacturers, send production requests, and collaborate in real-time. No middlemen, no delays.",
       highlight: "verified manufacturers",
     },
     {
       icon: "trending-up-outline",
-      emoji: "📈",
       title: "Grow faster\nwith smart insights.",
       body: "Get sales analytics, stock alerts, and performance reports that help you make better business decisions every day.",
       highlight: "smart insights",
@@ -47,21 +44,18 @@ const ONBOARDING_CONTENT = {
   manufacturer: [
     {
       icon: "construct-outline",
-      emoji: "🏭",
       title: "Production\nunder control.",
       body: "Track every production run, manage your factory floor, and monitor output quality — all from your phone.",
       highlight: "production runs",
     },
     {
       icon: "cube-outline",
-      emoji: "📦",
       title: "Inventory &\nsupply chain.",
       body: "Get real-time visibility into raw material levels, finished goods, and supplier deliveries. Never miss a restock.",
       highlight: "real-time visibility",
     },
     {
       icon: "flash-outline",
-      emoji: "⚡",
       title: "More orders,\nless friction.",
       body: "Receive production requests from SMEs instantly, confirm timelines, and manage fulfillment — streamlined end to end.",
       highlight: "instantly",
@@ -146,7 +140,7 @@ const Slide = ({
 
         {/* Icon circle */}
         <View style={[styles.iconCircle, { backgroundColor: theme.primary }]}>
-          <Text style={styles.emoji}>{item.emoji}</Text>
+          <Ionicons name={item.icon as any} size={40} color={theme.onPrimary} />
         </View>
 
         {/* Floating accent chips */}
@@ -212,6 +206,19 @@ const OnboardingScreen = () => {
 
   const isLast = activeIndex === slides.length - 1;
 
+  // Auto-scroll effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const nextIndex = (activeIndex + 1) % slides.length;
+      flatListRef.current?.scrollToIndex({
+        index: nextIndex,
+        animated: true,
+      });
+    }, 4000); // Auto-scroll every 4 seconds
+
+    return () => clearInterval(interval);
+  }, [activeIndex, slides.length]);
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setActiveIndex(index);
@@ -229,6 +236,10 @@ const OnboardingScreen = () => {
   };
 
   const skip = () => router.replace({ pathname: "/login", params: { role } });
+
+  const handleSwitchRole = () => {
+    router.replace("/(auth)");
+  };
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
@@ -248,13 +259,17 @@ const OnboardingScreen = () => {
         </View>
 
         {/* Skip */}
-        {!isLast && (
+        {/* {!isLast && (
           <TouchableOpacity onPress={skip} activeOpacity={0.7}>
             <Text style={[styles.skipText, { color: theme.textSecondary }]}>
               Skip
             </Text>
           </TouchableOpacity>
-        )}
+        )} */}
+
+        <TouchableOpacity activeOpacity={0.7} onPress={handleSwitchRole}>
+          <Ionicons name="swap-horizontal" size={25} color={theme.onPrimary} />
+        </TouchableOpacity>
       </View>
 
       {/* Slides */}
@@ -380,9 +395,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
-  },
-  emoji: {
-    fontSize: 40,
   },
 
   // Floating chips

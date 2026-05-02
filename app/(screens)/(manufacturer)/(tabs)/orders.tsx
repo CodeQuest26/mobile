@@ -109,7 +109,7 @@ export default function ManufacturerOrders() {
   });
 
   const handleFilterBtn = () => {
-    router.push("/(screens)/(manufacturer)/(screens)/filterScreen");
+    router.push("/filterScreen");
   };
 
   return (
@@ -119,17 +119,14 @@ export default function ManufacturerOrders() {
         <View style={[styles.screen]}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>My Orders</Text>
-            <TouchableOpacity
-              style={styles.filterBtn}
-              onPress={handleFilterBtn}
+            <Text
+              style={[
+                styles.title,
+                { color: theme.text, flex: 1, marginLeft: 20 },
+              ]}
             >
-              <Ionicons
-                name="filter-outline"
-                size={22}
-                color={theme.textSecondary}
-              />
-            </TouchableOpacity>
+              My Orders
+            </Text>
           </View>
 
           {/* Tab Bar */}
@@ -193,12 +190,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 10,
     paddingBottom: 8,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "800",
     letterSpacing: -0.5,
   },

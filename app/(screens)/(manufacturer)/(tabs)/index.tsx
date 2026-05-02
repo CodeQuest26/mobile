@@ -1,7 +1,9 @@
+import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  ImageBackground,
   LayoutChangeEvent,
   StatusBar,
   StyleSheet,
@@ -10,26 +12,25 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import Colors from "../../../../constants/colors";
 
 import { FadeIn } from "@/components/FadeIn";
-// import { HeroCard } from "@/components/HeroCard";
 import JobPeekCard from "@/components/JobPeekCard";
 import OrderCard from "@/components/OrderCard";
-import { StatChip } from "@/components/StatChip";
 import {
   ACTIVE_ORDERS,
   NEW_JOBS,
   QUICK_ACTIONS,
-  STATS,
+  USER,
 } from "@/constants/manufacturerData";
 
-import { USER } from "@/constants/manufacturerData";
+import MainContainer from "@/components/MainContainer";
 import { router } from "expo-router";
+const CardImg = require("../../../../assets/images/Production.jpeg");
 
 const time = new Date().getHours();
 const greeting = `Good ${time < 12 ? "morning" : time < 18 ? "afternoon" : "evening"}`;
 
+//  HeroCard
 interface HeroCardProps {
   theme: any;
   isDark: boolean;
@@ -63,13 +64,12 @@ const HeroCard = ({
   return (
     <FadeIn delay={0}>
       <View style={styles.heroWrapper}>
-        <Animated.View
-          style={[
-            styles.heroBg,
-            { backgroundColor: theme.primary },
-            { transform: [{ translateY: heroTranslateY }] },
-          ]}
+        <ImageBackground
+          source={CardImg}
+          style={styles.heroBgImage}
+          imageStyle={styles.heroBgImageStyle}
         >
+          <View style={styles.heroOverlay} />
           <Animated.View
             style={[
               styles.heroSlash1,
@@ -101,7 +101,12 @@ const HeroCard = ({
                 month: "short",
               })}
             </Text>
-            <TouchableOpacity style={styles.notifHero}>
+            <TouchableOpacity
+              onPress={() =>
+                router.push("/(screens)/(manufacturer)/(screens)/notification")
+              }
+              style={styles.notifHero}
+            >
               <Ionicons
                 name="notifications-outline"
                 size={20}
@@ -143,7 +148,7 @@ const HeroCard = ({
           <Text style={styles.heroTagline}>
             {greeting} 👋 Here's your factory overview
           </Text>
-        </Animated.View>
+        </ImageBackground>
 
         <View
           style={[
@@ -195,7 +200,7 @@ const HeroCard = ({
 
 export default function ManufacturerHome() {
   const colorScheme = useColorScheme();
-  const theme = Colors[colorScheme] || Colors.light;
+  const theme = Colors[colorScheme ?? "light"] || Colors.light;
   const isDark = colorScheme === "dark";
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -217,26 +222,21 @@ export default function ManufacturerHome() {
     return () => scrollY.removeListener(listener);
   }, [companyNameTop, scrollY, blurOpacity]);
 
-  const handleCompanyLayout = (event: any) => {
+  const handleCompanyLayout = (event: LayoutChangeEvent) => {
     if (companyNameTop === null) {
       setCompanyNameTop(event.nativeEvent.layout.y);
     }
   };
 
   return (
-    <>
+    <MainContainer>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      <View style={[styles.screen, { backgroundColor: theme.background }]}>
+
+      <View style={[styles.screen]}>
         <Animated.View
           style={[styles.statusBarBlurWrapper, { opacity: blurOpacity }]}
           pointerEvents="none"
-        >
-          {/* <BlurView
-            intensity={isDark ? 90 : 70}
-            tint={isDark ? "dark" : "light"}
-            style={StyleSheet.absoluteFillObject}
-          /> */}
-        </Animated.View>
+        />
 
         <Animated.ScrollView
           showsVerticalScrollIndicator={false}
@@ -254,16 +254,9 @@ export default function ManufacturerHome() {
             onCompanyLayout={handleCompanyLayout}
           />
 
-          <FadeIn delay={80}>
-            <View style={styles.statsGrid}>
-              {STATS.map((s, i) => (
-                <StatChip key={s.label} stat={s} theme={theme} delay={i * 40} />
-              ))}
-            </View>
-          </FadeIn>
-
+          {/* Quick Actions */}
           <FadeIn delay={160}>
-            <View style={styles.section}>
+            <View style={[styles.section, { marginTop: 0 }]}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   Quick Actions
@@ -274,6 +267,7 @@ export default function ManufacturerHome() {
                   <TouchableOpacity
                     key={qa.label}
                     activeOpacity={0.8}
+                    onPress={() => qa.route && router.push(qa.route as any)}
                     style={[
                       styles.qaBtn,
                       {
@@ -303,13 +297,18 @@ export default function ManufacturerHome() {
             </View>
           </FadeIn>
 
+          {/* Active Orders */}
           <FadeIn delay={240}>
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   Active Orders
                 </Text>
-                <TouchableOpacity onPress={() => router.replace("/orders")}>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push("/(screens)/(manufacturer)/(tabs)/orders")
+                  }
+                >
                   <Text style={[styles.seeAll, { color: theme.primary }]}>
                     See all
                   </Text>
@@ -321,13 +320,18 @@ export default function ManufacturerHome() {
             </View>
           </FadeIn>
 
+          {/* New Job Posts */}
           <FadeIn delay={320}>
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   New Job Posts
                 </Text>
-                <TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push("/(screens)/(manufacturer)/(tabs)/bids" as any)
+                  }
+                >
                   <Text style={[styles.seeAll, { color: theme.primary }]}>
                     Browse all
                   </Text>
@@ -342,6 +346,9 @@ export default function ManufacturerHome() {
                   <JobPeekCard key={j.id} job={j} theme={theme} />
                 ))}
                 <TouchableOpacity
+                  onPress={() =>
+                    router.push("/(screens)/(manufacturer)/(tabs)/bids" as any)
+                  }
                   style={[
                     styles.jobPeekCard,
                     styles.moreCard,
@@ -364,10 +371,10 @@ export default function ManufacturerHome() {
             </View>
           </FadeIn>
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: 70 }} />
         </Animated.ScrollView>
       </View>
-    </>
+    </MainContainer>
   );
 }
 
@@ -383,13 +390,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
     backgroundColor: "transparent",
     overflow: "hidden",
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 16,
-    gap: 10,
-    marginTop: 8,
   },
   section: { marginTop: 24, paddingHorizontal: 16 },
   sectionHeader: {
@@ -431,13 +431,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   moreCardText: { fontSize: 13, fontWeight: "700", textAlign: "center" },
-
   heroWrapper: { marginBottom: 24 },
   heroBg: {
+    overflow: "hidden",
+  },
+  heroBgImage: {
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 52,
-    overflow: "hidden",
+  },
+  heroBgImageStyle: {
+    resizeMode: "cover",
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   heroSlash1: {
     position: "absolute",
@@ -547,10 +555,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
+    height: 90,
   },
   escrowItem: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     gap: 4,
   },
   escrowLabel: { fontSize: 10.5, fontWeight: "500" },

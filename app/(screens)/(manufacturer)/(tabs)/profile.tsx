@@ -42,6 +42,8 @@ const MANUFACTURER_PROFILE = {
   },
 };
 
+const router = useRouter();
+
 export default function ManufacturerProfile() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
@@ -51,7 +53,7 @@ export default function ManufacturerProfile() {
   const [darkModeEnabled, setDarkModeEnabled] = useState(isDark);
 
   const handleEditProfile = () => {
-    Alert.alert("Edit Profile", "This will open an edit form.");
+    router.push("/(screens)/(manufacturer)/(screens)/editProfile");
   };
 
   const handleSettings = () => {
@@ -185,12 +187,14 @@ export default function ManufacturerProfile() {
                 <Text style={[styles.statValue, { color: theme.text }]}>
                   {MANUFACTURER_PROFILE.stats.totalOrders}
                 </Text>
+
                 <Text
                   style={[styles.statLabel, { color: theme.textSecondary }]}
                 >
                   Total Orders
                 </Text>
               </View>
+
               <View
                 style={[
                   styles.statCard,
@@ -396,6 +400,7 @@ export default function ManufacturerProfile() {
                     trackColor={{ false: "#767577", true: theme.primary }}
                   />
                 </View>
+
                 <View style={styles.preferenceRow}>
                   <View style={styles.preferenceLeft}>
                     <Ionicons
@@ -406,7 +411,7 @@ export default function ManufacturerProfile() {
                     <Text
                       style={[styles.preferenceLabel, { color: theme.text }]}
                     >
-                      Dark Mode
+                      {darkModeEnabled ? "Dark Mode" : "Light Mode"}
                     </Text>
                   </View>
                   <Switch
@@ -480,7 +485,7 @@ export default function ManufacturerProfile() {
             </View>
           </FadeIn>
 
-          <View style={{ height: 40 }} />
+          <View style={{ height: 80 }} />
         </ScrollView>
       </View>
     </>
@@ -706,4 +711,5 @@ const styles = StyleSheet.create({
 });
 
 // Missing import for Dimensions
+import { useRouter } from "expo-router";
 import { Dimensions } from "react-native";

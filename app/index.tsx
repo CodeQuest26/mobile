@@ -8,7 +8,7 @@ import { router } from "expo-router";
 const index = () => {
   return (
     <MainContainer safe={true}>
-      <TouchableOpacity onPress={() => router.push("/(auth)")}>
+      <TouchableOpacity onPress={() => router.replace("/(auth)")}>
         <ThemedText>index</ThemedText>
       </TouchableOpacity>
     </MainContainer>

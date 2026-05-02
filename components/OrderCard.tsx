@@ -9,6 +9,22 @@ import {
   View,
 } from "react-native";
 
+//  Types
+
+export type Order = {
+  id: string;
+  job: string;
+  sme: string;
+  smeLogo: null | string;
+  amount: string;
+  milestone: number;
+  milestoneLabel: string;
+  dueIn: string;
+  progress: number;
+  urgent: boolean;
+};
+
+//  FadeIn
 const FadeIn = ({
   children,
   delay = 0,
@@ -43,12 +59,13 @@ const FadeIn = ({
   );
 };
 
+//  OrderCard
 const OrderCard = ({
   order,
   theme,
   delay,
 }: {
-  order: (typeof ACTIVE_ORDERS)[0];
+  order: Order;
   theme: any;
   delay: number;
 }) => (
@@ -62,7 +79,7 @@ const OrderCard = ({
         },
       ]}
     >
-      {/* Top */}
+      {/* Top row */}
       <View style={styles.orderTop}>
         <View style={{ flex: 1 }}>
           {order.urgent && (
@@ -110,6 +127,7 @@ const OrderCard = ({
           ]}
         />
       </View>
+
       <View style={styles.progressLabels}>
         <Text style={[styles.progressPct, { color: theme.textSecondary }]}>
           {Math.round(order.progress * 100)}% complete
@@ -117,14 +135,23 @@ const OrderCard = ({
         <TouchableOpacity
           onPress={() =>
             router.push({
-              pathname: "../../(screens)/orderDetails",
+              pathname: "/(screens)/(manufacturer)/(screens)/orderDetails",
               params: { id: order.id },
             })
           }
+          style={{ flexDirection: "row" }}
         >
-          <Text style={[styles.viewLink, { color: theme.primary }]}>
-            View →
+          <Text
+            style={[
+              styles.viewLink,
+              {
+                color: theme.primary,
+              },
+            ]}
+          >
+            View
           </Text>
+          <Ionicons name="arrow-forward" size={15} color={theme.primary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -156,10 +183,24 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginBottom: 6,
   },
-  urgentPillText: { fontSize: 10.5, fontWeight: "700", color: "#EF4444" },
-  orderJob: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
-  orderSme: { fontSize: 12.5, marginTop: 2 },
-  orderAmount: { fontSize: 15, fontWeight: "800" },
+  urgentPillText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#EF4444",
+  },
+  orderJob: {
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  orderSme: {
+    fontSize: 12.5,
+    marginTop: 2,
+  },
+  orderAmount: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
   msRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -174,16 +215,37 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-  msDot: { width: 6, height: 6, borderRadius: 3 },
-  msBadgeText: { fontSize: 12, fontWeight: "600" },
-  dueText: { fontSize: 12 },
-  progressTrack: { height: 6, borderRadius: 3, marginBottom: 6 },
-  progressFill: { height: 6, borderRadius: 3 },
+  msDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  msBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  dueText: {
+    fontSize: 12,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginBottom: 6,
+  },
+  progressFill: {
+    height: 6,
+    borderRadius: 3,
+  },
   progressLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  progressPct: { fontSize: 11.5 },
-  viewLink: { fontSize: 12.5, fontWeight: "700" },
+  progressPct: {
+    fontSize: 11.5,
+  },
+  viewLink: {
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
 });
