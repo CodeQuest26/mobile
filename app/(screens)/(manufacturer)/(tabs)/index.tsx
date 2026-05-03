@@ -238,6 +238,13 @@ export default function ManufacturerHome() {
           pointerEvents="none"
         />
 
+        <HeroCard
+          theme={theme}
+          isDark={isDark}
+          scrollY={scrollY}
+          onCompanyLayout={handleCompanyLayout}
+        />
+
         <Animated.ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
@@ -247,13 +254,6 @@ export default function ManufacturerHome() {
             { useNativeDriver: true },
           )}
         >
-          <HeroCard
-            theme={theme}
-            isDark={isDark}
-            scrollY={scrollY}
-            onCompanyLayout={handleCompanyLayout}
-          />
-
           {/* Quick Actions */}
           <FadeIn delay={160}>
             <View style={[styles.section, { marginTop: 0 }]}>

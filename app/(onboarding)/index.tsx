@@ -267,8 +267,16 @@ const OnboardingScreen = () => {
           </TouchableOpacity>
         )} */}
 
-        <TouchableOpacity activeOpacity={0.7} onPress={handleSwitchRole}>
-          <Ionicons name="swap-horizontal" size={25} color={theme.onPrimary} />
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handleSwitchRole}
+          style={[]}
+        >
+          <Ionicons
+            name="swap-horizontal"
+            size={25}
+            color={theme.textSecondary}
+          />
         </TouchableOpacity>
       </View>
 
