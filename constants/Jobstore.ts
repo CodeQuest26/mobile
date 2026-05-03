@@ -1,6 +1,3 @@
-// store/jobStore.ts
-// Single source of truth for jobs, bids, and manufacturers.
-
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
 export type JobStatus = "active" | "completed" | "draft";
