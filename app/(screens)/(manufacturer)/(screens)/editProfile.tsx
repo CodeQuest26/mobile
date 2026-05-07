@@ -329,26 +329,6 @@ export default function EditManufacturerProfile() {
                 theme={theme}
                 icon="location-outline"
               />
-              <InputField
-                label="Registration Number"
-                value={formData.registrationNumber}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, registrationNumber: text })
-                }
-                error={errors.registrationNumber}
-                theme={theme}
-                icon="document-text-outline"
-              />
-              <InputField
-                label="Category"
-                value={formData.category}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, category: text })
-                }
-                error={errors.category}
-                theme={theme}
-                icon="briefcase-outline"
-              />
             </View>
 
             <Spacer style={{ height: 24 }} />
@@ -392,46 +372,6 @@ export default function EditManufacturerProfile() {
             </View>
 
             <Spacer style={{ height: 24 }} />
-
-            {/* Payment Details */}
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>
-                Payment Details
-              </ThemedText>
-              <InputField
-                label="Bank Name"
-                value={formData.bankName}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, bankName: text })
-                }
-                error={errors.bankName}
-                theme={theme}
-                icon="business-outline"
-              />
-              <InputField
-                label="Account Number"
-                value={formData.accountNumber}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, accountNumber: text })
-                }
-                error={errors.accountNumber}
-                theme={theme}
-                icon="card-outline"
-                keyboardType="numeric"
-              />
-              <InputField
-                label="Account Name"
-                value={formData.accountName}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, accountName: text })
-                }
-                error={errors.accountName}
-                theme={theme}
-                icon="person-outline"
-              />
-            </View>
-
-            <Spacer style={{ height: 40 }} />
 
             {/* Save Button */}
             <Pressable

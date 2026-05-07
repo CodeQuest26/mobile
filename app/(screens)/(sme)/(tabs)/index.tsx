@@ -1,12 +1,13 @@
+import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
+import Spacer from "@/components/Spacer";
 import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useRef } from "react";
+import React from "react";
 import {
-  Animated,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -17,40 +18,6 @@ import {
 } from "react-native";
 
 const { width } = Dimensions.get("window");
-
-const FadeIn = ({
-  children,
-  delay = 0,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-}) => {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(18)).current;
-
-  React.useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 420,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 380,
-        delay,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-      {children}
-    </Animated.View>
-  );
-};
 
 // Summary stat card component
 interface StatCardProps {
@@ -151,12 +118,12 @@ const SMEHome = () => {
       value: "8",
       color: "#8B5CF6",
     },
-    {
-      icon: "wallet",
-      label: "Total Spend",
-      value: "¢2,45,000",
-      color: "#EC4899",
-    },
+    // {
+    //   icon: "wallet",
+    //   label: "Total Spend",
+    //   value: "¢2,45,000",
+    //   color: "#EC4899",
+    // },
     {
       icon: "trending-up",
       label: "This Month",
@@ -222,7 +189,7 @@ const SMEHome = () => {
                 Good {greeting} 👋
               </ThemedText>
               <Text style={[styles.companyName, { color: theme.text }]}>
-                Tech Innovations Ltd
+                Tech Innovations Ltd {/**company name here */}
               </Text>
             </View>
             <TouchableOpacity
@@ -328,6 +295,8 @@ const SMEHome = () => {
             />
           ))}
         </View>
+
+        <Spacer style={{ height: 70 }} />
       </ScrollView>
     </MainContainer>
   );
@@ -400,13 +369,13 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "space-around",
     paddingHorizontal: 16,
     gap: 12,
     marginBottom: 12,
   },
   statCard: {
-    width: (width - 44) / 2,
+    // width: (width - 44) / 2,
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,

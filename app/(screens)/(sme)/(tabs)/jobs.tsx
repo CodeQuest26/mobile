@@ -1,5 +1,6 @@
 // app/(screens)/(sme)/(tabs)/myJobs.tsx
 import MainContainer from "@/components/MainContainer";
+import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import {
   getBidsForJob,
@@ -494,6 +495,8 @@ const MyJobs = () => {
             <EmptyState activeTab={activeTab} theme={theme} />
           )}
         </View>
+
+        <Spacer style={{ height: 40 }} />
       </ScrollView>
     </MainContainer>
   );

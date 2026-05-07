@@ -42,8 +42,6 @@ const MANUFACTURER_PROFILE = {
   },
 };
 
-const router = useRouter();
-
 export default function ManufacturerProfile() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
@@ -173,7 +171,7 @@ export default function ManufacturerProfile() {
           </View>
 
           {/* Stats Cards */}
-          <FadeIn delay={80}>
+          {/* <FadeIn delay={80}>
             <View style={styles.statsGrid}>
               <View
                 style={[
@@ -253,10 +251,10 @@ export default function ManufacturerProfile() {
                 </Text>
               </View>
             </View>
-          </FadeIn>
+          </FadeIn> */}
 
           {/* Business Details */}
-          <FadeIn delay={160}>
+          {/* <FadeIn delay={160}>
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Business Details
@@ -282,15 +280,9 @@ export default function ManufacturerProfile() {
                   value={MANUFACTURER_PROFILE.since}
                   theme={theme}
                 />
-                <DetailRow
-                  icon="briefcase-outline"
-                  label="Category"
-                  value={MANUFACTURER_PROFILE.category}
-                  theme={theme}
-                />
               </View>
             </View>
-          </FadeIn>
+          </FadeIn> */}
 
           {/* Contact Information */}
           <FadeIn delay={200}>
@@ -323,43 +315,6 @@ export default function ManufacturerProfile() {
                   icon="globe-outline"
                   label="Website"
                   value={MANUFACTURER_PROFILE.website}
-                  theme={theme}
-                />
-              </View>
-            </View>
-          </FadeIn>
-
-          {/* Payment Details */}
-          <FadeIn delay={240}>
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Payment Details
-              </Text>
-              <View
-                style={[
-                  styles.detailCard,
-                  {
-                    backgroundColor: theme.cardBackground,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <DetailRow
-                  icon="business-outline"
-                  label="Bank"
-                  value={MANUFACTURER_PROFILE.bankName}
-                  theme={theme}
-                />
-                <DetailRow
-                  icon="card-outline"
-                  label="Account Number"
-                  value={MANUFACTURER_PROFILE.accountNumber}
-                  theme={theme}
-                />
-                <DetailRow
-                  icon="person-outline"
-                  label="Account Name"
-                  value={MANUFACTURER_PROFILE.accountName}
                   theme={theme}
                 />
               </View>
@@ -427,46 +382,6 @@ export default function ManufacturerProfile() {
           {/* Action Buttons */}
           <FadeIn delay={320}>
             <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  {
-                    backgroundColor: theme.cardBackground,
-                    borderColor: theme.border,
-                  },
-                ]}
-                onPress={handleEditProfile}
-              >
-                <Ionicons
-                  name="create-outline"
-                  size={20}
-                  color={theme.primary}
-                />
-                <Text style={[styles.actionBtnText, { color: theme.primary }]}>
-                  Edit Profile
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  {
-                    backgroundColor: theme.cardBackground,
-                    borderColor: theme.border,
-                  },
-                ]}
-                onPress={handleSettings}
-              >
-                <Ionicons
-                  name="settings-outline"
-                  size={20}
-                  color={theme.textSecondary}
-                />
-                <Text
-                  style={[styles.actionBtnText, { color: theme.textSecondary }]}
-                >
-                  Settings
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.actionBtn,
@@ -711,5 +626,5 @@ const styles = StyleSheet.create({
 });
 
 // Missing import for Dimensions
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 import { Dimensions } from "react-native";

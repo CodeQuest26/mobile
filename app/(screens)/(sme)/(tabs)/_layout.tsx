@@ -18,7 +18,6 @@ import Animated, {
 } from "react-native-reanimated";
 
 export default function TabsLayout() {
-  // iOS: native system tabs using SF Symbols + Label
   if (Platform.OS === "ios") {
     return (
       <NativeTabs>
@@ -32,7 +31,7 @@ export default function TabsLayout() {
           <Label>Jobs</Label>
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="jobPost" href="/jobPost">
+        <NativeTabs.Trigger name="postJob" href="/postJob">
           <Icon sf="plus.circle.fill" />
           <Label>Post</Label>
         </NativeTabs.Trigger>
@@ -60,7 +59,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="jobs" />
-      <Tabs.Screen name="jobPost" />
+      <Tabs.Screen name="postJob" />
       <Tabs.Screen name="map" />
       <Tabs.Screen name="profile" />
     </Tabs>
@@ -83,29 +82,33 @@ function FloatingTabBar() {
           active={pathname === "/"}
           onPress={() => router.push("/")}
         />
+
         <TabItem
           icon="briefcase"
           label="Jobs"
           active={pathname === "/jobs"}
           onPress={() => router.push("/jobs")}
         />
+
         <TabItem
           icon="add-circle"
           label="Post"
-          active={pathname === "/jobPost"}
-          onPress={() => router.push("/jobPost")}
+          active={pathname === "/postJob"}
+          onPress={() => router.push("/postJob")}
         />
-        <TabItem
-          icon="map"
-          label="Map"
-          active={pathname === "/map"}
-          onPress={() => router.push("/map")}
-        />
+
         <TabItem
           icon="person"
           label="Profile"
           active={pathname === "/profile"}
           onPress={() => router.push("/profile")}
+        />
+
+        <TabItem
+          icon="map"
+          label="Map"
+          active={pathname === "/map"}
+          onPress={() => router.push("/map")}
         />
       </BlurView>
     </View>
