@@ -1,698 +1,471 @@
-// import { FadeIn } from "@/components/FadeIn";
-// import MainContainer from "@/components/MainContainer";
-// import { ThemedText } from "@/components/themed-text";
-// import Colors from "@/constants/colors";
-// import { Ionicons } from "@expo/vector-icons";
-// import * as Location from "expo-location";
-// import { router } from "expo-router";
-// import React, { useEffect, useRef, useState } from "react";
-// import {
-//   ActivityIndicator,
-//   Dimensions,
-//   ScrollView,
-//   StyleSheet,
-//   Text,
-//   TouchableOpacity,
-//   useColorScheme,
-//   View,
-// } from "react-native";
-// import MapView, {
-//   Callout,
-//   Marker,
-//   PROVIDER_GOOGLE,
-//   Region,
-// } from "react-native-maps";
+import MainContainer from "@/components/MainContainer";
+import Colors from "@/constants/colors";
+import * as Location from "expo-location";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from "react-native";
+import MapView, {
+  Marker,
+  PROVIDER_DEFAULT,
+  PROVIDER_GOOGLE,
+  Region,
+} from "react-native-maps";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// const { width, height } = Dimensions.get("window");
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// // Type for nearby manufacturing company
-// interface Manufacturer {
-//   id: string;
-//   name: string;
-//   address: string;
-//   distance: number; // in km
-//   rating: number;
-//   coordinates: {
-//     latitude: number;
-//     longitude: number;
-//   };
-// }
+/* ================= TYPES ================= */
 
-// // Mock function to generate nearby manufacturers based on user location
-// const generateNearbyManufacturers = (
-//   userLat: number,
-//   userLng: number,
-// ): Manufacturer[] => {
-//   const companies = [
-//     {
-//       name: "Precision Machining Co.",
-//       address: "123 Industrial Park",
-//       rating: 4.8,
-//     },
-//     {
-//       name: "Apex Fabrication",
-//       address: "456 Manufacturing Blvd",
-//       rating: 4.5,
-//     },
-//     { name: "Metro Metalworks", address: "789 Steel Avenue", rating: 4.2 },
-//     {
-//       name: "Elite Electronics Assembly",
-//       address: "321 Tech Drive",
-//       rating: 4.9,
-//     },
-//     { name: "Summit Plastics", address: "654 Polymer Lane", rating: 4.3 },
-//     { name: "Royal Textile Mills", address: "987 Fabric Street", rating: 4.0 },
-//     {
-//       name: "Phoenix Aerospace Components",
-//       address: "147 Skyway Road",
-//       rating: 4.7,
-//     },
-//     { name: "Cascade Woodworking", address: "258 Timber Trail", rating: 4.4 },
-//   ];
+interface Company {
+  id: string;
+  name: string;
+  coordinate: {
+    latitude: number;
+    longitude: number;
+  };
+  rating: number;
+  verified: boolean;
+  address: string;
+  distance: number;
+}
 
-//   return companies.map((company, index) => {
-//     // Random offset within ~3km radius (approx 0.03 degrees)
-//     const latOffset = (Math.random() - 0.5) * 0.05;
-//     const lngOffset = (Math.random() - 0.5) * 0.05;
-//     const distance = (Math.random() * 4 + 1).toFixed(1);
+/* ================= MOCK DATA ================= */
 
-//     return {
-//       id: index.toString(),
-//       name: company.name,
-//       address: company.address,
-//       distance: parseFloat(distance),
-//       rating: company.rating,
-//       coordinates: {
-//         latitude: userLat + latOffset,
-//         longitude: userLng + lngOffset,
-//       },
-//     };
-//   });
-// };
+const generateMockCompanies = (
+  centerLat: number,
+  centerLon: number,
+  radiusKm = 5,
+  count = 15,
+): Company[] => {
+  const companies: Company[] = [];
 
-// const Map = () => {
-//   const colorScheme = useColorScheme();
-//   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
-//   const mapRef = useRef<MapView>(null);
+  const names = [
+    "Precision Machining Co.",
+    "SteelCraft Industries",
+    "EcoPack Solutions",
+    "Apex Metalworks",
+    "NanoFab Technologies",
+    "Green Energy Components",
+    "Northside Casting",
+    "Westend Assembly",
+    "East Bay Electronics",
+    "Sunrise Robotics",
+  ];
 
-//   const [userLocation, setUserLocation] =
-//     useState<Location.LocationObjectCoords | null>(null);
-//   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
-//   const [loading, setLoading] = useState(true);
-//   const [locationPermission, setLocationPermission] = useState<boolean | null>(
-//     null,
-//   );
-//   const [mapRegion, setMapRegion] = useState<Region | null>(null);
+  for (let i = 0; i < count; i++) {
+    const offsetLat = (Math.random() - 0.5) * (radiusKm / 111);
+    const offsetLon =
+      (Math.random() - 0.5) *
+      (radiusKm / (111 * Math.cos(centerLat * (Math.PI / 180))));
 
-//   // Request location permissions
-//   const getLocationPermission = async () => {
-//     try {
-//       const { status } = await Location.requestForegroundPermissionsAsync();
-//       if (status !== "granted") {
-//         setLocationPermission(false);
-//         setLoading(false);
-//         return false;
-//       }
-//       setLocationPermission(true);
-//       return true;
-//     } catch (error) {
-//       console.error("Location permission error:", error);
-//       setLocationPermission(false);
-//       setLoading(false);
-//       return false;
-//     }
-//   };
+    const lat = centerLat + offsetLat;
+    const lon = centerLon + offsetLon;
 
-//   const getUserLocation = async () => {
-//     try {
-//       const location = await Location.getCurrentPositionAsync({
-//         accuracy: Location.Accuracy.High,
-//       });
-//       const coords = location.coords;
-//       setUserLocation(coords);
+    const rating = +(4 + Math.random()).toFixed(1);
+    const verified = Math.random() > 0.2;
+    const distance = Math.sqrt(offsetLat ** 2 + offsetLon ** 2) * 111 * 1000;
 
-//       const region: Region = {
-//         latitude: coords.latitude,
-//         longitude: coords.longitude,
-//         latitudeDelta: 0.05,
-//         longitudeDelta: 0.05,
-//       };
-//       setMapRegion(region);
+    companies.push({
+      id: `c_${i}`,
+      name: names[i % names.length],
+      coordinate: { latitude: lat, longitude: lon },
+      rating,
+      verified,
+      address: `${Math.floor(Math.random() * 1000)} Industrial Blvd`,
+      distance,
+    });
+  }
 
-//       const nearby = generateNearbyManufacturers(
-//         coords.latitude,
-//         coords.longitude,
-//       );
-//       setManufacturers(nearby);
+  return companies.filter((c) => c.rating >= 4.5 && c.verified);
+};
 
-//       return coords;
-//     } catch (error) {
-//       console.error("Error getting location:", error);
-//       return null;
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const initializeMap = async () => {
-//     setLoading(true);
-//     const hasPermission = await getLocationPermission();
-//     if (hasPermission) {
-//       await getUserLocation();
-//     } else {
-//       setLoading(false);
-//     }
-//   };
-
-//   useEffect(() => {
-//     initializeMap();
-//   }, []);
-
-//   const recenterMap = () => {
-//     if (userLocation && mapRef.current) {
-//       mapRef.current.animateToRegion({
-//         latitude: userLocation.latitude,
-//         longitude: userLocation.longitude,
-//         latitudeDelta: 0.05,
-//         longitudeDelta: 0.05,
-//       });
-//     }
-//   };
-
-//   const handleViewDetails = (manufacturer: Manufacturer) => {
-//     router.push({
-//       pathname: "/(screens)/(sme)/(screens)/companyDetails",
-//       params: { id: manufacturer.id, name: manufacturer.name },
-//     });
-//   };
-
-//   if (loading) {
-//     return (
-//       <MainContainer safe>
-//         <View style={styles.loadingContainer}>
-//           <ActivityIndicator size="large" color={theme.primary} />
-//           <ThemedText
-//             style={[styles.loadingText, { color: theme.textSecondary }]}
-//           >
-//             Finding nearby manufacturers...
-//           </ThemedText>
-//         </View>
-//       </MainContainer>
-//     );
-//   }
-
-//   if (!locationPermission) {
-//     return (
-//       <MainContainer safe>
-//         <View style={styles.permissionContainer}>
-//           <Ionicons
-//             name="location-outline"
-//             size={64}
-//             color={theme.textSecondary}
-//           />
-//           <ThemedText style={[styles.permissionTitle, { color: theme.text }]}>
-//             Location Access Required
-//           </ThemedText>
-//           <ThemedText
-//             style={[styles.permissionText, { color: theme.textSecondary }]}
-//           >
-//             Please enable location services to see nearby manufacturing
-//             companies.
-//           </ThemedText>
-
-//           <TouchableOpacity
-//             style={[
-//               styles.permissionButton,
-//               { backgroundColor: theme.primary },
-//             ]}
-//             onPress={initializeMap}
-//           >
-//             <Text
-//               style={[styles.permissionButtonText, { color: theme.onPrimary }]}
-//             >
-//               Try Again
-//             </Text>
-//           </TouchableOpacity>
-//         </View>
-//       </MainContainer>
-//     );
-//   }
-
-//   return (
-//     <MainContainer safe>
-//       <View style={styles.container}>
-//         {/* Header */}
-//         <FadeIn delay={0}>
-//           <View style={styles.header}>
-//             <View>
-//               <ThemedText
-//                 style={[styles.greeting, { color: theme.textSecondary }]}
-//               >
-//                 Find Partners
-//               </ThemedText>
-//               <Text style={[styles.title, { color: theme.text }]}>
-//                 Nearby Manufacturers
-//               </Text>
-//             </View>
-//             <TouchableOpacity
-//               onPress={initializeMap}
-//               style={[styles.refreshButton, { backgroundColor: theme.border }]}
-//             >
-//               <Ionicons name="refresh-outline" size={20} color={theme.icon} />
-//             </TouchableOpacity>
-//           </View>
-//         </FadeIn>
-
-//         {/* Map View */}
-//         <FadeIn delay={100}>
-//           <View style={styles.mapContainer}>
-//             {mapRegion && (
-//               <MapView
-//                 ref={mapRef}
-//                 provider={PROVIDER_GOOGLE}
-//                 style={styles.map}
-//                 initialRegion={mapRegion}
-//                 showsUserLocation={true}
-//                 showsMyLocationButton={false}
-//                 showsCompass={true}
-//                 showsBuildings={true}
-//               >
-//                 {manufacturers.map((manufacturer) => (
-//                   <Marker
-//                     key={manufacturer.id}
-//                     coordinate={manufacturer.coordinates}
-//                     title={manufacturer.name}
-//                     description={`${manufacturer.distance}km away • ⭐ ${manufacturer.rating}`}
-//                   >
-//                     <View
-//                       style={[
-//                         styles.customMarker,
-//                         {
-//                           backgroundColor: theme.primary,
-//                           borderColor: theme.onPrimary,
-//                         },
-//                       ]}
-//                     >
-//                       <Ionicons
-//                         name="business"
-//                         size={16}
-//                         color={theme.onPrimary}
-//                       />
-//                     </View>
-//                     <Callout
-//                       style={[
-//                         styles.callout,
-//                         { backgroundColor: theme.cardBackground },
-//                       ]}
-//                       onPress={() => handleViewDetails(manufacturer)}
-//                     >
-//                       <View style={styles.calloutContent}>
-//                         <Text
-//                           style={[styles.calloutTitle, { color: theme.text }]}
-//                         >
-//                           {manufacturer.name}
-//                         </Text>
-//                         <Text
-//                           style={[
-//                             styles.calloutAddress,
-//                             { color: theme.textSecondary },
-//                           ]}
-//                         >
-//                           {manufacturer.address}
-//                         </Text>
-//                         <View style={styles.calloutRow}>
-//                           <Ionicons
-//                             name="location-outline"
-//                             size={14}
-//                             color={theme.primary}
-//                           />
-//                           <Text
-//                             style={[
-//                               styles.calloutDistance,
-//                               { color: theme.textSecondary },
-//                             ]}
-//                           >
-//                             {manufacturer.distance} km away
-//                           </Text>
-//                         </View>
-//                         <View style={styles.calloutRow}>
-//                           <Ionicons name="star" size={14} color="#FBBF24" />
-//                           <Text
-//                             style={[
-//                               styles.calloutRating,
-//                               { color: theme.textSecondary },
-//                             ]}
-//                           >
-//                             {manufacturer.rating} / 5.0
-//                           </Text>
-//                         </View>
-//                         <TouchableOpacity
-//                           style={[
-//                             styles.calloutButton,
-//                             { backgroundColor: theme.primary },
-//                           ]}
-//                           onPress={() => handleViewDetails(manufacturer)}
-//                         >
-//                           <Text
-//                             style={[
-//                               styles.calloutButtonText,
-//                               { color: theme.onPrimary },
-//                             ]}
-//                           >
-//                             View Details
-//                           </Text>
-//                         </TouchableOpacity>
-//                       </View>
-//                     </Callout>
-//                   </Marker>
-//                 ))}
-//               </MapView>
-//             )}
-
-//             {/* Recenter Button */}
-//             <TouchableOpacity
-//               style={[
-//                 styles.recenterButton,
-//                 { backgroundColor: theme.cardBackground },
-//               ]}
-//               onPress={recenterMap}
-//             >
-//               <Ionicons name="locate" size={22} color={theme.primary} />
-//             </TouchableOpacity>
-//           </View>
-//         </FadeIn>
-
-//         {/* Bottom Manufacturers List */}
-//         <FadeIn delay={200}>
-//           <View style={styles.bottomListContainer}>
-//             <View style={styles.bottomListHeader}>
-//               <Text style={[styles.bottomListTitle, { color: theme.text }]}>
-//                 Nearby Manufacturing Partners
-//               </Text>
-//               <TouchableOpacity
-//                 onPress={() =>
-//                   router.push("/(screens)/(sme)/(screens)/manufacturersList")
-//                 }
-//               >
-//                 <Text style={[styles.seeAllText, { color: theme.primary }]}>
-//                   See All
-//                 </Text>
-//               </TouchableOpacity>
-//             </View>
-
-//             <ScrollView
-//               horizontal
-//               showsHorizontalScrollIndicator={false}
-//               style={styles.horizontalList}
-//               contentContainerStyle={styles.horizontalListContent}
-//             >
-//               {manufacturers.map((manufacturer, index) => (
-//                 <TouchableOpacity
-//                   key={manufacturer.id}
-//                   style={[
-//                     styles.manufacturerCard,
-//                     {
-//                       backgroundColor: theme.cardBackground,
-//                       borderColor: theme.border,
-//                       marginLeft: index === 0 ? 16 : 0,
-//                     },
-//                   ]}
-//                   onPress={() => handleViewDetails(manufacturer)}
-//                 >
-//                   <View style={styles.cardIconContainer}>
-//                     <Ionicons name="business" size={24} color={theme.primary} />
-//                   </View>
-//                   <Text
-//                     style={[styles.cardName, { color: theme.text }]}
-//                     numberOfLines={1}
-//                   >
-//                     {manufacturer.name}
-//                   </Text>
-//                   <View style={styles.cardDetails}>
-//                     <View style={styles.cardRow}>
-//                       <Ionicons
-//                         name="location-outline"
-//                         size={12}
-//                         color={theme.textSecondary}
-//                       />
-//                       <Text
-//                         style={[
-//                           styles.cardDistance,
-//                           { color: theme.textSecondary },
-//                         ]}
-//                       >
-//                         {manufacturer.distance} km
-//                       </Text>
-//                     </View>
-//                     <View style={styles.cardRow}>
-//                       <Ionicons name="star" size={12} color="#FBBF24" />
-//                       <Text
-//                         style={[
-//                           styles.cardRating,
-//                           { color: theme.textSecondary },
-//                         ]}
-//                       >
-//                         {manufacturer.rating}
-//                       </Text>
-//                     </View>
-//                   </View>
-//                 </TouchableOpacity>
-//               ))}
-//             </ScrollView>
-//           </View>
-//         </FadeIn>
-//       </View>
-//     </MainContainer>
-//   );
-// };
-
-// export default Map;
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//   },
-//   loadingContainer: {
-//     flex: 1,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     gap: 16,
-//   },
-//   loadingText: {
-//     fontSize: 14,
-//     fontWeight: "500",
-//   },
-//   permissionContainer: {
-//     flex: 1,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     paddingHorizontal: 32,
-//     gap: 16,
-//   },
-//   permissionTitle: {
-//     fontSize: 20,
-//     fontWeight: "700",
-//     textAlign: "center",
-//   },
-//   permissionText: {
-//     fontSize: 14,
-//     textAlign: "center",
-//     marginBottom: 8,
-//   },
-//   permissionButton: {
-//     paddingHorizontal: 24,
-//     paddingVertical: 12,
-//     borderRadius: 12,
-//     marginTop: 8,
-//   },
-//   permissionButtonText: {
-//     fontSize: 16,
-//     fontWeight: "600",
-//   },
-//   header: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     paddingHorizontal: 16,
-//     paddingVertical: 12,
-//   },
-//   greeting: {
-//     fontSize: 13,
-//     fontWeight: "500",
-//     marginBottom: 4,
-//   },
-//   title: {
-//     fontSize: 22,
-//     fontWeight: "700",
-//   },
-//   refreshButton: {
-//     width: 40,
-//     height: 40,
-//     borderRadius: 12,
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   mapContainer: {
-//     height: height * 0.5,
-//     marginHorizontal: 16,
-//     borderRadius: 20,
-//     overflow: "hidden",
-//     marginVertical: 8,
-//     shadowColor: "#000",
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.1,
-//     shadowRadius: 8,
-//     elevation: 4,
-//   },
-//   map: {
-//     width: "100%",
-//     height: "100%",
-//   },
-//   customMarker: {
-//     width: 36,
-//     height: 36,
-//     borderRadius: 18,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     borderWidth: 2,
-//     shadowColor: "#000",
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.25,
-//     shadowRadius: 4,
-//     elevation: 3,
-//   },
-//   callout: {
-//     width: 240,
-//     padding: 0,
-//     borderRadius: 12,
-//     overflow: "hidden",
-//   },
-//   calloutContent: {
-//     padding: 12,
-//   },
-//   calloutTitle: {
-//     fontSize: 14,
-//     fontWeight: "700",
-//     marginBottom: 4,
-//   },
-//   calloutAddress: {
-//     fontSize: 11,
-//     marginBottom: 6,
-//   },
-//   calloutRow: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 4,
-//     marginBottom: 4,
-//   },
-//   calloutDistance: {
-//     fontSize: 11,
-//   },
-//   calloutRating: {
-//     fontSize: 11,
-//   },
-//   calloutButton: {
-//     marginTop: 8,
-//     paddingVertical: 6,
-//     borderRadius: 8,
-//     alignItems: "center",
-//   },
-//   calloutButtonText: {
-//     fontSize: 12,
-//     fontWeight: "600",
-//   },
-//   recenterButton: {
-//     position: "absolute",
-//     bottom: 12,
-//     right: 12,
-//     width: 44,
-//     height: 44,
-//     borderRadius: 22,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     shadowColor: "#000",
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.2,
-//     shadowRadius: 4,
-//     elevation: 4,
-//   },
-//   bottomListContainer: {
-//     marginTop: 16,
-//     flex: 1,
-//   },
-//   bottomListHeader: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     paddingHorizontal: 16,
-//     marginBottom: 12,
-//   },
-//   bottomListTitle: {
-//     fontSize: 16,
-//     fontWeight: "700",
-//   },
-//   seeAllText: {
-//     fontSize: 13,
-//     fontWeight: "600",
-//   },
-//   horizontalList: {
-//     flexGrow: 0,
-//   },
-//   horizontalListContent: {
-//     paddingRight: 16,
-//     gap: 12,
-//   },
-//   manufacturerCard: {
-//     width: 140,
-//     padding: 12,
-//     borderRadius: 12,
-//     borderWidth: 1,
-//     alignItems: "center",
-//     gap: 8,
-//   },
-//   cardIconContainer: {
-//     width: 50,
-//     height: 50,
-//     borderRadius: 25,
-//     backgroundColor: "rgba(75, 179, 126, 0.1)",
-//     justifyContent: "center",
-//     alignItems: "center",
-//     marginBottom: 4,
-//   },
-//   cardName: {
-//     fontSize: 13,
-//     fontWeight: "600",
-//     textAlign: "center",
-//   },
-//   cardDetails: {
-//     flexDirection: "row",
-//     gap: 12,
-//     marginTop: 4,
-//   },
-//   cardRow: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 4,
-//   },
-//   cardDistance: {
-//     fontSize: 11,
-//   },
-//   cardRating: {
-//     fontSize: 11,
-//   },
-// });
-
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+/* ================= COMPONENT ================= */
 
 const Map = () => {
+  const theme = Colors[useColorScheme() ?? "light"];
+  const insets = useSafeAreaInsets();
+
+  // Tab bar height: 49pt on iOS + bottom inset, 56dp on Android
+  const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 49 + insets.bottom : 56;
+
+  const mapRef = useRef<MapView>(null);
+
+  const [userLocation, setUserLocation] = useState<Region | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  /* ================= MODAL ================= */
+
+  const openModal = (company: Company) => {
+    setSelectedCompany(company);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setTimeout(() => setSelectedCompany(null), 300);
+  };
+
+  /* ================= LOCATION & DATA ================= */
+
+  const fetchCompanies = async (lat: number, lon: number) => {
+    setFetching(true);
+    await new Promise((r) => setTimeout(r, 600));
+    const data = generateMockCompanies(lat, lon, 8, 20);
+    setCompanies(data);
+    setFetching(false);
+  };
+
+  const getLocation = async () => {
+    try {
+      setLoading(true);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Location access is needed to show nearby companies. Falling back to Kumasi.",
+        );
+        const fallback: Region = {
+          latitude: 6.6885,
+          longitude: -1.6244,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        };
+        setUserLocation(fallback);
+        await fetchCompanies(fallback.latitude, fallback.longitude);
+        return;
+      }
+
+      // ✅ Real current position with highest accuracy
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+      });
+
+      const region: Region = {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+
+      setUserLocation(region);
+      await fetchCompanies(region.latitude, region.longitude);
+    } catch (e) {
+      Alert.alert("Error", "Failed to get your location. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getLocation();
+  }, []);
+
+  const centerUser = () => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion(userLocation, 800);
+    }
+  };
+
+  /* ================= LOADING ================= */
+
+  if (loading || !userLocation) {
+    return (
+      <MainContainer safe>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text }]}>
+            Getting your location...
+          </Text>
+        </View>
+      </MainContainer>
+    );
+  }
+
+  /* ================= UI ================= */
+
   return (
-    <View>
-      <Text>Map</Text>
-    </View>
+    <MainContainer>
+      <View style={styles.container}>
+        {/* MAP */}
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          provider={
+            Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
+          }
+          initialRegion={userLocation}
+          showsUserLocation
+          showsMyLocationButton={false}
+          showsCompass
+        >
+          {companies.map((c) => (
+            <Marker
+              key={c.id}
+              coordinate={c.coordinate}
+              pinColor={c.rating > 4.7 ? "#FFD700" : "#F06292"}
+              onPress={() => openModal(c)}
+            />
+          ))}
+        </MapView>
+
+        {/* FETCHING OVERLAY */}
+        {fetching && (
+          <View style={styles.topOverlay}>
+            <ActivityIndicator color="#fff" size="small" />
+            <Text style={styles.overlayText}>Updating...</Text>
+          </View>
+        )}
+
+        {/* ✅ CENTER BUTTON — sits above tab bar */}
+        <TouchableOpacity
+          style={[styles.centerBtn, { bottom: TAB_BAR_HEIGHT + 16 }]}
+          onPress={centerUser}
+          activeOpacity={0.8}
+        >
+          <Text style={{ fontSize: 22 }}>📍</Text>
+        </TouchableOpacity>
+
+        {/* ================= MODAL ================= */}
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={closeModal}
+          statusBarTranslucent
+        >
+          {/* Backdrop — tap to dismiss */}
+          <Pressable style={styles.modalBackdrop} onPress={closeModal}>
+            {/* Inner Pressable blocks propagation so tapping card doesn't close */}
+            <Pressable
+              style={[styles.modalCard, { height: SCREEN_HEIGHT * 0.5 }]}
+              onPress={() => {}}
+            >
+              {/* Handle bar */}
+              <View style={styles.handle} />
+
+              {/* Close button */}
+              <TouchableOpacity style={styles.closeBtn} onPress={closeModal}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+
+              {selectedCompany && (
+                <View style={styles.modalContent}>
+                  <Text style={styles.title}>{selectedCompany.name}</Text>
+
+                  <View style={styles.divider} />
+
+                  <View style={styles.row}>
+                    <Text style={styles.rowIcon}>⭐</Text>
+                    <Text style={styles.rowText}>
+                      {selectedCompany.rating} Rating
+                    </Text>
+                  </View>
+
+                  <View style={styles.row}>
+                    <Text style={styles.rowIcon}>📍</Text>
+                    <Text style={styles.rowText}>
+                      {selectedCompany.address}
+                    </Text>
+                  </View>
+
+                  <View style={styles.row}>
+                    <Text style={styles.rowIcon}>🗺️</Text>
+                    <Text style={styles.rowText}>
+                      {(selectedCompany.distance / 1000).toFixed(1)} km away
+                    </Text>
+                  </View>
+
+                  <View style={styles.row}>
+                    <Text style={styles.rowIcon}>
+                      {selectedCompany.verified ? "✅" : "❌"}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.rowText,
+                        {
+                          color: selectedCompany.verified
+                            ? "#2e7d32"
+                            : "#c62828",
+                          fontWeight: "600",
+                        },
+                      ]}
+                    >
+                      {selectedCompany.verified ? "Verified" : "Unverified"}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity style={styles.ctaBtn} onPress={closeModal}>
+                    <Text style={styles.ctaBtnText}>View Details</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      </View>
+    </MainContainer>
   );
 };
 
 export default Map;
 
-const styles = StyleSheet.create({});
+/* ================= STYLES ================= */
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  map: { flex: 1 },
+
+  loading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+  },
+
+  topOverlay: {
+    position: "absolute",
+    top: 16,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  overlayText: {
+    color: "#fff",
+    marginLeft: 8,
+    fontSize: 13,
+  },
+
+  /* ✅ No hardcoded bottom — set dynamically via TAB_BAR_HEIGHT */
+  centerBtn: {
+    position: "absolute",
+    right: 20,
+    backgroundColor: "#fff",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+  },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+
+  modalCard: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 20,
+  },
+
+  handle: {
+    width: 44,
+    height: 5,
+    backgroundColor: "#ddd",
+    borderRadius: 3,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+
+  closeBtn: {
+    position: "absolute",
+    top: 16,
+    right: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeBtnText: {
+    fontSize: 13,
+    color: "#555",
+    fontWeight: "600",
+  },
+
+  modalContent: {
+    flex: 1,
+    marginTop: 8,
+  },
+
+  title: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 12,
+    marginRight: 36,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: "#eee",
+    marginBottom: 16,
+  },
+
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  rowIcon: {
+    fontSize: 18,
+    width: 32,
+  },
+  rowText: {
+    fontSize: 15,
+    color: "#333",
+    flex: 1,
+  },
+
+  ctaBtn: {
+    marginTop: "auto",
+    backgroundColor: "#111",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  ctaBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+});

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MakersHub",
-    "slug": "MakersHub",
+    "slug": "makershub",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,17 +10,31 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.MakersHub"
+      "bundleIdentifier": "com.anonymous.MakersHub",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Allow MakersHub to access your location to show nearby companies.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow MakersHub to access your location even in the background for better recommendations.",
+        "NSLocationAlwaysUsageDescription": "Allow MakersHub to access your location for continuous updates."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#E6F4FE"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.anonymous.MakersHub"
     },
     "web": {
       "output": "static",
@@ -40,12 +54,25 @@
           }
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow MakersHub to access your location to show nearby companies.",
+          "locationAlwaysPermission": "Allow MakersHub to access your location even in the background."
+        }
+      ],
       "expo-font",
       "expo-image"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "39c9d52c-934b-4b87-a7a6-984658243fa2"
+      }
+    },
+    "owner": "0xcyril01"
   }
 }

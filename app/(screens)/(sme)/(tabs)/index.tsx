@@ -175,84 +175,81 @@ const SMEHome = () => {
 
   return (
     <MainContainer safe>
+      {/* Header */}
+      <FadeIn delay={0}>
+        <View style={styles.header}>
+          <View>
+            <ThemedText
+              style={[styles.greeting, { color: theme.textSecondary }]}
+            >
+              Good {greeting} 👋
+            </ThemedText>
+            <Text style={[styles.companyName, { color: theme.text }]}>
+              Tech Innovations Ltd {/**company name here */}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() =>
+              router.push("/(screens)/(sme)/(screens)/notifications")
+            }
+            style={[styles.notificationIcon, { backgroundColor: theme.border }]}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={20}
+              color={theme.icon}
+            />
+          </TouchableOpacity>
+        </View>
+      </FadeIn>
+
+      {/* Post a Job Button */}
+      <FadeIn delay={100}>
+        <TouchableOpacity
+          onPress={() => {
+            router.push("/(screens)/(sme)/(screens)/postJob");
+          }}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[theme.primary, "#2E9D5F"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.postJobButton}
+          >
+            <Ionicons
+              name="add-circle"
+              size={24}
+              color={theme.onPrimary}
+              style={styles.postJobIcon}
+            />
+            <View>
+              <Text style={[styles.postJobTitle, { color: theme.onPrimary }]}>
+                Post a New Job
+              </Text>
+              <Text
+                style={[
+                  styles.postJobSubtitle,
+                  { color: theme.onPrimary + "CC" },
+                ]}
+              >
+                Get quotes from vetted SMEs
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={theme.onPrimary}
+              style={{ marginLeft: "auto" }}
+            />
+          </LinearGradient>
+        </TouchableOpacity>
+      </FadeIn>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Header */}
-        <FadeIn delay={0}>
-          <View style={styles.header}>
-            <View>
-              <ThemedText
-                style={[styles.greeting, { color: theme.textSecondary }]}
-              >
-                Good {greeting} 👋
-              </ThemedText>
-              <Text style={[styles.companyName, { color: theme.text }]}>
-                Tech Innovations Ltd {/**company name here */}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() =>
-                router.push("/(screens)/(sme)/(screens)/notifications")
-              }
-              style={[
-                styles.notificationIcon,
-                { backgroundColor: theme.border },
-              ]}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={20}
-                color={theme.icon}
-              />
-            </TouchableOpacity>
-          </View>
-        </FadeIn>
-
-        {/* Post a Job Button */}
-        <FadeIn delay={100}>
-          <TouchableOpacity
-            onPress={() => {
-              router.push("/(screens)/(sme)/(screens)/postJob");
-            }}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={[theme.primary, "#2E9D5F"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.postJobButton}
-            >
-              <Ionicons
-                name="add-circle"
-                size={24}
-                color={theme.onPrimary}
-                style={styles.postJobIcon}
-              />
-              <View>
-                <Text style={[styles.postJobTitle, { color: theme.onPrimary }]}>
-                  Post a New Job
-                </Text>
-                <Text
-                  style={[
-                    styles.postJobSubtitle,
-                    { color: theme.onPrimary + "CC" },
-                  ]}
-                >
-                  Get quotes from vetted SMEs
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={theme.onPrimary}
-                style={{ marginLeft: "auto" }}
-              />
-            </LinearGradient>
-          </TouchableOpacity>
-        </FadeIn>
-
         {/* Stats Grid */}
         <FadeIn delay={150}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -270,6 +267,8 @@ const SMEHome = () => {
             />
           ))}
         </View>
+
+        <Spacer style={{ height: 5 }} />
 
         {/* Recent Activity Section */}
         <FadeIn delay={400}>
@@ -372,10 +371,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     paddingHorizontal: 16,
     gap: 12,
-    marginBottom: 12,
   },
   statCard: {
-    // width: (width - 44) / 2,
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
@@ -389,7 +386,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
   },
   statValue: {
     fontSize: 18,
@@ -408,10 +404,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    marginTop: 16,
   },
   activityList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     gap: 12,
     marginTop: 12,
   },
