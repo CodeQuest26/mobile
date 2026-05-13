@@ -1,6 +1,7 @@
 import MainContainer from "@/components/MainContainer";
 import PostJobForm from "@/components/sme/PostJobForm";
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -12,7 +13,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 

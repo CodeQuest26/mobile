@@ -2,6 +2,7 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
@@ -11,7 +12,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 

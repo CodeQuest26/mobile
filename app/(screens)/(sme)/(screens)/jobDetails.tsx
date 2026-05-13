@@ -1,19 +1,12 @@
-import FadeIn from "@/components/common/FadeIn";
 import MainContainer from "@/components/MainContainer";
-import BidCard from "@/components/sme/BidCard";
-import ManufacturerModal from "@/components/sme/ManufacturerModal";
 import Colors from "@/constants/colors";
-import {
-  BidStatus,
-  getDaysUntilDeadline,
-  getJobWithBids,
-  JobWithBids,
-} from "@/constants/Jobstore";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef } from "react";
 import {
-  Image,
+  Alert,
+  Animated,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,435 +15,627 @@ import {
   View,
 } from "react-native";
 
-// ─── Constants (only those needed in this file) ───────────────────────────────
-const CATEGORY_COLORS: Record<string, string> = {
-  Packaging: "#3B82F6",
-  Hardware: "#8B5CF6",
-  Electronics: "#06B6D4",
-  Textiles: "#EC4899",
-  "Food Processing": "#F97316",
+const { width } = Dimensions.get("window");
+
+// FadeIn animation component
+const FadeIn = ({
+  children,
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+}) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(18)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 420,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 380,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      {children}
+    </Animated.View>
+  );
 };
-const getCategoryColor = (cat: string) => CATEGORY_COLORS[cat] ?? "#6B7280";
 
-// Info row component (unchanged)
-const InfoRow = ({ icon, label, value, theme, valueColor }: any) => (
-  <View style={styles.infoRow}>
-    <View
-      style={[styles.infoIconWrap, { backgroundColor: theme.primary + "15" }]}
-    >
-      <Ionicons name={icon} size={15} color={theme.primary} />
-    </View>
-    <View style={styles.infoTextWrap}>
-      <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
-        {label}
-      </Text>
-      <Text style={[styles.infoValue, { color: valueColor ?? theme.text }]}>
-        {value}
-      </Text>
-    </View>
-  </View>
-);
+// Mock data (same as in jobs.tsx)
+const MOCK_BIDS = [
+  {
+    id: "b1",
+    jobId: "j1",
+    manufacturerId: "m1",
+    manufacturerName: "Accra Metal Works",
+    amount: "GH₵ 48,500",
+    deliveryTime: "21 days",
+    notes:
+      "ISO 9001 certified with 10+ years experience in beverage packaging. We have state-of-the-art printing equipment and can handle custom branding requirements.",
+    submittedAt: "2025-04-29",
+    status: "pending",
+    rating: 4.8,
+    completedJobs: 89,
+  },
+  {
+    id: "b2",
+    jobId: "j1",
+    manufacturerId: "m2",
+    manufacturerName: "Ghana Industrial Ltd",
+    amount: "GH₵ 51,200",
+    deliveryTime: "18 days",
+    notes:
+      "Full-service manufacturing with integrated design capabilities. Our facility includes CNC machining and custom printing services.",
+    submittedAt: "2025-04-30",
+    status: "pending",
+    rating: 4.6,
+    completedJobs: 156,
+  },
+  {
+    id: "b3",
+    jobId: "j1",
+    manufacturerId: "m3",
+    manufacturerName: "Tema Manufacturing Co.",
+    amount: "GH₵ 49,800",
+    deliveryTime: "25 days",
+    notes:
+      "Specialized in metal packaging solutions with extensive quality control processes. We offer competitive pricing with guaranteed delivery.",
+    submittedAt: "2025-04-28",
+    status: "pending",
+    rating: 4.4,
+    completedJobs: 67,
+  },
+];
 
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+const SME_JOBS = [
+  {
+    id: "j1",
+    category: "Packaging",
+    product: "Aluminium Beverage Cans",
+    quantity: "10,000 units",
+    budget: "GH₵ 52,000",
+    location: "Spintex Road, Accra",
+    description:
+      "We need a reliable manufacturer to produce 10,000 aluminium beverage cans with custom printed branding. Cans must meet food-grade standards and be ready for filling at our Spintex facility.",
+    deadline: "2025-05-15",
+    postedAt: "2025-04-28",
+    status: "active",
+    bidsCount: 8,
+    image:
+      "https://5.imimg.com/data5/SELLER/Default/2025/10/549803421/JE/WZ/UK/136717440/500ml-aluminium-beverage-can-1000x1000.png",
+  },
+];
+
+interface BidCardProps {
+  bid: any;
+  theme: any;
+  delay: number;
+  onAccept: (bidId: string) => void;
+  onViewProfile: (manufacturerId: string) => void;
+}
+
+const BidCard = ({
+  bid,
+  theme,
+  delay,
+  onAccept,
+  onViewProfile,
+}: BidCardProps) => {
+  return (
+    <FadeIn delay={delay}>
+      <View
+        style={[
+          styles.bidCard,
+          { backgroundColor: theme.cardBackground, borderColor: theme.border },
+        ]}
+      >
+        {/* Header */}
+        <View style={styles.bidHeader}>
+          <TouchableOpacity
+            onPress={() => onViewProfile(bid.manufacturerId)}
+            style={styles.manufacturerInfo}
+          >
+            <View
+              style={[styles.avatar, { backgroundColor: theme.primary + "20" }]}
+            >
+              <Text style={[styles.avatarText, { color: theme.primary }]}>
+                {bid.manufacturerName
+                  .split(" ")
+                  .map((n: string) => n[0])
+                  .join("")}
+              </Text>
+            </View>
+            <View style={styles.manufacturerDetails}>
+              <Text style={[styles.manufacturerName, { color: theme.text }]}>
+                {bid.manufacturerName}
+              </Text>
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={12} color="#FBBF24" />
+                <Text
+                  style={[styles.ratingText, { color: theme.textSecondary }]}
+                >
+                  {bid.rating} ({bid.completedJobs} jobs)
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+          <Text style={[styles.bidAmount, { color: theme.primary }]}>
+            {bid.amount}
+          </Text>
+        </View>
+
+        {/* Bid Details */}
+        <View style={styles.bidDetails}>
+          <View style={styles.detailRow}>
+            <Ionicons
+              name="time-outline"
+              size={16}
+              color={theme.textSecondary}
+            />
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+              Delivery: {bid.deliveryTime}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={theme.textSecondary}
+            />
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+              Submitted: {new Date(bid.submittedAt).toLocaleDateString()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Notes */}
+        <Text style={[styles.bidNotes, { color: theme.text }]}>
+          {bid.notes}
+        </Text>
+
+        {/* Actions */}
+        <View style={styles.bidActions}>
+          <TouchableOpacity
+            onPress={() => onViewProfile(bid.manufacturerId)}
+            style={[styles.secondaryBtn, { borderColor: theme.border }]}
+          >
+            <Text style={[styles.secondaryBtnText, { color: theme.text }]}>
+              View Profile
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onAccept(bid.id)}
+            style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
+          >
+            <Text style={[styles.primaryBtnText, { color: theme.onPrimary }]}>
+              Accept Bid
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </FadeIn>
+  );
+};
+
 const JobDetails = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
 
-  const [job, setJob] = useState<JobWithBids | undefined>(() =>
-    getJobWithBids(id),
-  );
-  const [selectedBid, setSelectedBid] = useState<any | null>(null);
+  // Mock job data - in real app, fetch by ID
+  const job = SME_JOBS.find((j) => j.id === id) || SME_JOBS[0];
+  const bids = MOCK_BIDS.filter((b) => b.jobId === id);
 
-  if (!job) {
-    return (
-      <MainContainer safe>
-        <View style={styles.notFound}>
-          <Ionicons
-            name="alert-circle-outline"
-            size={48}
-            color={theme.textSecondary}
-          />
-          <Text style={[styles.notFoundText, { color: theme.textSecondary }]}>
-            No Available Job Found.
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[styles.backBtn, { backgroundColor: theme.primary }]}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </MainContainer>
+  const handleAcceptBid = (bidId: string) => {
+    Alert.alert(
+      "Accept Bid",
+      "Are you sure you want to accept this bid? This will create a binding contract with the manufacturer.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Accept",
+          style: "destructive",
+          onPress: () => {
+            // TODO: Accept bid API call
+            Alert.alert(
+              "Success",
+              "Bid accepted! The manufacturer will be notified.",
+            );
+          },
+        },
+      ],
     );
-  }
-
-  const daysLeft = getDaysUntilDeadline(job.deadline);
-  const isUrgent = daysLeft <= 7 && job.status === "active";
-
-  const handleAcceptBid = () => {
-    if (!selectedBid) return;
-    setJob((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        bids: prev.bids.map((b) =>
-          b.id === selectedBid.id
-            ? { ...b, status: "accepted" as BidStatus }
-            : b.status === "pending"
-              ? { ...b, status: "rejected" as BidStatus }
-              : b,
-        ),
-      };
-    });
-    setSelectedBid(null);
   };
 
-  const handleRejectBid = () => {
-    if (!selectedBid) return;
-    setJob((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        bids: prev.bids.map((b) =>
-          b.id === selectedBid.id
-            ? { ...b, status: "rejected" as BidStatus }
-            : b,
-        ),
-      };
-    });
-    setSelectedBid(null);
+  const handleViewProfile = (manufacturerId: string) => {
+    // TODO: Navigate to manufacturer profile
+    console.log("Navigate to manufacturer profile:", manufacturerId);
   };
+
+  const daysLeft = Math.ceil(
+    (new Date(job.deadline).getTime() - new Date().getTime()) /
+      (1000 * 60 * 60 * 24),
+  );
 
   return (
     <MainContainer safe>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 48 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {/* Header */}
         <FadeIn delay={0}>
-          <View style={styles.detailHeader}>
+          <View style={styles.header}>
             <TouchableOpacity
               onPress={() => router.back()}
-              style={[
-                styles.backCircleBtn,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
+              style={styles.backBtn}
             >
-              <Ionicons name="chevron-back" size={20} color={theme.text} />
+              <Ionicons name="chevron-back" size={24} color={theme.text} />
             </TouchableOpacity>
-            <Text style={[styles.detailHeaderTitle, { color: theme.text }]}>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>
               Job Details
             </Text>
-            <TouchableOpacity
-              style={[
-                styles.editBtn,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Ionicons name="create-outline" size={18} color={theme.primary} />
+            <View style={{ width: 32 }} />
+          </View>
+        </FadeIn>
+
+        {/* Job Overview */}
+        <FadeIn delay={50}>
+          <View
+            style={[
+              styles.jobOverview,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <View style={styles.jobHeader}>
+              <Text style={[styles.jobTitle, { color: theme.text }]}>
+                {job.product}
+              </Text>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: "#10B981" + "20" },
+                ]}
+              >
+                <Text style={[styles.statusText, { color: "#10B981" }]}>
+                  Active
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.jobCategory, { color: theme.textSecondary }]}>
+              {job.category} • {job.quantity}
+            </Text>
+
+            <View style={styles.jobStats}>
+              <View style={styles.stat}>
+                <Ionicons name="cash-outline" size={20} color={theme.primary} />
+                <Text style={[styles.statValue, { color: theme.primary }]}>
+                  {job.budget}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.textSecondary }]}
+                >
+                  Budget
+                </Text>
+              </View>
+              <View style={styles.stat}>
+                <Ionicons
+                  name="location-outline"
+                  size={20}
+                  color={theme.textSecondary}
+                />
+                <Text style={[styles.statValue, { color: theme.text }]}>
+                  {job.location}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.textSecondary }]}
+                >
+                  Location
+                </Text>
+              </View>
+              <View style={styles.stat}>
+                <Ionicons
+                  name="time-outline"
+                  size={20}
+                  color={daysLeft <= 7 ? "#EF4444" : theme.textSecondary}
+                />
+                <Text style={[styles.statValue, { color: theme.text }]}>
+                  {daysLeft > 0 ? `${daysLeft} days` : "Overdue"}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.textSecondary }]}
+                >
+                  Deadline
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.jobDescription, { color: theme.text }]}>
+              {job.description}
+            </Text>
+          </View>
+        </FadeIn>
+
+        {/* Bids Section */}
+        <FadeIn delay={100}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Bids Received ({bids.length})
+            </Text>
+            <TouchableOpacity>
+              <Text style={{ color: theme.primary, fontWeight: "600" }}>
+                Sort by Price
+              </Text>
             </TouchableOpacity>
           </View>
         </FadeIn>
 
-        <FadeIn delay={40}>
-          <View
-            style={[
-              styles.heroCard,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <View style={styles.heroInner}>
-              <View style={styles.heroTop}>
-                <View style={styles.heroLeft}>
-                  <Text style={[styles.heroTitle, { color: theme.text }]}>
-                    {job.product}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.heroQuantity,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {job.quantity}
-                  </Text>
-                </View>
-                {job.image && (
-                  <Image
-                    source={{ uri: job.image }}
-                    style={[styles.heroImage, { borderColor: theme.border }]}
-                    resizeMode="contain"
-                  />
-                )}
-              </View>
+        {bids.length > 0 ? (
+          <View style={styles.bidsContainer}>
+            {bids.map((bid, index) => (
+              <BidCard
+                key={bid.id}
+                bid={bid}
+                theme={theme}
+                delay={150 + index * 50}
+                onAccept={handleAcceptBid}
+                onViewProfile={handleViewProfile}
+              />
+            ))}
+          </View>
+        ) : (
+          <FadeIn delay={150}>
+            <View style={styles.emptyBids}>
+              <Ionicons
+                name="people-outline"
+                size={48}
+                color={theme.textSecondary}
+                style={{ marginBottom: 16 }}
+              />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                No Bids Yet
+              </Text>
               <Text
-                style={[
-                  styles.heroDescription,
-                  { color: theme.textSecondary, borderTopColor: theme.border },
-                ]}
+                style={[styles.emptySubtitle, { color: theme.textSecondary }]}
               >
-                {job.description}
+                Manufacturers are reviewing your job. Bids will appear here
+                soon.
               </Text>
             </View>
-          </View>
-        </FadeIn>
-
-        <FadeIn delay={80}>
-          <View
-            style={[
-              styles.infoCard,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <InfoRow
-              icon="cash-outline"
-              label="Budget"
-              value={job.budget}
-              theme={theme}
-              valueColor={theme.primary}
-            />
-            <View
-              style={[
-                styles.infoCardDivider,
-                { backgroundColor: theme.border },
-              ]}
-            />
-            <InfoRow
-              icon="location-outline"
-              label="Location"
-              value={job.location}
-              theme={theme}
-            />
-            <View
-              style={[
-                styles.infoCardDivider,
-                { backgroundColor: theme.border },
-              ]}
-            />
-            <InfoRow
-              icon="calendar-outline"
-              label="Deadline"
-              value={job.deadline}
-              theme={theme}
-              valueColor={isUrgent ? "#EF4444" : undefined}
-            />
-            <View
-              style={[
-                styles.infoCardDivider,
-                { backgroundColor: theme.border },
-              ]}
-            />
-            <InfoRow
-              icon="time-outline"
-              label="Posted"
-              value={job.postedAt}
-              theme={theme}
-            />
-          </View>
-        </FadeIn>
-
-        <FadeIn delay={120}>
-          <View style={styles.bidsSection}>
-            <View style={styles.bidsSectionHeader}>
-              <Text style={[styles.bidsSectionTitle, { color: theme.text }]}>
-                Bids Received
-              </Text>
-              <View
-                style={[
-                  styles.bidsCountBubble,
-                  { backgroundColor: theme.primary },
-                ]}
-              >
-                <Text style={styles.bidsCountBubbleText}>
-                  {job.bids.length}
-                </Text>
-              </View>
-            </View>
-            {job.bids.length === 0 ? (
-              <View
-                style={[
-                  styles.noBidsBox,
-                  {
-                    backgroundColor: theme.cardBackground,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="hourglass-outline"
-                  size={32}
-                  color={theme.textSecondary}
-                />
-                <Text
-                  style={[styles.noBidsText, { color: theme.textSecondary }]}
-                >
-                  No bids yet. Manufacturers will respond soon.
-                </Text>
-              </View>
-            ) : (
-              job.bids.map((bid, i) => (
-                <BidCard
-                  key={bid.id}
-                  bid={bid}
-                  theme={theme}
-                  delay={160 + i * 60}
-                  onPress={() => setSelectedBid(bid)}
-                />
-              ))
-            )}
-          </View>
-        </FadeIn>
+          </FadeIn>
+        )}
       </ScrollView>
-
-      <ManufacturerModal
-        visible={!!selectedBid}
-        manufacturer={selectedBid?.manufacturer ?? null}
-        bid={selectedBid}
-        theme={theme}
-        onClose={() => setSelectedBid(null)}
-        onAccept={handleAcceptBid}
-        onReject={handleRejectBid}
-      />
     </MainContainer>
   );
 };
 
+export default JobDetails;
+
 const styles = StyleSheet.create({
-  detailHeader: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 8,
   },
-  backCircleBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
   },
-  detailHeaderTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.3 },
-  editBtn: {
-    width: 40,
-    height: 40,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  // Job Overview
+  jobOverview: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+  },
+  jobHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  jobTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    flex: 1,
+    marginRight: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  jobCategory: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 16,
+  },
+  jobStats: {
+    flexDirection: "row",
+    marginBottom: 16,
+    gap: 20,
+  },
+  stat: {
     alignItems: "center",
+    flex: 1,
   },
-  heroCard: {
-    marginHorizontal: 20,
-    borderRadius: 18,
+  statValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: "400",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  jobDescription: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  // Bids Section
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  bidsContainer: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+
+  // Bid Cards
+  bidCard: {
+    borderRadius: 16,
     borderWidth: 1,
-    overflow: "hidden",
-    marginBottom: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
-    elevation: 4,
+    padding: 16,
   },
-  heroInner: { padding: 16 },
-  heroTop: {
+  bidHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 12,
   },
-  heroLeft: { flex: 1, marginRight: 12 },
-  heroTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-    lineHeight: 27,
-    marginBottom: 4,
-  },
-  heroQuantity: { fontSize: 14, fontWeight: "500" },
-  heroImage: { width: 80, height: 80, borderRadius: 14, borderWidth: 1 },
-  heroDescription: {
-    fontSize: 14,
-    lineHeight: 21,
-    borderTopWidth: 1,
-    paddingTop: 14,
-    marginTop: 4,
-  },
-  infoCard: {
-    marginHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 4,
-    marginBottom: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  infoRow: {
+  manufacturerInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  infoIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  infoTextWrap: { flex: 1 },
-  infoLabel: { fontSize: 11, fontWeight: "500", marginBottom: 2 },
-  infoValue: { fontSize: 15, fontWeight: "600" },
-  infoCardDivider: { height: 1, marginHorizontal: 16, opacity: 0.5 },
-  bidsSection: { paddingHorizontal: 20 },
-  bidsSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 14,
-  },
-  bidsSectionTitle: { fontSize: 20, fontWeight: "800", letterSpacing: -0.4 },
-  bidsCountBubble: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    paddingHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bidsCountBubbleText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  noBidsBox: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 32,
-    alignItems: "center",
-    gap: 12,
-  },
-  noBidsText: { fontSize: 15, textAlign: "center", lineHeight: 22 },
-  notFound: {
     flex: 1,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    gap: 16,
+    marginRight: 12,
   },
-  notFoundText: { fontSize: 16 },
-  backBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-});
+  avatarText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  manufacturerDetails: {
+    flex: 1,
+  },
+  manufacturerName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  bidAmount: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  bidDetails: {
+    marginBottom: 12,
+    gap: 8,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  bidNotes: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  bidActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  secondaryBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  secondaryBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  primaryBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  primaryBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
 
-export default JobDetails;
+  // Empty State
+  emptyBids: {
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    fontWeight: "400",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+});

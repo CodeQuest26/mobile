@@ -4,6 +4,7 @@ import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 // import * as ImagePicker from "expo-image-picker";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -18,7 +19,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 

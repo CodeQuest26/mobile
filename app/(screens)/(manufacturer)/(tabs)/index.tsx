@@ -1,30 +1,27 @@
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  FlatList,
   ImageBackground,
   LayoutChangeEvent,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 
 import { FadeIn } from "@/components/FadeIn";
 import JobPeekCard from "@/components/JobPeekCard";
-import OrderCard from "@/components/OrderCard";
-import {
-  ACTIVE_ORDERS,
-  NEW_JOBS,
-  QUICK_ACTIONS,
-  USER,
-} from "@/constants/manufacturerData";
+import { NEW_JOBS, QUICK_ACTIONS, USER } from "@/constants/manufacturerData";
 
 import MainContainer from "@/components/MainContainer";
+import Spacer from "@/components/Spacer";
 import { router } from "expo-router";
+
 const CardImg = require("../../../../assets/images/Production.jpeg");
 
 const time = new Date().getHours();
@@ -272,7 +269,6 @@ export default function ManufacturerHome() {
                       styles.qaBtn,
                       {
                         backgroundColor: theme.cardBackground,
-                        borderColor: theme.border,
                       },
                     ]}
                   >
@@ -297,29 +293,6 @@ export default function ManufacturerHome() {
             </View>
           </FadeIn>
 
-          {/* Active Orders */}
-          <FadeIn delay={240}>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  Active Orders
-                </Text>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/orders")
-                  }
-                >
-                  <Text style={[styles.seeAll, { color: theme.primary }]}>
-                    See all
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {ACTIVE_ORDERS.map((o, i) => (
-                <OrderCard key={o.id} order={o} theme={theme} delay={i * 60} />
-              ))}
-            </View>
-          </FadeIn>
-
           {/* New Job Posts */}
           <FadeIn delay={320}>
             <View style={styles.section}>
@@ -337,41 +310,50 @@ export default function ManufacturerHome() {
                   </Text>
                 </TouchableOpacity>
               </View>
-              <Animated.ScrollView
-                horizontal
+
+              <Spacer style={{ height: 10 }} />
+
+              <FlatList
+                data={NEW_JOBS.slice(0, 3)}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <JobPeekCard job={item} theme={theme} />
+                )}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.jobsHScroll}
-              >
-                {NEW_JOBS.map((j) => (
-                  <JobPeekCard key={j.id} job={j} theme={theme} />
-                ))}
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/bids" as any)
-                  }
-                  style={[
-                    styles.jobPeekCard,
-                    styles.moreCard,
-                    {
-                      backgroundColor: theme.primary + "12",
-                      borderColor: theme.primary + "30",
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name="grid-outline"
-                    size={28}
-                    color={theme.primary}
-                  />
-                  <Text style={[styles.moreCardText, { color: theme.primary }]}>
-                    View all posts
-                  </Text>
-                </TouchableOpacity>
-              </Animated.ScrollView>
+                ListFooterComponent={
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(
+                        "/(screens)/(manufacturer)/(tabs)/bids" as any,
+                      )
+                    }
+                    style={[
+                      styles.jobPeekCard,
+                      styles.moreCard,
+                      {
+                        backgroundColor: theme.primary + "12",
+                        borderColor: theme.primary + "30",
+                        width: "100%",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="grid-outline"
+                      size={28}
+                      color={theme.primary}
+                    />
+                    <Text
+                      style={[styles.moreCardText, { color: theme.primary }]}
+                    >
+                      View all posts
+                    </Text>
+                  </TouchableOpacity>
+                }
+              />
             </View>
           </FadeIn>
 
-          <View style={{ height: 70 }} />
+          <View style={{ height: 90 }} />
         </Animated.ScrollView>
       </View>
     </MainContainer>
@@ -404,7 +386,6 @@ const styles = StyleSheet.create({
   qaBtn: {
     flex: 1,
     borderRadius: 16,
-    borderWidth: 1,
     paddingVertical: 14,
     alignItems: "center",
     gap: 8,
@@ -417,7 +398,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   qaLabel: { fontSize: 11, fontWeight: "600", textAlign: "center" },
-  jobsHScroll: { paddingRight: 16, gap: 10 },
   jobPeekCard: {
     width: 160,
     borderRadius: 18,

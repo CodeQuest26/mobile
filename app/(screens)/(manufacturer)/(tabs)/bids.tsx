@@ -3,6 +3,7 @@ import MainContainer from "@/components/MainContainer";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import { JOBS, type Job } from "@/constants/manufacturerData";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -13,7 +14,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 

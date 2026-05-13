@@ -61,7 +61,11 @@ export default function ManufacturerProfile() {
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: () => router.replace("/login"),
+      },
     ]);
   };
 
@@ -359,7 +363,7 @@ export default function ManufacturerProfile() {
                 <View style={styles.preferenceRow}>
                   <View style={styles.preferenceLeft}>
                     <Ionicons
-                      name="moon-outline"
+                      name={darkModeEnabled ? "moon-outline" : "sunny-outline"}
                       size={20}
                       color={theme.textSecondary}
                     />

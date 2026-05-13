@@ -9,6 +9,7 @@ import {
   SME_JOBS,
   SMEJob,
 } from "@/constants/Jobstore";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -20,7 +21,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 

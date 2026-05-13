@@ -87,7 +87,6 @@ const JobPeekCard = memo(
           styles.jobPeekCard,
           {
             backgroundColor: theme.cardBackground,
-            borderColor: theme.border,
             shadowColor: theme.text,
           },
           animatedStyle,
@@ -107,7 +106,7 @@ const JobPeekCard = memo(
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: imageUri }}
-            style={styles.jobImage}
+            style={[styles.jobImage]}
             resizeMode="cover"
             onLoadStart={() => setImageLoading(true)}
             onLoadEnd={() => setImageLoading(false)}
@@ -116,6 +115,7 @@ const JobPeekCard = memo(
               setImageLoading(false);
             }}
           />
+
           {imageLoading && (
             <View
               style={[styles.imageLoader, { backgroundColor: theme.border }]}
@@ -127,24 +127,6 @@ const JobPeekCard = memo(
             colors={["transparent", "rgba(0,0,0,0.6)"]}
             style={styles.imageOverlay}
           />
-
-          {/* Category Pill */}
-          <View style={styles.categoryPill}>
-            <Text style={styles.categoryText}>{category}</Text>
-          </View>
-
-          {/* Save Button */}
-          <TouchableOpacity
-            style={[styles.saveButton, { backgroundColor: "rgba(0,0,0,0.5)" }]}
-            onPress={handleSave}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons
-              name={isSaved ? "bookmark" : "bookmark-outline"}
-              size={16}
-              color={theme.warning}
-            />
-          </TouchableOpacity>
         </View>
 
         {/* Content Section */}
@@ -189,25 +171,7 @@ const JobPeekCard = memo(
             <Text style={[styles.jobPeekBudget, { color: theme.primary }]}>
               {job.budget}
             </Text>
-            <View style={styles.bidsRow}>
-              <Ionicons
-                name="people-outline"
-                size={12}
-                color={theme.textSecondary}
-              />
-              <Text style={[styles.bidsText, { color: theme.textSecondary }]}>
-                {bids} {bids === 1 ? "bid" : "bids"}
-              </Text>
-            </View>
-          </View>
 
-          <View style={styles.footerRow}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={[styles.ratingText, { color: theme.textSecondary }]}>
-                {rating.toFixed(1)}
-              </Text>
-            </View>
             <View style={styles.timeContainer}>
               <Ionicons
                 name="time-outline"
@@ -229,9 +193,7 @@ export default JobPeekCard;
 
 const styles = StyleSheet.create({
   jobPeekCard: {
-    width: CARD_WIDTH,
     borderRadius: 20,
-    borderWidth: 1,
     overflow: "hidden",
     marginBottom: 16,
     shadowOffset: { width: 0, height: 4 },

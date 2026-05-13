@@ -1,6 +1,7 @@
 // src/app/(auth)/ForgotPasswordScreen.tsx
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -14,7 +15,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 

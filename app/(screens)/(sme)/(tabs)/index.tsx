@@ -1,19 +1,19 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
+import Map from "@/components/sme/Map";
 import Spacer from "@/components/Spacer";
 import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
   Dimensions,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 
@@ -176,7 +176,12 @@ const SMEHome = () => {
   return (
     <MainContainer safe>
       {/* Header */}
-      <FadeIn delay={0}>
+
+      <View
+        style={{
+          paddingHorizontal: 15,
+        }}
+      >
         <View style={styles.header}>
           <View>
             <ThemedText
@@ -201,10 +206,8 @@ const SMEHome = () => {
             />
           </TouchableOpacity>
         </View>
-      </FadeIn>
 
-      {/* Post a Job Button */}
-      <FadeIn delay={100}>
+        {/* Post a Job Button */}
         <TouchableOpacity
           onPress={() => {
             router.push("/(screens)/(sme)/(screens)/postJob");
@@ -244,13 +247,15 @@ const SMEHome = () => {
             />
           </LinearGradient>
         </TouchableOpacity>
-      </FadeIn>
 
-      <ScrollView
+        <Spacer style={{ height: 30 }} />
+      </View>
+
+      {/* <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Stats Grid */}
+        Stats Grid
         <FadeIn delay={150}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
             Overview
@@ -270,7 +275,7 @@ const SMEHome = () => {
 
         <Spacer style={{ height: 5 }} />
 
-        {/* Recent Activity Section */}
+        Recent Activity Section
         <FadeIn delay={400}>
           <View style={styles.activityHeader}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -296,7 +301,18 @@ const SMEHome = () => {
         </View>
 
         <Spacer style={{ height: 70 }} />
-      </ScrollView>
+      </ScrollView> */}
+
+      <View
+        style={{
+          flex: 1,
+          borderTopLeftRadius: 30,
+          borderTopRightRadius: 30,
+          overflow: "hidden",
+        }}
+      >
+        <Map />
+      </View>
     </MainContainer>
   );
 };
@@ -308,9 +324,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
     paddingVertical: 16,
-    marginBottom: 8,
   },
   greeting: {
     fontSize: 14,
@@ -331,8 +345,6 @@ const styles = StyleSheet.create({
 
   // Post a Job Button
   postJobButton: {
-    marginHorizontal: 16,
-    marginVertical: 12,
     borderRadius: 16,
     padding: 16,
     flexDirection: "row",
@@ -443,4 +455,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     flexShrink: 0,
   },
+  searchInputContainer: {
+    backgroundColor: "red",
+    borderRadius: 25,
+    height: 50,
+    justifyContent: "center",
+    paddingLeft: 10,
+  },
+  searchInput: { width: "auto", height: "100%" },
 });

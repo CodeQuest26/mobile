@@ -1,19 +1,17 @@
-// src/app/(screens)/(manufacturer)/(screens)/bidDetails.tsx
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 
@@ -59,277 +57,248 @@ export default function BidDetailsScreen() {
   };
 
   return (
-    <>
-      <StatusBar barStyle="default" />
-      <MainContainer safe>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backBtn}
-            >
-              <Ionicons name="chevron-back" size={24} color={theme.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>
-              Job Details
+    <MainContainer safe>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
+            <Ionicons name="chevron-back" size={24} color={theme.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            Job Details
+          </Text>
+          <View style={{ width: 32 }} />
+        </View>
+
+        {/* Job overview card — mirrors JobPeekCard layout */}
+        <FadeIn delay={0}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Text style={[styles.productTitle, { color: theme.text }]}>
+              {job.product}
             </Text>
-            <View style={{ width: 32 }} />
+
+            <Text style={[styles.smeLabel, { color: theme.textSecondary }]}>
+              Posted by{" "}
+              <Text style={{ color: theme.text, fontWeight: "700" }}>
+                {job.sme}
+              </Text>
+            </Text>
+
+            <View style={styles.divider} />
+
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text
+                  style={[styles.infoLabel, { color: theme.textSecondary }]}
+                >
+                  Quantity
+                </Text>
+                <Text style={[styles.infoValue, { color: theme.text }]}>
+                  {job.quantity}
+                </Text>
+              </View>
+
+              <View style={styles.infoItem}>
+                <Text
+                  style={[styles.infoLabel, { color: theme.textSecondary }]}
+                >
+                  Budget
+                </Text>
+                <Text style={[styles.infoValue, { color: theme.primary }]}>
+                  {job.budget}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.locRow}>
+              <Ionicons
+                name="location-outline"
+                size={13}
+                color={theme.textSecondary}
+              />
+              <Text style={[styles.locText, { color: theme.textSecondary }]}>
+                {job.location}
+              </Text>
+
+              {/* <Text style={[styles.postedAt, { color: theme.textSecondary }]}>
+                · Posted {job.postedAt}
+              </Text> */}
+            </View>
           </View>
+        </FadeIn>
 
-          {/* Job overview card — mirrors JobPeekCard layout */}
-          <FadeIn delay={0}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.catTag,
-                  { backgroundColor: theme.primary + "15" },
-                ]}
-              >
-                <Text style={[styles.catText, { color: theme.primary }]}>
-                  {job.category}
-                </Text>
-              </View>
+        {/* Description */}
+        <FadeIn delay={80}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Description
+            </Text>
+            <Text style={[styles.bodyText, { color: theme.textSecondary }]}>
+              {job.description}
+            </Text>
+          </View>
+        </FadeIn>
 
-              <Text style={[styles.productTitle, { color: theme.text }]}>
-                {job.product}
-              </Text>
-
-              <Text style={[styles.smeLabel, { color: theme.textSecondary }]}>
-                Posted by{" "}
-                <Text style={{ color: theme.text, fontWeight: "700" }}>
-                  {job.sme}
-                </Text>
-              </Text>
-
-              <View style={styles.divider} />
-
-              <View style={styles.infoRow}>
-                <View style={styles.infoItem}>
-                  <Text
-                    style={[styles.infoLabel, { color: theme.textSecondary }]}
-                  >
-                    Quantity
-                  </Text>
-                  <Text style={[styles.infoValue, { color: theme.text }]}>
-                    {job.quantity}
-                  </Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Text
-                    style={[styles.infoLabel, { color: theme.textSecondary }]}
-                  >
-                    Budget
-                  </Text>
-                  <Text style={[styles.infoValue, { color: theme.primary }]}>
-                    {job.budget}
-                  </Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Text
-                    style={[styles.infoLabel, { color: theme.textSecondary }]}
-                  >
-                    Deadline
-                  </Text>
-                  <Text style={[styles.infoValue, { color: theme.text }]}>
-                    {job.deadline}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.locRow}>
+        {/* Requirements */}
+        <FadeIn delay={120}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Requirements
+            </Text>
+            {job.requirements.map((req, idx) => (
+              <View key={idx} style={styles.reqRow}>
                 <Ionicons
-                  name="location-outline"
-                  size={13}
-                  color={theme.textSecondary}
+                  name="checkmark-circle-outline"
+                  size={16}
+                  color={theme.primary}
+                  style={{ marginTop: 1 }}
                 />
-                <Text style={[styles.locText, { color: theme.textSecondary }]}>
-                  {job.location}
-                </Text>
-                <Text style={[styles.postedAt, { color: theme.textSecondary }]}>
-                  · Posted {job.postedAt}
+                <Text style={[styles.reqText, { color: theme.textSecondary }]}>
+                  {req}
                 </Text>
               </View>
-            </View>
-          </FadeIn>
+            ))}
+          </View>
+        </FadeIn>
 
-          {/* Description */}
-          <FadeIn delay={80}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Description
-              </Text>
-              <Text style={[styles.bodyText, { color: theme.textSecondary }]}>
-                {job.description}
-              </Text>
-            </View>
-          </FadeIn>
+        {/* Bid form */}
+        <FadeIn delay={160}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              {bidSubmitted ? "Bid Submitted ✓" : "Place Your Bid"}
+            </Text>
 
-          {/* Requirements */}
-          <FadeIn delay={120}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Requirements
-              </Text>
-              {job.requirements.map((req, idx) => (
-                <View key={idx} style={styles.reqRow}>
-                  <Ionicons
-                    name="checkmark-circle-outline"
-                    size={16}
-                    color={theme.primary}
-                    style={{ marginTop: 1 }}
-                  />
-                  <Text
-                    style={[styles.reqText, { color: theme.textSecondary }]}
-                  >
-                    {req}
+            {bidSubmitted ? (
+              <View style={styles.successBox}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={40}
+                  color={theme.primary}
+                />
+                <Text style={[styles.successTitle, { color: theme.text }]}>
+                  Bid placed successfully!
+                </Text>
+                <Text
+                  style={[styles.successSub, { color: theme.textSecondary }]}
+                >
+                  You bid{" "}
+                  <Text style={{ color: theme.primary, fontWeight: "700" }}>
+                    GH₵{" "}
+                    {parseFloat(bidAmount.replace(/,/g, "")).toLocaleString()}
                   </Text>
-                </View>
-              ))}
-            </View>
-          </FadeIn>
-
-          {/* Bid form */}
-          <FadeIn delay={160}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                {bidSubmitted ? "Bid Submitted ✓" : "Place Your Bid"}
-              </Text>
-
-              {bidSubmitted ? (
-                <View style={styles.successBox}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={40}
-                    color={theme.primary}
-                  />
-                  <Text style={[styles.successTitle, { color: theme.text }]}>
-                    Bid placed successfully!
-                  </Text>
-                  <Text
-                    style={[styles.successSub, { color: theme.textSecondary }]}
-                  >
-                    You bid{" "}
-                    <Text style={{ color: theme.primary, fontWeight: "700" }}>
-                      GH₵{" "}
-                      {parseFloat(bidAmount.replace(/,/g, "")).toLocaleString()}
-                    </Text>
-                    . {job.sme} will be notified and may contact you shortly.
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text
-                    style={[styles.inputLabel, { color: theme.textSecondary }]}
-                  >
-                    Your bid amount (GH₵)
-                  </Text>
-                  <View
-                    style={[
-                      styles.inputWrapper,
-                      {
-                        borderColor: theme.border,
-                        backgroundColor: theme.cardBackground,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.currencyPrefix, { color: theme.text }]}
-                    >
-                      GH₵
-                    </Text>
-                    <TextInput
-                      style={[styles.input, { color: theme.text }]}
-                      placeholder="e.g. 48,000"
-                      placeholderTextColor={theme.textSecondary}
-                      keyboardType="numeric"
-                      value={bidAmount}
-                      onChangeText={setBidAmount}
-                    />
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.inputLabel,
-                      { color: theme.textSecondary, marginTop: 12 },
-                    ]}
-                  >
-                    Note to SME{" "}
-                    <Text style={{ fontStyle: "italic" }}>(optional)</Text>
+                  . {job.sme} will be notified and may contact you shortly.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text
+                  style={[styles.inputLabel, { color: theme.textSecondary }]}
+                >
+                  Your bid amount (GH₵)
+                </Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      borderColor: theme.border,
+                      backgroundColor: theme.cardBackground,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.currencyPrefix, { color: theme.text }]}>
+                    GH₵
                   </Text>
                   <TextInput
-                    style={[
-                      styles.noteInput,
-                      {
-                        borderColor: theme.border,
-                        color: theme.text,
-                        backgroundColor: theme.cardBackground,
-                      },
-                    ]}
-                    placeholder="Briefly describe your capacity or turnaround time…"
+                    style={[styles.input, { color: theme.text }]}
+                    placeholder="e.g. 48,000"
                     placeholderTextColor={theme.textSecondary}
-                    multiline
-                    numberOfLines={4}
-                    value={note}
-                    onChangeText={setNote}
-                    textAlignVertical="top"
+                    keyboardType="numeric"
+                    value={bidAmount}
+                    onChangeText={setBidAmount}
                   />
+                </View>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.submitBtn,
-                      { backgroundColor: theme.primary },
-                    ]}
-                    onPress={handleSubmitBid}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.submitBtnText}>Submit Bid</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          </FadeIn>
+                <Text
+                  style={[
+                    styles.inputLabel,
+                    { color: theme.textSecondary, marginTop: 12 },
+                  ]}
+                >
+                  Note to SME{" "}
+                  <Text style={{ fontStyle: "italic" }}>(optional)</Text>
+                </Text>
+                <TextInput
+                  style={[
+                    styles.noteInput,
+                    {
+                      borderColor: theme.border,
+                      color: theme.text,
+                      backgroundColor: theme.cardBackground,
+                    },
+                  ]}
+                  placeholder="Briefly describe your capacity or turnaround time…"
+                  placeholderTextColor={theme.textSecondary}
+                  multiline
+                  numberOfLines={4}
+                  value={note}
+                  onChangeText={setNote}
+                  textAlignVertical="top"
+                />
 
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      </MainContainer>
-    </>
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: theme.primary }]}
+                  onPress={handleSubmitBid}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.submitBtnText}>Submit Bid</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </FadeIn>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </MainContainer>
   );
 }
 
@@ -374,7 +343,6 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 4,
   },
   infoItem: { flex: 1, gap: 2 },
   infoLabel: { fontSize: 11, fontWeight: "600" },

@@ -201,126 +201,122 @@ const Map = () => {
   /* ================= UI ================= */
 
   return (
-    <MainContainer>
-      <View style={styles.container}>
-        {/* MAP */}
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          provider={
-            Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
-          }
-          initialRegion={userLocation}
-          showsUserLocation
-          showsMyLocationButton={false}
-          showsCompass
-        >
-          {companies.map((c) => (
-            <Marker
-              key={c.id}
-              coordinate={c.coordinate}
-              pinColor={c.rating > 4.7 ? "#FFD700" : "#F06292"}
-              onPress={() => openModal(c)}
-            />
-          ))}
-        </MapView>
+    // <MainContainer>
+    <View style={styles.container}>
+      {/* MAP */}
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        provider={
+          Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
+        }
+        initialRegion={userLocation}
+        showsUserLocation
+        showsMyLocationButton={false}
+        showsCompass
+      >
+        {companies.map((c) => (
+          <Marker
+            key={c.id}
+            coordinate={c.coordinate}
+            pinColor={c.rating > 4.7 ? "#FFD700" : "#F06292"}
+            onPress={() => openModal(c)}
+          />
+        ))}
+      </MapView>
 
-        {/* FETCHING OVERLAY */}
-        {fetching && (
-          <View style={styles.topOverlay}>
-            <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.overlayText}>Updating...</Text>
-          </View>
-        )}
+      {/* FETCHING OVERLAY */}
+      {fetching && (
+        <View style={styles.topOverlay}>
+          <ActivityIndicator color="#fff" size="small" />
+          <Text style={styles.overlayText}>Updating...</Text>
+        </View>
+      )}
 
-        {/* ✅ CENTER BUTTON — sits above tab bar */}
-        <TouchableOpacity
-          style={[styles.centerBtn, { bottom: TAB_BAR_HEIGHT + 16 }]}
-          onPress={centerUser}
-          activeOpacity={0.8}
-        >
-          <Text style={{ fontSize: 22 }}>📍</Text>
-        </TouchableOpacity>
+      {/* ✅ CENTER BUTTON — sits above tab bar */}
+      <TouchableOpacity
+        style={[styles.centerBtn, { bottom: TAB_BAR_HEIGHT + 16 }]}
+        onPress={centerUser}
+        activeOpacity={0.8}
+      >
+        <Text style={{ fontSize: 22 }}>📍</Text>
+      </TouchableOpacity>
 
-        {/* ================= MODAL ================= */}
-        <Modal
-          visible={modalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={closeModal}
-          statusBarTranslucent
-        >
-          {/* Backdrop — tap to dismiss */}
-          <Pressable style={styles.modalBackdrop} onPress={closeModal}>
-            {/* Inner Pressable blocks propagation so tapping card doesn't close */}
-            <Pressable
-              style={[styles.modalCard, { height: SCREEN_HEIGHT * 0.5 }]}
-              onPress={() => {}}
-            >
-              {/* Handle bar */}
-              <View style={styles.handle} />
+      {/* ================= MODAL ================= */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeModal}
+        statusBarTranslucent
+      >
+        {/* Backdrop — tap to dismiss */}
+        <Pressable style={styles.modalBackdrop} onPress={closeModal}>
+          {/* Inner Pressable blocks propagation so tapping card doesn't close */}
+          <Pressable
+            style={[styles.modalCard, { height: SCREEN_HEIGHT * 0.5 }]}
+            onPress={() => {}}
+          >
+            {/* Handle bar */}
+            <View style={styles.handle} />
 
-              {/* Close button */}
-              <TouchableOpacity style={styles.closeBtn} onPress={closeModal}>
-                <Text style={styles.closeBtnText}>✕</Text>
-              </TouchableOpacity>
+            {/* Close button */}
+            <TouchableOpacity style={styles.closeBtn} onPress={closeModal}>
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
 
-              {selectedCompany && (
-                <View style={styles.modalContent}>
-                  <Text style={styles.title}>{selectedCompany.name}</Text>
+            {selectedCompany && (
+              <View style={styles.modalContent}>
+                <Text style={styles.title}>{selectedCompany.name}</Text>
 
-                  <View style={styles.divider} />
+                <View style={styles.divider} />
 
-                  <View style={styles.row}>
-                    <Text style={styles.rowIcon}>⭐</Text>
-                    <Text style={styles.rowText}>
-                      {selectedCompany.rating} Rating
-                    </Text>
-                  </View>
-
-                  <View style={styles.row}>
-                    <Text style={styles.rowIcon}>📍</Text>
-                    <Text style={styles.rowText}>
-                      {selectedCompany.address}
-                    </Text>
-                  </View>
-
-                  <View style={styles.row}>
-                    <Text style={styles.rowIcon}>🗺️</Text>
-                    <Text style={styles.rowText}>
-                      {(selectedCompany.distance / 1000).toFixed(1)} km away
-                    </Text>
-                  </View>
-
-                  <View style={styles.row}>
-                    <Text style={styles.rowIcon}>
-                      {selectedCompany.verified ? "✅" : "❌"}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.rowText,
-                        {
-                          color: selectedCompany.verified
-                            ? "#2e7d32"
-                            : "#c62828",
-                          fontWeight: "600",
-                        },
-                      ]}
-                    >
-                      {selectedCompany.verified ? "Verified" : "Unverified"}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity style={styles.ctaBtn} onPress={closeModal}>
-                    <Text style={styles.ctaBtnText}>View Details</Text>
-                  </TouchableOpacity>
+                <View style={styles.row}>
+                  <Text style={styles.rowIcon}>⭐</Text>
+                  <Text style={styles.rowText}>
+                    {selectedCompany.rating} Rating
+                  </Text>
                 </View>
-              )}
-            </Pressable>
+
+                <View style={styles.row}>
+                  <Text style={styles.rowIcon}>📍</Text>
+                  <Text style={styles.rowText}>{selectedCompany.address}</Text>
+                </View>
+
+                <View style={styles.row}>
+                  <Text style={styles.rowIcon}>🗺️</Text>
+                  <Text style={styles.rowText}>
+                    {(selectedCompany.distance / 1000).toFixed(1)} km away
+                  </Text>
+                </View>
+
+                <View style={styles.row}>
+                  <Text style={styles.rowIcon}>
+                    {selectedCompany.verified ? "✅" : "❌"}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.rowText,
+                      {
+                        color: selectedCompany.verified ? "#2e7d32" : "#c62828",
+                        fontWeight: "600",
+                      },
+                    ]}
+                  >
+                    {selectedCompany.verified ? "Verified" : "Unverified"}
+                  </Text>
+                </View>
+
+                <TouchableOpacity style={styles.ctaBtn} onPress={closeModal}>
+                  <Text style={styles.ctaBtnText}>View Details</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </Pressable>
-        </Modal>
-      </View>
-    </MainContainer>
+        </Pressable>
+      </Modal>
+    </View>
+    // </MainContainer>
   );
 };
 
@@ -329,7 +325,9 @@ export default Map;
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   map: { flex: 1 },
 
   loading: {

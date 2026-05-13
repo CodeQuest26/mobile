@@ -3,16 +3,15 @@ import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import OrderCard from "@/components/OrderCard"; // adjust path if needed
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 
@@ -113,74 +112,69 @@ export default function ManufacturerOrders() {
   };
 
   return (
-    <>
-      <StatusBar barStyle={"default"} />
-      <MainContainer safe>
-        <View style={[styles.screen]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text
-              style={[
-                styles.title,
-                { color: theme.text, flex: 1, marginLeft: 20 },
-              ]}
-            >
-              My Orders
-            </Text>
-          </View>
-
-          {/* Tab Bar */}
-          <View style={styles.tabBar}>
-            <TouchableOpacity
-              style={[styles.tab, getTabStyle("active")]}
-              onPress={() => setActiveTab("active")}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, getTabTextStyle("active")]}>
-                Active
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, getTabStyle("completed")]}
-              onPress={() => setActiveTab("completed")}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, getTabTextStyle("completed")]}>
-                Completed
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Orders List */}
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+    <MainContainer safe>
+      <View style={[styles.screen]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text
+            style={[
+              styles.title,
+              { color: theme.text, flex: 1, marginLeft: 20 },
+            ]}
           >
-            {hasOrders ? (
-              orders.map((order, index) => (
-                <FadeIn key={order.id} delay={index * 50}>
-                  <OrderCard order={order} theme={theme} delay={0} />
-                </FadeIn>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons
-                  name="cube-outline"
-                  size={64}
-                  color={theme.textSecondary + "50"}
-                />
-                <Text
-                  style={[styles.emptyText, { color: theme.textSecondary }]}
-                >
-                  No {activeTab} orders found
-                </Text>
-              </View>
-            )}
-            <View style={{ height: 40 }} />
-          </ScrollView>
+            My Orders
+          </Text>
         </View>
-      </MainContainer>
-    </>
+
+        {/* Tab Bar */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tab, getTabStyle("active")]}
+            onPress={() => setActiveTab("active")}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, getTabTextStyle("active")]}>
+              Active
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, getTabStyle("completed")]}
+            onPress={() => setActiveTab("completed")}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, getTabTextStyle("completed")]}>
+              Completed
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Orders List */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {hasOrders ? (
+            orders.map((order, index) => (
+              <FadeIn key={order.id} delay={index * 50}>
+                <OrderCard order={order} theme={theme} delay={0} />
+              </FadeIn>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="cube-outline"
+                size={64}
+                color={theme.textSecondary + "50"}
+              />
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No {activeTab} orders found
+              </Text>
+            </View>
+          )}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </View>
+    </MainContainer>
   );
 }
 

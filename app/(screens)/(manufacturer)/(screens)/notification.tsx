@@ -2,6 +2,7 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -14,7 +15,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import { RectButton, Swipeable } from "react-native-gesture-handler";
@@ -430,11 +430,11 @@ const styles = StyleSheet.create({
   contentColumn: {
     flex: 1,
   },
-  title: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
+  // title: {
+  //   fontSize: 15,
+  //   fontWeight: "700",
+  //   marginBottom: 4,
+  // },
   message: {
     fontSize: 13,
     lineHeight: 18,

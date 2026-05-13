@@ -1,4 +1,5 @@
 import Colors from "@/constants/colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Icon, Label, Tabs, usePathname, useRouter } from "expo-router";
@@ -8,7 +9,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import Animated, {
@@ -36,9 +36,9 @@ export default function TabsLayout() {
           <Label>Post</Label>
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="map" href="/map">
-          <Icon sf="map.fill" />
-          <Label>Map</Label>
+        <NativeTabs.Trigger name="messages" href="/messages">
+          <Icon sf="message.fill" />
+          <Label>Message</Label>
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="profile" href="/profile">
