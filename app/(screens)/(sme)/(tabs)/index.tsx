@@ -1,6 +1,5 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
-import Map from "@/components/sme/Map";
 import Spacer from "@/components/Spacer";
 import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
@@ -261,7 +260,6 @@ const SMEHome = () => {
             Overview
           </Text>
         </FadeIn>
-
         <View style={styles.statsGrid}>
           {stats.map((stat, index) => (
             <StatCard
@@ -272,9 +270,7 @@ const SMEHome = () => {
             />
           ))}
         </View>
-
         <Spacer style={{ height: 5 }} />
-
         Recent Activity Section
         <FadeIn delay={400}>
           <View style={styles.activityHeader}>
@@ -288,7 +284,6 @@ const SMEHome = () => {
             </TouchableOpacity>
           </View>
         </FadeIn>
-
         <View style={styles.activityList}>
           {recentActivity.map((activity, index) => (
             <ActivityItem
@@ -299,11 +294,10 @@ const SMEHome = () => {
             />
           ))}
         </View>
-
         <Spacer style={{ height: 70 }} />
       </ScrollView> */}
 
-      <View
+      {/* <View
         style={{
           flex: 1,
           borderTopLeftRadius: 30,
@@ -312,7 +306,7 @@ const SMEHome = () => {
         }}
       >
         <Map />
-      </View>
+      </View> */}
     </MainContainer>
   );
 };

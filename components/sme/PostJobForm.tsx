@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import FadeIn from "../common/FadeIn";
 import CategoryModal from "./CategoryModal";
+import Spacer from "@/components/Spacer";
 
 // Job categories with icons
 const JOB_CATEGORIES = [
@@ -95,20 +96,12 @@ const PostJobForm = () => {
       Alert.alert("Missing Quantity", "Please specify the quantity needed.");
       return false;
     }
-    if (!formData.budget.trim()) {
-      Alert.alert("Missing Budget", "Please set your budget for this job.");
-      return false;
-    }
+    // if (!formData.budget.trim()) {
+    //   Alert.alert("Missing Budget", "Please set your budget for this job.");
+    //   return false;
+    // }
     if (!formData.location.trim()) {
       Alert.alert("Missing Location", "Please enter the delivery location.");
-      return false;
-    }
-    if (!formData.description.trim()) {
-      Alert.alert("Missing Description", "Please provide a job description.");
-      return false;
-    }
-    if (!formData.deadline) {
-      Alert.alert("Missing Deadline", "Please set a deadline for the job.");
       return false;
     }
     return true;
@@ -157,6 +150,9 @@ const PostJobForm = () => {
           contentContainerStyle={{ paddingBottom: 100 }}
           keyboardShouldPersistTaps="handled"
         >
+
+
+
           {/* Category Selection */}
           <FadeIn delay={50}>
             <View style={styles.section}>
@@ -192,6 +188,7 @@ const PostJobForm = () => {
               </TouchableOpacity>
             </View>
           </FadeIn>
+
           {/* Product Name */}
           <FadeIn delay={100}>
             <View style={styles.section}>
@@ -216,6 +213,7 @@ const PostJobForm = () => {
               </View>
             </View>
           </FadeIn>
+
           {/* Quantity & Budget Row */}
           <FadeIn delay={150}>
             <View style={styles.section}>
@@ -298,54 +296,7 @@ const PostJobForm = () => {
               </View>
             </View>
           </FadeIn>
-          {/* Description */}
-          {/* <FadeIn delay={250}>
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Job Description
-            </Text>
-            <View
-              style={[styles.textAreaContainer, { borderColor: theme.border }]}
-            >
-              <TextInput
-                style={[styles.textArea, { color: theme.text }]}
-                placeholder="Describe your manufacturing requirements, specifications, quality standards, and any special instructions..."
-                placeholderTextColor={theme.textSecondary}
-                value={formData.description}
-                onChangeText={(value) => updateFormData("description", value)}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-          </View>
-        </FadeIn> */}
-          {/* Deadline */}
-          <FadeIn delay={300}>
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Deadline
-              </Text>
 
-              <View
-                style={[styles.inputContainer, { borderColor: theme.border }]}
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={20}
-                  color={theme.textSecondary}
-                />
-
-                <TextInput
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="e.g., 2025-05-15"
-                  placeholderTextColor={theme.textSecondary}
-                  value={formData.deadline}
-                  onChangeText={(value) => updateFormData("deadline", value)}
-                />
-              </View>
-            </View>
-          </FadeIn>
           {/* Requirements */}
           <FadeIn delay={350}>
             <View style={styles.section}>
@@ -510,6 +461,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
+    height:"100%",
+    width:"100%"
   },
   textAreaContainer: {
     borderWidth: 1,

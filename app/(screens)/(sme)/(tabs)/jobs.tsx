@@ -383,10 +383,7 @@ const MyJobs = () => {
 
   return (
     <MainContainer safe>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
-      >
+
         {/* Header */}
         <FadeIn delay={0}>
           <View style={styles.header}>
@@ -478,6 +475,11 @@ const MyJobs = () => {
             </View>
           </FadeIn>
         </View>
+
+      <ScrollView
+          showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[1]}
+      >
 
         {/* List */}
         <View style={styles.listContainer}>
