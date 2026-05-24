@@ -14,6 +14,7 @@ export type Theme = {
   shadow: string;
   info: string;
   warning: string;
+  error: string;
 };
 
 const primaryColor = "#4CB37E";
@@ -31,6 +32,7 @@ export const Colors: Record<NonNullable<ColorSchemeName>, Theme> = {
     border: "#E0E0E0",
     shadow: "#000000",
     warning: "#f97316",
+    error: "#fa4343",
     info: primaryColor,
   },
   dark: {
@@ -45,6 +47,7 @@ export const Colors: Record<NonNullable<ColorSchemeName>, Theme> = {
     border: "#4A4A4C",
     shadow: "#000000",
     warning: "#f97316",
+    error: "#fa4343",
     info: primaryColor,
   },
 };

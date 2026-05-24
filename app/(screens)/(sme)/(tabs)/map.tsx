@@ -1,7 +1,8 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +12,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useColorScheme,
   View,
@@ -103,6 +105,9 @@ const Map = () => {
 
   const [userLocation, setUserLocation] = useState<Region | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [query, setQuery] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
+  const searchInputRef = useRef<TextInput | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -129,6 +134,12 @@ const Map = () => {
     setCompanies(data);
     setFetching(false);
   };
+
+  const filteredCompanies = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return companies;
+    return companies.filter((c) => c.name.toLowerCase().includes(q));
+  }, [companies, query]);
 
   const getLocation = async () => {
     try {
@@ -203,6 +214,40 @@ const Map = () => {
   return (
     <MainContainer>
       <View style={styles.container}>
+        {/* SEARCH BAR (toggleable) */}
+        {searchVisible && (
+          <View
+            style={[
+              styles.searchContainer,
+              {
+                top: 16 + insets.top,
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+                borderWidth: 1,
+              },
+            ]}
+          >
+            <TextInput
+              ref={(r) => {
+                searchInputRef.current = r;
+              }}
+              placeholder="Search companies or services"
+              placeholderTextColor="#999"
+              value={query}
+              onChangeText={setQuery}
+              style={[styles.searchInput, { color: theme.text }]}
+              returnKeyType="search"
+            />
+            {query.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setQuery("")}
+                style={styles.searchClear}
+              >
+                <Text style={{ color: theme.primary }}>✕</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
         {/* MAP */}
         <MapView
           ref={mapRef}
@@ -215,7 +260,7 @@ const Map = () => {
           showsMyLocationButton={false}
           showsCompass
         >
-          {companies.map((c) => (
+          {filteredCompanies.map((c) => (
             <Marker
               key={c.id}
               coordinate={c.coordinate}
@@ -240,6 +285,21 @@ const Map = () => {
           activeOpacity={0.8}
         >
           <Text style={{ fontSize: 22 }}>📍</Text>
+        </TouchableOpacity>
+
+        {/* SEARCH FAB — shows/hides the search bar */}
+        <TouchableOpacity
+          style={[styles.searchFab, { bottom: TAB_BAR_HEIGHT + 16 + 72 }]}
+          onPress={() => {
+            setSearchVisible((v) => {
+              const next = !v;
+              if (next) setTimeout(() => searchInputRef.current?.focus(), 250);
+              return next;
+            });
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="search" size={20} color={theme.onPrimary} />
         </TouchableOpacity>
 
         {/* ================= MODAL ================= */}
@@ -375,6 +435,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 5,
   },
+  searchFab: {
+    position: "absolute",
+    right: 20,
+    backgroundColor: "#111",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+  },
 
   modalBackdrop: {
     flex: 1,
@@ -467,5 +542,28 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "700",
+  },
+  /* SEARCH */
+  searchContainer: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.95)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    elevation: 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 4,
+  },
+  searchClear: {
+    marginLeft: 8,
+    padding: 6,
   },
 });

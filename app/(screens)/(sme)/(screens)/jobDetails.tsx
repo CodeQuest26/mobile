@@ -233,7 +233,7 @@ const JobDetails = () => {
               value={job.location}
               theme={theme}
             />
-            <View
+            {/* <View
               style={[
                 styles.infoCardDivider,
                 { backgroundColor: theme.border },
@@ -257,7 +257,7 @@ const JobDetails = () => {
               label="Posted"
               value={job.postedAt}
               theme={theme}
-            />
+            /> */}
           </View>
         </FadeIn>
 
