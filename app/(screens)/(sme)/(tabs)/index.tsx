@@ -118,12 +118,6 @@ const SMEHome = () => {
       value: "8",
       color: "#8B5CF6",
     },
-    // {
-    //   icon: "wallet",
-    //   label: "Total Spend",
-    //   value: "¢2,45,000",
-    //   color: "#EC4899",
-    // },
     {
       icon: "trending-up",
       label: "This Month",

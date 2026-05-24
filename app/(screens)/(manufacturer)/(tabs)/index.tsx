@@ -429,8 +429,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
+    height: 258,
   },
-  moreCardText: { fontSize: 13, fontWeight: "700", textAlign: "center" },
+  moreCardText: {
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   heroWrapper: { marginBottom: 24 },
   heroBg: {
     overflow: "hidden",

@@ -133,11 +133,17 @@ const LoginScreen = () => {
             </Text>
           </View>
 
-          <Spacer style={{ height: 12 }} />
+          <Spacer style={{ height: 10 }} />
 
-          <ThemedText style={{ fontSize: 28, fontWeight: "bold" }}>
+          <ThemedText
+            style={{
+              fontSize: 23,
+              fontWeight: "bold",
+            }}
+          >
             Welcome back 👋
           </ThemedText>
+
           <Spacer style={{ height: 6 }} />
           <ThemedText style={{ fontSize: 14, color: theme.textSecondary }}>
             {roleMeta.tagline}
@@ -349,6 +355,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     padding: 0,
+    height: "100%",
+    width: "100%",
   },
 
   forgotRow: {
