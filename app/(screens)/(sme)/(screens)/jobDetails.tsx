@@ -2,6 +2,7 @@ import FadeIn from "@/components/common/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import BidCard from "@/components/sme/BidCard";
 import ManufacturerModal from "@/components/sme/ManufacturerModal";
+import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import {
   BidStatus,
@@ -74,6 +75,7 @@ const JobDetails = () => {
           <Text style={[styles.notFoundText, { color: theme.textSecondary }]}>
             No Available Job Found.
           </Text>
+
           <TouchableOpacity
             onPress={() => router.back()}
             style={[styles.backBtn, { backgroundColor: theme.primary }]}
@@ -124,48 +126,46 @@ const JobDetails = () => {
 
   return (
     <MainContainer safe>
+      <View style={styles.detailHeader}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[
+              styles.backCircleBtn,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Ionicons name="chevron-back" size={20} color={theme.text} />
+          </TouchableOpacity>
+
+          <Text style={[styles.detailHeaderTitle, { color: theme.text }]}>
+            Job Details
+          </Text>
+        </View>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 48 }}
       >
-        <FadeIn delay={0}>
-          <View style={styles.detailHeader}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={[
-                styles.backCircleBtn,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Ionicons name="chevron-back" size={20} color={theme.text} />
-            </TouchableOpacity>
-            <Text style={[styles.detailHeaderTitle, { color: theme.text }]}>
-              Job Details
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.editBtn,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Ionicons name="create-outline" size={18} color={theme.primary} />
-            </TouchableOpacity>
-          </View>
-        </FadeIn>
-
         <FadeIn delay={40}>
+          <Spacer style={{ height: 20 }} />
+
           <View
             style={[
               styles.heroCard,
               {
                 backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
               },
             ]}
           >
@@ -187,7 +187,7 @@ const JobDetails = () => {
                 {job.image && (
                   <Image
                     source={{ uri: job.image }}
-                    style={[styles.heroImage, { borderColor: theme.border }]}
+                    style={[styles.heroImage]}
                     resizeMode="contain"
                   />
                 )}
@@ -210,7 +210,6 @@ const JobDetails = () => {
               styles.infoCard,
               {
                 backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
               },
             ]}
           >
@@ -233,31 +232,6 @@ const JobDetails = () => {
               value={job.location}
               theme={theme}
             />
-            {/* <View
-              style={[
-                styles.infoCardDivider,
-                { backgroundColor: theme.border },
-              ]}
-            />
-            <InfoRow
-              icon="calendar-outline"
-              label="Deadline"
-              value={job.deadline}
-              theme={theme}
-              valueColor={isUrgent ? "#EF4444" : undefined}
-            />
-            <View
-              style={[
-                styles.infoCardDivider,
-                { backgroundColor: theme.border },
-              ]}
-            />
-            <InfoRow
-              icon="time-outline"
-              label="Posted"
-              value={job.postedAt}
-              theme={theme}
-            /> */}
           </View>
         </FadeIn>
 
@@ -267,6 +241,7 @@ const JobDetails = () => {
               <Text style={[styles.bidsSectionTitle, { color: theme.text }]}>
                 Bids Received
               </Text>
+
               <View
                 style={[
                   styles.bidsCountBubble,
@@ -339,23 +314,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
   detailHeaderTitle: { fontSize: 17, fontWeight: "700", letterSpacing: -0.3 },
-  editBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   heroCard: {
     marginHorizontal: 20,
     borderRadius: 18,
-    borderWidth: 1,
     overflow: "hidden",
     marginBottom: 14,
     shadowColor: "#000",
@@ -380,7 +345,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   heroQuantity: { fontSize: 14, fontWeight: "500" },
-  heroImage: { width: 80, height: 80, borderRadius: 14, borderWidth: 1 },
+  heroImage: { width: 80, height: 80, borderRadius: 14 },
   heroDescription: {
     fontSize: 14,
     lineHeight: 21,
@@ -391,7 +356,6 @@ const styles = StyleSheet.create({
   infoCard: {
     marginHorizontal: 20,
     borderRadius: 16,
-    borderWidth: 1,
     paddingVertical: 4,
     marginBottom: 14,
     shadowColor: "#000",
@@ -437,7 +401,6 @@ const styles = StyleSheet.create({
   bidsCountBubbleText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   noBidsBox: {
     borderRadius: 16,
-    borderWidth: 1,
     padding: 32,
     alignItems: "center",
     gap: 12,

@@ -2,6 +2,7 @@ import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -371,7 +372,14 @@ const Map = () => {
                     </Text>
                   </View>
 
-                  <TouchableOpacity style={styles.ctaBtn} onPress={closeModal}>
+                  <TouchableOpacity
+                    style={styles.ctaBtn}
+                    onPress={() =>
+                      router.push(
+                        "/(screens)/(sme)/(screens)/manufacturerProfile",
+                      )
+                    }
+                  >
                     <Text style={styles.ctaBtnText}>View Details</Text>
                   </TouchableOpacity>
                 </View>

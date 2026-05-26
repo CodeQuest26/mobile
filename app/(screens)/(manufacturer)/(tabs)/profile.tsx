@@ -61,7 +61,11 @@ export default function ManufacturerProfile() {
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: () => router.replace("/(auth)/login"),
+      },
     ]);
   };
 

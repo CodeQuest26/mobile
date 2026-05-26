@@ -72,32 +72,29 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
       >
         <View style={[styles.modalHandle, { backgroundColor: theme.border }]} />
 
+        {/* Header */}
+        <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[
+              styles.modalCloseBtn,
+              {
+                backgroundColor: theme.cardBackground,
+              },
+            ]}
+          >
+            <Ionicons name="close" size={20} color={theme.text} />
+          </TouchableOpacity>
+          <Text style={[styles.modalTitle, { color: theme.text }]}>
+            Manufacturer Profile
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}
         >
-          {/* Header */}
-          <View
-            style={[styles.modalHeader, { borderBottomColor: theme.border }]}
-          >
-            <TouchableOpacity
-              onPress={onClose}
-              style={[
-                styles.modalCloseBtn,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Ionicons name="close" size={20} color={theme.text} />
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Manufacturer Profile
-            </Text>
-            <View style={{ width: 40 }} />
-          </View>
-
           <View style={{ paddingHorizontal: 20 }}>
             {/* Identity block */}
             <View
@@ -105,7 +102,6 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                 styles.identityBlock,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -193,7 +189,6 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                     styles.tag,
                     {
                       backgroundColor: theme.primary + "15",
-                      borderColor: theme.primary + "30",
                     },
                   ]}
                 >
@@ -213,7 +208,6 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                 styles.bidDetailCard,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -382,14 +376,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
   modalTitle: { fontSize: 17, fontWeight: "700" },
   identityBlock: {
     borderRadius: 16,
-    borderWidth: 1,
     padding: 16,
     marginBottom: 14,
   },
@@ -436,12 +428,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    borderWidth: 1,
   },
   tagText: { fontSize: 13, fontWeight: "600" },
   bidDetailCard: {
     borderRadius: 16,
-    borderWidth: 1,
     padding: 16,
     marginBottom: 20,
   },
@@ -499,7 +489,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 14,
     borderRadius: 14,
-    borderWidth: 1,
   },
   contactBtnText: { fontSize: 15, fontWeight: "700" },
 });

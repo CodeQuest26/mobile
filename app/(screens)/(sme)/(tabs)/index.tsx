@@ -39,10 +39,7 @@ const StatCard = ({
 }: StatCardProps) => (
   <FadeIn delay={delay}>
     <View
-      style={[
-        styles.statCard,
-        { backgroundColor: theme.cardBackground, borderColor: theme.border },
-      ]}
+      style={[styles.statCard, { backgroundColor: theme.cardBackground + 90 }]}
     >
       <View style={[styles.iconBox, { backgroundColor: color + "18" }]}>
         <Ionicons name={icon as any} size={24} color={color} />
@@ -179,7 +176,7 @@ const SMEHome = () => {
               Good {greeting} 👋
             </ThemedText>
             <Text style={[styles.companyName, { color: theme.text }]}>
-              Tech Innovations Ltd {/**company name here */}
+              Company name
             </Text>
           </View>
           <TouchableOpacity
@@ -198,58 +195,54 @@ const SMEHome = () => {
       </FadeIn>
 
       {/* Post a Job Button */}
-      <FadeIn delay={100}>
-        <TouchableOpacity
-          onPress={() => {
-            router.push("/(screens)/(sme)/(screens)/postJob");
-          }}
-          activeOpacity={0.8}
+      <TouchableOpacity
+        onPress={() => {
+          router.push("/(screens)/(sme)/(screens)/postJob");
+        }}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={[theme.primary, "#2E9D5F"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.postJobButton}
         >
-          <LinearGradient
-            colors={[theme.primary, "#2E9D5F"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.postJobButton}
-          >
-            <Ionicons
-              name="add-circle"
-              size={24}
-              color={theme.onPrimary}
-              style={styles.postJobIcon}
-            />
-            <View>
-              <Text style={[styles.postJobTitle, { color: theme.onPrimary }]}>
-                Post a New Job
-              </Text>
-              <Text
-                style={[
-                  styles.postJobSubtitle,
-                  { color: theme.onPrimary + "CC" },
-                ]}
-              >
-                Get quotes from vetted SMEs
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.onPrimary}
-              style={{ marginLeft: "auto" }}
-            />
-          </LinearGradient>
-        </TouchableOpacity>
-      </FadeIn>
+          <Ionicons
+            name="add-circle"
+            size={24}
+            color={theme.onPrimary}
+            style={styles.postJobIcon}
+          />
+          <View>
+            <Text style={[styles.postJobTitle, { color: theme.onPrimary }]}>
+              Post a New Job
+            </Text>
+            <Text
+              style={[
+                styles.postJobSubtitle,
+                { color: theme.onPrimary + "CC" },
+              ]}
+            >
+              Get quotes from vetted SMEs
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={theme.onPrimary}
+            style={{ marginLeft: "auto" }}
+          />
+        </LinearGradient>
+      </TouchableOpacity>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         {/* Stats Grid */}
-        <FadeIn delay={150}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Overview
-          </Text>
-        </FadeIn>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          Overview
+        </Text>
 
         <View style={styles.statsGrid}>
           {stats.map((stat, index) => (
@@ -270,7 +263,11 @@ const SMEHome = () => {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
               Recent Activity
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                router.push("/(screens)/(sme)/(screens)/notifications")
+              }
+            >
               <Text style={{ color: theme.primary, fontWeight: "600" }}>
                 See All
               </Text>
@@ -368,7 +365,6 @@ const styles = StyleSheet.create({
   },
   statCard: {
     borderRadius: 16,
-    borderWidth: 1,
     padding: 16,
     gap: 8,
     justifyContent: "center",

@@ -146,7 +146,6 @@ const Profile = () => {
                 styles.accountItem,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -218,7 +217,6 @@ const Profile = () => {
                 styles.preferenceItem,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -244,6 +242,7 @@ const Profile = () => {
                   </Text>
                 </View>
               </View>
+
               <Switch
                 value={isDarkMode}
                 onValueChange={setIsDarkMode}
@@ -260,7 +259,6 @@ const Profile = () => {
                 styles.preferenceItem,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -479,7 +477,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
-    borderWidth: 1,
   },
   preferenceItem: {
     flexDirection: "row",
@@ -488,7 +485,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
-    borderWidth: 1,
   },
   itemContent: {
     flexDirection: "row",

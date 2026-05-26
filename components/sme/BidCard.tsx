@@ -75,7 +75,6 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
               styles.bidCard,
               {
                 backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
               },
             ]}
           >
@@ -228,7 +227,6 @@ export default BidCard;
 const styles = StyleSheet.create({
   bidCard: {
     borderRadius: 16,
-    borderWidth: 1,
     marginBottom: 14,
     overflow: "hidden",
     shadowColor: "#000",

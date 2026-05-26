@@ -31,10 +31,10 @@ export default function TabsLayout() {
           <Label>Jobs</Label>
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="postJob" href="/postJob">
+        {/* <NativeTabs.Trigger name="postJob" href="/postJob">
           <Icon sf="plus.circle.fill" />
           <Label>Post</Label>
-        </NativeTabs.Trigger>
+        </NativeTabs.Trigger> */}
 
         <NativeTabs.Trigger name="map" href="/map">
           <Icon sf="map.fill" />
