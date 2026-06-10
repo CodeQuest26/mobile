@@ -16,14 +16,10 @@ import {
 import { FadeIn } from "@/components/FadeIn";
 import JobPeekCard from "@/components/JobPeekCard";
 import OrderCard from "@/components/OrderCard";
-import {
-  ACTIVE_ORDERS,
-  NEW_JOBS,
-  QUICK_ACTIONS,
-  USER,
-} from "@/constants/manufacturerData";
+import { ACTIVE_ORDERS, NEW_JOBS, USER } from "@/constants/manufacturerData";
 
 import MainContainer from "@/components/MainContainer";
+import Spacer from "@/components/Spacer";
 import { router } from "expo-router";
 const CardImg = require("../../../../assets/images/Production.jpeg");
 
@@ -255,7 +251,7 @@ export default function ManufacturerHome() {
           )}
         >
           {/* Quick Actions */}
-          <FadeIn delay={160}>
+          {/* <FadeIn delay={160}>
             <View style={[styles.section, { marginTop: 0 }]}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -295,38 +291,16 @@ export default function ManufacturerHome() {
                 ))}
               </View>
             </View>
-          </FadeIn>
-
-          {/* Active Orders */}
-          <FadeIn delay={240}>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  Active Orders
-                </Text>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/orders")
-                  }
-                >
-                  <Text style={[styles.seeAll, { color: theme.primary }]}>
-                    See all
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {ACTIVE_ORDERS.map((o, i) => (
-                <OrderCard key={o.id} order={o} theme={theme} delay={i * 60} />
-              ))}
-            </View>
-          </FadeIn>
+          </FadeIn> */}
 
           {/* New Job Posts */}
           <FadeIn delay={320}>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
+            <View style={[styles.section, { paddingHorizontal: 0 }]}>
+              <View style={[styles.sectionHeader, { paddingHorizontal: 15 }]}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   New Job Posts
                 </Text>
+
                 <TouchableOpacity
                   onPress={() =>
                     router.push("/(screens)/(manufacturer)/(tabs)/bids" as any)
@@ -340,7 +314,7 @@ export default function ManufacturerHome() {
               <Animated.ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.jobsHScroll}
+                contentContainerStyle={[styles.jobsHScroll, { marginLeft: 15 }]}
               >
                 {NEW_JOBS.map((j) => (
                   <JobPeekCard key={j.id} job={j} theme={theme} />
@@ -371,7 +345,30 @@ export default function ManufacturerHome() {
             </View>
           </FadeIn>
 
-          <View style={{ height: 70 }} />
+          {/* Active Orders */}
+          <FadeIn delay={240}>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  Active Orders
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push("/(screens)/(manufacturer)/(tabs)/orders")
+                  }
+                >
+                  <Text style={[styles.seeAll, { color: theme.primary }]}>
+                    See all
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {ACTIVE_ORDERS.map((o, i) => (
+                <OrderCard key={o.id} order={o} theme={theme} delay={i * 60} />
+              ))}
+            </View>
+          </FadeIn>
+
+          <Spacer style={{ height: 70 }} />
         </Animated.ScrollView>
       </View>
     </MainContainer>
@@ -391,7 +388,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     overflow: "hidden",
   },
-  section: { marginTop: 24, paddingHorizontal: 16 },
+  section: { marginTop: 24, paddingHorizontal: 15 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -429,7 +426,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    height: 258,
+    height: 235,
   },
   moreCardText: {
     fontSize: 13,

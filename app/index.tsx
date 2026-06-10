@@ -1,18 +1,24 @@
-import React from "react";
-import { StyleSheet, TouchableOpacity } from "react-native";
+import { StyleSheet } from "react-native";
 
-import MainContainer from "@/components/MainContainer";
-import { ThemedText } from "@/components/themed-text";
 import { router } from "expo-router";
 
 const index = () => {
-  return (
-    <MainContainer safe={true}>
-      <TouchableOpacity onPress={() => router.replace("/(auth)")}>
-        <ThemedText>index</ThemedText>
-      </TouchableOpacity>
-    </MainContainer>
-  );
+  const loggedIn: boolean = true;
+  const role: string = "manufacturer";
+
+  if (loggedIn) {
+    if (role === "manufacturer")
+      router.replace("/(screens)/(manufacturer)/(tabs)");
+    else if (role === "sme") router.replace("/(screens)/(sme)/(tabs)");
+  } else router.replace("/(auth)/login");
+
+  // return (
+  //   <MainContainer safe={true}>
+  //     <TouchableOpacity onPress={() => router.replace("/(auth)")}>
+  //       <ThemedText>index</ThemedText>
+  //     </TouchableOpacity>
+  //   </MainContainer>
+  // );
 };
 
 export default index;

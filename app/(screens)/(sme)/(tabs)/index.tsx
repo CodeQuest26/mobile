@@ -1,6 +1,5 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
-import Spacer from "@/components/Spacer";
 import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +8,6 @@ import { router } from "expo-router";
 import React from "react";
 import {
   Dimensions,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -235,12 +233,12 @@ const SMEHome = () => {
         </LinearGradient>
       </TouchableOpacity>
 
-      <ScrollView
+      {/* <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        {/* Stats Grid */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+      > */}
+      {/* Stats Grid */}
+      {/* <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Overview
         </Text>
 
@@ -255,10 +253,10 @@ const SMEHome = () => {
           ))}
         </View>
 
-        <Spacer style={{ height: 5 }} />
+        <Spacer style={{ height: 5 }} /> */}
 
-        {/* Recent Activity Section */}
-        <FadeIn delay={400}>
+      {/* Recent Activity Section */}
+      {/* <FadeIn delay={400}>
           <View style={styles.activityHeader}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
               Recent Activity
@@ -287,7 +285,7 @@ const SMEHome = () => {
         </View>
 
         <Spacer style={{ height: 70 }} />
-      </ScrollView>
+      </ScrollView> */}
     </MainContainer>
   );
 };

@@ -70,12 +70,17 @@ const OrderCard = ({
   delay: number;
 }) => (
   <FadeIn delay={delay}>
-    <View
+    <TouchableOpacity
+      onPress={() =>
+        router.push({
+          pathname: "/(screens)/(manufacturer)/(screens)/orderDetails",
+          params: { id: order.id },
+        })
+      }
       style={[
         styles.orderCard,
         {
           backgroundColor: theme.cardBackground,
-          borderColor: order.urgent ? theme.primary + "60" : theme.border,
         },
       ]}
     >
@@ -127,34 +132,7 @@ const OrderCard = ({
           ]}
         />
       </View>
-
-      <View style={styles.progressLabels}>
-        <Text style={[styles.progressPct, { color: theme.textSecondary }]}>
-          {Math.round(order.progress * 100)}% complete
-        </Text>
-        <TouchableOpacity
-          onPress={() =>
-            router.push({
-              pathname: "/(screens)/(manufacturer)/(screens)/orderDetails",
-              params: { id: order.id },
-            })
-          }
-          style={{ flexDirection: "row" }}
-        >
-          <Text
-            style={[
-              styles.viewLink,
-              {
-                color: theme.primary,
-              },
-            ]}
-          >
-            View
-          </Text>
-          <Ionicons name="arrow-forward" size={15} color={theme.primary} />
-        </TouchableOpacity>
-      </View>
-    </View>
+    </TouchableOpacity>
   </FadeIn>
 );
 
@@ -163,7 +141,6 @@ export default OrderCard;
 const styles = StyleSheet.create({
   orderCard: {
     borderRadius: 18,
-    borderWidth: 1,
     padding: 16,
     marginBottom: 10,
   },

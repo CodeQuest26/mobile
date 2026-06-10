@@ -62,36 +62,36 @@ const FadeIn = ({
 };
 
 //  Constants
-const STATUS_CONFIG = {
-  active: {
-    color: "#00C48C",
-    bg: "rgba(0,196,140,0.12)",
-    label: "Active",
-    icon: "radio-button-on" as const,
-  },
-  completed: {
-    color: "#6366F1",
-    bg: "rgba(99,102,241,0.12)",
-    label: "Completed",
-    icon: "checkmark-circle" as const,
-  },
-  draft: {
-    color: "#F59E0B",
-    bg: "rgba(245,158,11,0.12)",
-    label: "Draft",
-    icon: "ellipse-outline" as const,
-  },
-};
+// const STATUS_CONFIG = {
+//   active: {
+//     color: "#00C48C",
+//     bg: "rgba(0,196,140,0.12)",
+//     label: "Active",
+//     icon: "radio-button-on" as const,
+//   },
+//   completed: {
+//     color: "#6366F1",
+//     bg: "rgba(99,102,241,0.12)",
+//     label: "Completed",
+//     icon: "checkmark-circle" as const,
+//   },
+//   draft: {
+//     color: "#F59E0B",
+//     bg: "rgba(245,158,11,0.12)",
+//     label: "Draft",
+//     icon: "ellipse-outline" as const,
+//   },
+// };
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Packaging: "#3B82F6",
-  Hardware: "#8B5CF6",
-  Electronics: "#06B6D4",
-  Textiles: "#EC4899",
-  "Food Processing": "#F97316",
-};
+// const CATEGORY_COLORS: Record<string, string> = {
+//   Packaging: "#3B82F6",
+//   Hardware: "#8B5CF6",
+//   Electronics: "#06B6D4",
+//   Textiles: "#EC4899",
+//   "Food Processing": "#F97316",
+// };
 
-const getCategoryColor = (cat: string) => CATEGORY_COLORS[cat] ?? "#6B7280";
+// const getCategoryColor = (cat: string) => CATEGORY_COLORS[cat] ?? "#6B7280";
 
 //  Stat pill
 const StatPill = ({
@@ -139,8 +139,6 @@ const JobCard = ({
 }) => {
   const daysLeft = getDaysUntilDeadline(job.deadline);
   const isUrgent = daysLeft <= 7 && job.status === "active";
-  const status = STATUS_CONFIG[job.status];
-  const catColor = getCategoryColor(job.category);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const bids = getBidsForJob(job.id);
@@ -180,21 +178,7 @@ const JobCard = ({
               {/* Top row */}
               <View style={styles.cardTopRow}>
                 <View style={styles.cardLeft}>
-                  <View style={[styles.statusBadge]}>
-                    <Ionicons
-                      name={status.icon}
-                      size={11}
-                      color={status.color}
-                    />
-                    <Text
-                      style={[
-                        styles.statusText,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {status.label}
-                    </Text>
-                  </View>
+                  <View style={[styles.statusBadge]}></View>
                   <Text
                     style={[styles.cardTitle, { color: theme.text }]}
                     numberOfLines={2}
@@ -214,8 +198,7 @@ const JobCard = ({
                     style={[
                       styles.cardImage,
                       {
-                        borderColor: theme.border,
-                        backgroundColor: isDark ? "#1a1a2e" : "#f0f4f8",
+                        backgroundColor: theme.background,
                       },
                     ]}
                     resizeMode="contain"
@@ -225,12 +208,15 @@ const JobCard = ({
                     style={[
                       styles.cardImagePlaceholder,
                       {
-                        backgroundColor: catColor + "15",
-                        borderColor: catColor + "30",
+                        backgroundColor: theme.background,
                       },
                     ]}
                   >
-                    <Ionicons name="cube-outline" size={28} color={catColor} />
+                    <Ionicons
+                      name="cube-outline"
+                      size={28}
+                      color={theme.textSecondary}
+                    />
                   </View>
                 )}
               </View>
@@ -302,7 +288,6 @@ const JobCard = ({
   );
 };
 
-//  Empty state
 const EmptyState = ({
   activeTab,
   theme,
@@ -364,7 +349,6 @@ const EmptyState = ({
   );
 };
 
-//  Screen
 const MyJobs = () => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -613,12 +597,11 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   cardQty: { fontSize: 13, fontWeight: "500" },
-  cardImage: { width: 72, height: 72, borderRadius: 14, borderWidth: 1 },
+  cardImage: { width: 72, height: 72, borderRadius: 14 },
   cardImagePlaceholder: {
     width: 72,
     height: 72,
     borderRadius: 14,
-    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },

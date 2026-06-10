@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 14,
     borderRadius: 12,
-    borderWidth: 1.5,
+    borderWidth: 1,
     gap: 8,
   },
   actionButtonText: {

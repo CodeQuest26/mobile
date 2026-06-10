@@ -135,17 +135,6 @@ export default function BidDetailsScreen() {
                   {job.budget}
                 </Text>
               </View>
-
-              {/* <View style={styles.infoItem}>
-                <Text
-                  style={[styles.infoLabel, { color: theme.textSecondary }]}
-                >
-                  Deadline
-                </Text>
-                <Text style={[styles.infoValue, { color: theme.text }]}>
-                  {job.deadline}
-                </Text>
-              </View> */}
             </View>
 
             <View style={styles.locRow}>
@@ -347,7 +336,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: "700" },
   card: {
     borderRadius: 20,
-    borderWidth: 1,
     padding: 16,
     marginBottom: 16,
     gap: 6,

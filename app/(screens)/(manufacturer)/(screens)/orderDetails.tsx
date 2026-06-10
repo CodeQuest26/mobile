@@ -96,7 +96,6 @@ export default function OrderDetailScreen() {
                 styles.card,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -104,18 +103,6 @@ export default function OrderDetailScreen() {
                 <Text style={[styles.jobName, { color: theme.text }]}>
                   {order.job}
                 </Text>
-                {order.urgent && (
-                  <View
-                    style={[
-                      styles.urgentBadge,
-                      { backgroundColor: "#EF444420" },
-                    ]}
-                  >
-                    <Text style={[styles.urgentText, { color: "#EF4444" }]}>
-                      Urgent
-                    </Text>
-                  </View>
-                )}
               </View>
               <Text style={[styles.smeName, { color: theme.textSecondary }]}>
                 {order.sme}
@@ -167,7 +154,6 @@ export default function OrderDetailScreen() {
                 styles.card,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -200,7 +186,6 @@ export default function OrderDetailScreen() {
                 styles.card,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -253,7 +238,6 @@ export default function OrderDetailScreen() {
                 styles.card,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -293,7 +277,6 @@ export default function OrderDetailScreen() {
                 styles.card,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -313,48 +296,6 @@ export default function OrderDetailScreen() {
             </View>
           </FadeIn>
 
-          {/* Conversation */}
-          <FadeIn delay={240}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Conversation
-              </Text>
-              {order.messages.map((msg, idx) => (
-                <View key={idx} style={styles.messageBubble}>
-                  <Text style={[styles.messageFrom, { color: theme.primary }]}>
-                    {msg.from}
-                  </Text>
-                  <Text
-                    style={[styles.messageText, { color: theme.textSecondary }]}
-                  >
-                    {msg.message}
-                  </Text>
-                  <Text
-                    style={[styles.messageTime, { color: theme.textSecondary }]}
-                  >
-                    {msg.timestamp}
-                  </Text>
-                </View>
-              ))}
-              <TouchableOpacity
-                style={[styles.chatBtn, { borderColor: theme.primary }]}
-                onPress={() => router.push(`/chat/${order.sme}` as any)}
-              >
-                <Text style={[styles.chatBtnText, { color: theme.primary }]}>
-                  Open Chat
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </FadeIn>
-
           {/* Action Buttons */}
           {!isCompleted && (
             <FadeIn delay={280}>
@@ -364,22 +305,6 @@ export default function OrderDetailScreen() {
                   onPress={markNextMilestone}
                 >
                   <Text style={styles.actionBtnText}>Mark Next Milestone</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.actionBtnOutline,
-                    { borderColor: theme.primary },
-                  ]}
-                  onPress={() => console.log("Contact support")}
-                >
-                  <Text
-                    style={[
-                      styles.actionBtnOutlineText,
-                      { color: theme.primary },
-                    ]}
-                  >
-                    Report Issue
-                  </Text>
                 </TouchableOpacity>
               </View>
             </FadeIn>
@@ -412,7 +337,6 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 20,
-    borderWidth: 1,
     padding: 16,
     marginBottom: 16,
   },

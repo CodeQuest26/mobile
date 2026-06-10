@@ -1,7 +1,7 @@
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { Icon, Label, Tabs, usePathname, useRouter } from "expo-router";
+import { Icon, Label, usePathname, useRouter } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import {
   Platform,
@@ -18,9 +18,11 @@ import Animated, {
 } from "react-native-reanimated";
 
 export default function TabLayout() {
+  const colorScheme = useColorScheme();
+
   if (Platform.OS === "ios") {
     return (
-      <NativeTabs>
+      <NativeTabs iconColor={colorScheme === "dark" ? "#fff" : "#000"}>
         <NativeTabs.Trigger name="index" href="/">
           <Icon sf="house.fill" />
           <Label>Home</Label>
@@ -43,18 +45,6 @@ export default function TabLayout() {
       </NativeTabs>
     );
   }
-
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBar: () => <FloatingTabBar />,
-      }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
-  );
 }
 
 function FloatingTabBar() {

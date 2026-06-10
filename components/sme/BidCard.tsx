@@ -13,26 +13,17 @@ import {
 import FadeIn from "../common/FadeIn";
 import StarRating from "./StarRating";
 
-const BID_STATUS: Record<
-  BidStatus,
-  { label: string; color: string; bg: string; icon: string }
-> = {
+const BID_STATUS: Record<BidStatus, { label: string; icon: string }> = {
   pending: {
     label: "Pending",
-    color: "#F59E0B",
-    bg: "rgba(245,158,11,0.12)",
     icon: "time-outline",
   },
   accepted: {
     label: "Accepted",
-    color: "#10B981",
-    bg: "rgba(16,185,129,0.12)",
     icon: "checkmark-circle",
   },
   rejected: {
     label: "Rejected",
-    color: "#EF4444",
-    bg: "rgba(239,68,68,0.12)",
     icon: "close-circle",
   },
 };
@@ -121,7 +112,7 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
                       <Ionicons
                         name="checkmark-circle"
                         size={16}
-                        color="#3B82F6"
+                        color={theme.text}
                       />
                     )}
                   </View>
@@ -157,19 +148,17 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
               </View>
 
               {/* Bid status */}
-              <View
-                style={[
-                  styles.bidStatusPill,
-                  { backgroundColor: bidStatus.bg },
-                ]}
-              >
+              <View style={[styles.bidStatusPill]}>
                 <Ionicons
                   name={bidStatus.icon as any}
                   size={13}
-                  color={bidStatus.color}
+                  color={theme.textSecondary}
                 />
                 <Text
-                  style={[styles.bidStatusPillText, { color: bidStatus.color }]}
+                  style={[
+                    styles.bidStatusPillText,
+                    { color: theme.textSecondary },
+                  ]}
                 >
                   {bidStatus.label}
                 </Text>

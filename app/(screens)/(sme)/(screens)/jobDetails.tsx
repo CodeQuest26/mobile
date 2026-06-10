@@ -253,6 +253,7 @@ const JobDetails = () => {
                 </Text>
               </View>
             </View>
+
             {job.bids.length === 0 ? (
               <View
                 style={[

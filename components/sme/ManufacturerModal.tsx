@@ -13,26 +13,17 @@ import {
 import StarRating from "./StarRating";
 
 // ─── Local constants & helpers ────────────────────────────────────────────────
-const BID_STATUS: Record<
-  BidStatus,
-  { label: string; color: string; bg: string; icon: string }
-> = {
+const BID_STATUS: Record<BidStatus, { label: string; icon: string }> = {
   pending: {
     label: "Pending",
-    color: "#F59E0B",
-    bg: "rgba(245,158,11,0.12)",
     icon: "time-outline",
   },
   accepted: {
     label: "Accepted",
-    color: "#10B981",
-    bg: "rgba(16,185,129,0.12)",
     icon: "checkmark-circle",
   },
   rejected: {
     label: "Rejected",
-    color: "#EF4444",
-    bg: "rgba(239,68,68,0.12)",
     icon: "close-circle",
   },
 };
@@ -141,7 +132,7 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                       <Ionicons
                         name="checkmark-circle"
                         size={18}
-                        color="#3B82F6"
+                        color={theme.text}
                       />
                     )}
                   </View>
@@ -192,7 +183,9 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                     },
                   ]}
                 >
-                  <Text style={[styles.tagText, { color: theme.primary }]}>
+                  <Text
+                    style={[styles.tagText, { color: theme.textSecondary }]}
+                  >
                     {s}
                   </Text>
                 </View>
@@ -227,19 +220,17 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                     {bid.amount}
                   </Text>
                 </View>
-                <View
-                  style={[
-                    styles.bidStatusBadge,
-                    { backgroundColor: bidStatus.bg },
-                  ]}
-                >
+                <View style={[styles.bidStatusBadge]}>
                   <Ionicons
                     name={bidStatus.icon as any}
                     size={14}
-                    color={bidStatus.color}
+                    color={theme.textSecondary}
                   />
                   <Text
-                    style={[styles.bidStatusText, { color: bidStatus.color }]}
+                    style={[
+                      styles.bidStatusText,
+                      { color: theme.textSecondary },
+                    ]}
                   >
                     {bidStatus.label}
                   </Text>
@@ -303,20 +294,22 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   onPress={onReject}
-                  style={[styles.rejectBtn, { borderColor: "#EF4444" }]}
+                  style={[styles.rejectBtn, { borderColor: theme.error }]}
                 >
                   <Ionicons
                     name="close-circle-outline"
                     size={18}
-                    color="#EF4444"
+                    color={theme.error}
                   />
-                  <Text style={[styles.rejectBtnText, { color: "#EF4444" }]}>
+
+                  <Text style={[styles.rejectBtnText, { color: theme.error }]}>
                     Decline Bid
                   </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={onAccept}
-                  style={[styles.acceptBtn, { backgroundColor: "#10B981" }]}
+                  style={[styles.acceptBtn, { backgroundColor: theme.primary }]}
                 >
                   <Ionicons
                     name="checkmark-circle-outline"
@@ -334,7 +327,6 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                 styles.contactBtn,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
                 },
               ]}
             >
@@ -469,9 +461,9 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
-  rejectBtnText: { fontSize: 15, fontWeight: "700" },
+  rejectBtnText: { fontSize: 15, fontWeight: "600" },
   acceptBtn: {
     flex: 1.5,
     flexDirection: "row",
