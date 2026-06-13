@@ -5,6 +5,7 @@ import {
   Animated,
   ImageBackground,
   LayoutChangeEvent,
+  Pressable,
   StatusBar,
   StyleSheet,
   Text,
@@ -24,7 +25,15 @@ import { router } from "expo-router";
 const CardImg = require("../../../../assets/images/Production.jpeg");
 
 const time = new Date().getHours();
-const greeting = `Good ${time < 12 ? "morning" : time < 18 ? "afternoon" : "evening"}`;
+const greeting = `Good ${
+  time >= 5 && time < 12
+    ? "morning"
+    : time >= 12 && time < 16
+      ? "afternoon"
+      : time >= 16 && time < 21
+        ? "evening"
+        : "night"
+}`;
 
 //  HeroCard
 interface HeroCardProps {
@@ -113,9 +122,15 @@ const HeroCard = ({
           </View>
 
           <View style={styles.heroCompanyRow} onLayout={onCompanyLayout}>
-            <View style={styles.heroLogoBox}>
+            <Pressable
+              style={styles.heroLogoBox}
+              onPress={() =>
+                router.push("/(screens)/(manufacturer)/(screens)/profile")
+              }
+            >
               <Text style={styles.heroLogoText}>{USER.initials}</Text>
-            </View>
+            </Pressable>
+
             <View style={{ flex: 1 }}>
               <View style={styles.heroNameRow}>
                 <Text style={styles.heroCompany} numberOfLines={1}>
@@ -130,6 +145,7 @@ const HeroCard = ({
                   />
                 )}
               </View>
+
               <View style={styles.heroLocRow}>
                 <Ionicons
                   name="location-outline"
@@ -142,7 +158,10 @@ const HeroCard = ({
           </View>
 
           <Text style={styles.heroTagline}>
-            {greeting} 👋 Here's your factory overview
+            {greeting}
+            {time > 5 && time < 21
+              ? " 👋, Here's your factory overview"
+              : " 😴"}
           </Text>
         </ImageBackground>
 
@@ -226,7 +245,7 @@ export default function ManufacturerHome() {
 
   return (
     <MainContainer>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      {/* <StatusBar barStyle={isDark ? "light-content" : "dark-content"} /> */}
 
       <View style={[styles.screen]}>
         <Animated.View
@@ -250,49 +269,6 @@ export default function ManufacturerHome() {
             { useNativeDriver: true },
           )}
         >
-          {/* Quick Actions */}
-          {/* <FadeIn delay={160}>
-            <View style={[styles.section, { marginTop: 0 }]}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  Quick Actions
-                </Text>
-              </View>
-              <View style={styles.quickActions}>
-                {QUICK_ACTIONS.map((qa) => (
-                  <TouchableOpacity
-                    key={qa.label}
-                    activeOpacity={0.8}
-                    onPress={() => qa.route && router.push(qa.route as any)}
-                    style={[
-                      styles.qaBtn,
-                      {
-                        backgroundColor: theme.cardBackground,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.qaIcon,
-                        { backgroundColor: qa.color + "18" },
-                      ]}
-                    >
-                      <Ionicons
-                        name={qa.icon as any}
-                        size={20}
-                        color={qa.color}
-                      />
-                    </View>
-                    <Text style={[styles.qaLabel, { color: theme.text }]}>
-                      {qa.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </FadeIn> */}
-
           {/* New Job Posts */}
           <FadeIn delay={320}>
             <View style={[styles.section, { paddingHorizontal: 0 }]}>

@@ -7,6 +7,7 @@ const ManufacturerScreensLayout = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="profile" />
         <Stack.Screen name="filterScreen" />
       </Stack>
     </GestureHandlerRootView>

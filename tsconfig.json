@@ -11,6 +11,8 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "constants/colors.ts"
+    "constants/colors.ts",
+    "app/(screens)/(manufacturer)/(screens)/profile.tsx",
+    "app/(screens)/(manufacturer)/(tabs)/profile.tsxx"
   ]
 }

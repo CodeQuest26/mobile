@@ -18,12 +18,9 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import MapView, {
-  Marker,
-  PROVIDER_DEFAULT,
-  PROVIDER_GOOGLE,
-  Region,
-} from "react-native-maps";
+// react-native-maps can throw when native module isn't linked.
+// We'll dynamically require it at runtime so the app doesn't crash
+// when the native module is missing (useful for certain dev setups).
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -102,9 +99,11 @@ const Map = () => {
   // Tab bar height: 49pt on iOS + bottom inset, 56dp on Android
   const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 49 + insets.bottom : 56;
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
 
-  const [userLocation, setUserLocation] = useState<Region | null>(null);
+  const [MapsModule, setMapsModule] = useState<any>(null);
+
+  const [userLocation, setUserLocation] = useState<any | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [query, setQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
@@ -189,6 +188,22 @@ const Map = () => {
     getLocation();
   }, []);
 
+  // Attempt to dynamically require react-native-maps to avoid crashing
+  // when the native module isn't available during development.
+  useEffect(() => {
+    let mounted = true;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require("react-native-maps");
+      if (mounted) setMapsModule(mod);
+    } catch (e) {
+      console.warn("react-native-maps not available:", e);
+    }
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const centerUser = () => {
     if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion(userLocation, 800);
@@ -204,6 +219,25 @@ const Map = () => {
           <ActivityIndicator size="large" color={theme.primary} />
           <Text style={[styles.loadingText, { color: theme.text }]}>
             Getting your location...
+          </Text>
+        </View>
+      </MainContainer>
+    );
+  }
+
+  // If maps native module isn't available, show a safe fallback UI.
+  if (!MapsModule) {
+    return (
+      <MainContainer>
+        <View style={[styles.loading, { padding: 16 }]}>
+          <Text
+            style={[
+              styles.loadingText,
+              { color: theme.text, textAlign: "center" },
+            ]}
+          >
+            Map is unavailable on this device. Install and link
+            react-native-maps to enable the map view.
           </Text>
         </View>
       </MainContainer>
@@ -250,11 +284,13 @@ const Map = () => {
           </View>
         )}
         {/* MAP */}
-        <MapView
+        <MapsModule.default
           ref={mapRef}
           style={styles.map}
           provider={
-            Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
+            Platform.OS === "android"
+              ? MapsModule.PROVIDER_GOOGLE
+              : MapsModule.PROVIDER_DEFAULT
           }
           initialRegion={userLocation}
           showsUserLocation
@@ -262,14 +298,14 @@ const Map = () => {
           showsCompass
         >
           {filteredCompanies.map((c) => (
-            <Marker
+            <MapsModule.Marker
               key={c.id}
               coordinate={c.coordinate}
               pinColor={c.rating > 4.7 ? "#FFD700" : "#F06292"}
               onPress={() => openModal(c)}
             />
           ))}
-        </MapView>
+        </MapsModule.default>
 
         {/* FETCHING OVERLAY */}
         {fetching && (
