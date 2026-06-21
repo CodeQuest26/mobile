@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 const Index = () => {
   const loggedIn: boolean = true;
-  const role: string = "manufacturer";
+  const role: string = "sme";
 
   useEffect(() => {
     if (loggedIn) {

@@ -1,24 +1,24 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import {
-  Contact,
-  CONTACTS,
-  formatListTime,
-  getAvatarColor,
-  Message,
+    Contact,
+    CONTACTS,
+    formatListTime,
+    getAvatarColor,
+    Message,
 } from "@/constants/contacts";
 import { useChatConversations } from "@/hooks/useChatConversations";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  useColorScheme,
-  View,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    useColorScheme,
+    View,
 } from "react-native";
 
 // ─── Contact Row Component ────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ const Chat = () => {
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
 
   const { conversations, setConversations, lastRead, setLastRead } =
-    useChatConversations("manufacturer");
+    useChatConversations("sme");
   const [search, setSearch] = React.useState("");
 
   const filteredContacts = CONTACTS.filter((c) =>
@@ -122,7 +122,7 @@ const Chat = () => {
     router.push({
       pathname: "../../ChatRoom",
       params: {
-        userType: "manufacturer",
+        userType: "sme",
         contactId: contact.id,
         contactName: contact.name,
         contactInitials: contact.initials,

@@ -1,7 +1,7 @@
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { Icon, Label, Tabs, usePathname, useRouter } from "expo-router";
+import { Icon, Label, usePathname, useRouter } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import {
   Platform,
@@ -18,30 +18,32 @@ import Animated, {
 } from "react-native-reanimated";
 
 export default function TabsLayout() {
+  const colorScheme = useColorScheme();
+
   if (Platform.OS === "ios") {
     return (
-      <NativeTabs>
-        <NativeTabs.Trigger name="index" href="/">
+      <NativeTabs iconColor={colorScheme === "dark" ? "#fff" : "#000"}>
+        <NativeTabs.Trigger name="index">
           <Icon sf="house.fill" />
           <Label>Home</Label>
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="jobs" href="/jobs">
+        <NativeTabs.Trigger name="jobs">
           <Icon sf="briefcase.fill" />
           <Label>Jobs</Label>
         </NativeTabs.Trigger>
 
-        {/* <NativeTabs.Trigger name="postJob" href="/postJob">
-          <Icon sf="plus.circle.fill" />
-          <Label>Post</Label>
-        </NativeTabs.Trigger> */}
+        <NativeTabs.Trigger role="search" name="chat">
+          <Icon sf="message.fill" />
+          <Label>Chat</Label>
+        </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="map" href="/map">
+        <NativeTabs.Trigger name="map">
           <Icon sf="map.fill" />
           <Label>Map</Label>
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="profile" href="/profile">
+        <NativeTabs.Trigger name="profile">
           <Icon sf="person.crop.circle.fill" />
           <Label>Profile</Label>
         </NativeTabs.Trigger>
@@ -49,20 +51,12 @@ export default function TabsLayout() {
     );
   }
 
-  // Android / other platforms: custom floating tab bar with Ionicons
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBar: () => <FloatingTabBar />,
-      }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="jobs" />
-      <Tabs.Screen name="postJob" />
-      <Tabs.Screen name="map" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
+    <View style={styles.wrapper}>
+      <BlurView intensity={90} tint="light" style={styles.container}>
+        <FloatingTabBar />
+      </BlurView>
+    </View>
   );
 }
 
@@ -74,43 +68,41 @@ function FloatingTabBar() {
   const theme = Colors[colorScheme] ?? Colors.light;
 
   return (
-    <View style={styles.wrapper}>
-      <BlurView intensity={90} tint="light" style={styles.container}>
-        <TabItem
-          icon="home"
-          label="Home"
-          active={pathname === "/"}
-          onPress={() => router.push("/")}
-        />
+    <View style={styles.tabBarContainer}>
+      <TabItem
+        icon="home"
+        label="Home"
+        active={pathname === "/"}
+        onPress={() => router.push("/")}
+      />
 
-        <TabItem
-          icon="briefcase"
-          label="Jobs"
-          active={pathname === "/jobs"}
-          onPress={() => router.push("/jobs")}
-        />
+      <TabItem
+        icon="briefcase"
+        label="Jobs"
+        active={pathname === "/jobs"}
+        onPress={() => router.push("/jobs")}
+      />
 
-        <TabItem
-          icon="add-circle"
-          label="Post"
-          active={pathname === "/postJob"}
-          onPress={() => router.push("/postJob")}
-        />
+      <TabItem
+        icon="chatbubbles"
+        label="Chat"
+        active={pathname === "/chat"}
+        onPress={() => router.push("/chat")}
+      />
 
-        <TabItem
-          icon="person"
-          label="Profile"
-          active={pathname === "/profile"}
-          onPress={() => router.push("/profile")}
-        />
+      <TabItem
+        icon="map"
+        label="Map"
+        active={pathname === "/map"}
+        onPress={() => router.push("/map")}
+      />
 
-        <TabItem
-          icon="map"
-          label="Map"
-          active={pathname === "/map"}
-          onPress={() => router.push("/map")}
-        />
-      </BlurView>
+      <TabItem
+        icon="person"
+        label="Profile"
+        active={pathname === "/profile"}
+        onPress={() => router.push("/profile")}
+      />
     </View>
   );
 }
@@ -165,6 +157,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 10,
+  },
+  tabBarContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
   },
   tab: {
     flex: 1,
