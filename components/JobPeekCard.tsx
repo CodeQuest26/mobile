@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  ImageSourcePropType,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -68,8 +69,9 @@ const JobPeekCard = memo(
       setIsSaved(!isSaved);
     };
 
-    const defaultImage = require("../assets/images/factory.jpeg");
-    const imageUri = imageError || !job.image ? defaultImage : job.image;
+    const defaultImage: ImageSourcePropType = require("../assets/images/factory.jpeg");
+    const imageSource: ImageSourcePropType =
+      imageError || !job.image ? defaultImage : { uri: job.image };
 
     return (
       <AnimatedTouchable
@@ -78,8 +80,6 @@ const JobPeekCard = memo(
           styles.jobPeekCard,
           {
             backgroundColor: theme.cardBackground,
-            borderColor: theme.border,
-            shadowColor: theme.text,
           },
           animatedStyle,
         ]}
@@ -97,7 +97,7 @@ const JobPeekCard = memo(
         {/* Image Section */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: imageUri }}
+            source={imageSource}
             style={styles.jobImage}
             resizeMode="cover"
             onLoadStart={() => setImageLoading(true)}
@@ -175,13 +175,11 @@ const styles = StyleSheet.create({
   jobPeekCard: {
     width: CARD_WIDTH,
     borderRadius: 20,
-    borderWidth: 1,
     overflow: "hidden",
     marginBottom: 16,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 3,
   },
   imageContainer: {
     position: "relative",

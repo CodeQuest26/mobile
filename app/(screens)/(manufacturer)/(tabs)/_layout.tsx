@@ -1,21 +1,7 @@
-import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
-import { Icon, Label, usePathname, useRouter } from "expo-router";
+import { Icon, Label, Tabs } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import {
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useColorScheme,
-  View,
-} from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import { Platform, StyleSheet, useColorScheme } from "react-native";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -45,63 +31,83 @@ export default function TabLayout() {
       </NativeTabs>
     );
   }
-}
-
-function FloatingTabBar() {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const colorScheme = useColorScheme();
-  const theme = Colors[colorScheme] ?? Colors.light;
 
   return (
-    <View style={styles.wrapper}>
-      <BlurView intensity={90} tint="light" style={styles.container}>
-        <TabItem
-          icon="home"
-          label="Home"
-          active={pathname === "/"}
-          onPress={() => router.push("/")}
-        />
-        <TabItem
-          icon="person"
-          label="Profile"
-          active={pathname === "/profile"}
-          onPress={() => router.push("/profile")}
-        />
-      </BlurView>
-    </View>
-  );
-}
-
-function TabItem({ icon, label, active, onPress }: any) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  // Determine icon name: filled when active, outline when inactive
-  const iconName = active ? icon : `${icon}-outline`;
-
-  return (
-    <TouchableOpacity
-      onPress={() => {
-        scale.value = withSpring(0.9, {}, () => {
-          scale.value = withSpring(1);
-        });
-        onPress();
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colorScheme === "dark" ? "#fff" : "#000",
+        tabBarStyle: {
+          position: "absolute",
+          bottom: 20,
+          left: 16,
+          right: 16,
+          marginHorizontal: 10,
+          borderRadius: 30,
+          height: 60,
+          backgroundColor:
+            colorScheme === "dark"
+              ? "rgba(0,0,0,0.9)"
+              : "rgba(255,255,255,0.9)",
+        },
       }}
-      style={styles.tab}
-      activeOpacity={0.8}
     >
-      <Animated.View
-        style={[styles.inner, animatedStyle, active && styles.activeTab]}
-      >
-        <Ionicons name={iconName} size={20} color={active ? "#000" : "#666"} />
-        {active && <Text style={styles.label}>{label}</Text>}
-      </Animated.View>
-    </TouchableOpacity>
+      <Tabs.Screen
+        name="index"
+        options={{
+          tabBarLabel: "Home",
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="jobs"
+        options={{
+          tabBarLabel: "Jobs",
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons
+              name={focused ? "briefcase" : "briefcase-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="orders"
+        options={{
+          tabBarLabel: "Orders",
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons
+              name={focused ? "receipt" : "receipt-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="chat"
+        options={{
+          tabBarLabel: "Chat",
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons
+              name={focused ? "chatbubble" : "chatbubble-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
 

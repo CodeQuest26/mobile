@@ -103,10 +103,10 @@ const PostJobForm = () => {
       Alert.alert("Missing Location", "Please enter the delivery location.");
       return false;
     }
-    if (!formData.description.trim()) {
-      Alert.alert("Missing Description", "Please provide a job description.");
-      return false;
-    }
+    // if (!formData.description.trim()) {
+    //   Alert.alert("Missing Description", "Please provide a job description.");
+    //   return false;
+    // }r
     if (!formData.deadline) {
       Alert.alert("Missing Deadline", "Please set a deadline for the job.");
       return false;
@@ -152,6 +152,44 @@ const PostJobForm = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
+        {/* Header */}
+        <View
+          style={[
+            {
+              paddingHorizontal: 15,
+              marginBottom: 20,
+              flexDirection: "row",
+              alignItems: "center",
+            },
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={{
+              height: 40,
+              width: 40,
+              backgroundColor: theme.iconBackground,
+              justifyContent: "center",
+              alignItems: "center",
+              borderRadius: 10,
+            }}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={25} color={theme.icon} />
+          </TouchableOpacity>
+
+          <Text
+            style={{
+              fontWeight: "bold",
+              fontSize: 20,
+              color: theme.text,
+              marginLeft: 10,
+            }}
+          >
+            Job Post Form
+          </Text>
+        </View>
+
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 100 }}
@@ -192,12 +230,14 @@ const PostJobForm = () => {
               </TouchableOpacity>
             </View>
           </FadeIn>
+
           {/* Product Name */}
           <FadeIn delay={100}>
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Product Name
               </Text>
+
               <View
                 style={[styles.inputContainer, { borderColor: theme.border }]}
               >
@@ -216,6 +256,7 @@ const PostJobForm = () => {
               </View>
             </View>
           </FadeIn>
+
           {/* Quantity & Budget Row */}
           <FadeIn delay={150}>
             <View style={styles.section}>
@@ -274,6 +315,7 @@ const PostJobForm = () => {
               </View>
             </View>
           </FadeIn>
+
           {/* Location */}
           <FadeIn delay={200}>
             <View style={styles.section}>
@@ -298,28 +340,7 @@ const PostJobForm = () => {
               </View>
             </View>
           </FadeIn>
-          {/* Description */}
-          {/* <FadeIn delay={250}>
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Job Description
-            </Text>
-            <View
-              style={[styles.textAreaContainer, { borderColor: theme.border }]}
-            >
-              <TextInput
-                style={[styles.textArea, { color: theme.text }]}
-                placeholder="Describe your manufacturing requirements, specifications, quality standards, and any special instructions..."
-                placeholderTextColor={theme.textSecondary}
-                value={formData.description}
-                onChangeText={(value) => updateFormData("description", value)}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-          </View>
-        </FadeIn> */}
+
           {/* Deadline */}
           <FadeIn delay={300}>
             <View style={styles.section}>
@@ -346,6 +367,7 @@ const PostJobForm = () => {
               </View>
             </View>
           </FadeIn>
+
           {/* Requirements */}
           <FadeIn delay={350}>
             <View style={styles.section}>
@@ -504,12 +526,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
-    height: 48,
+    height: 50,
   },
   input: {
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
+    height: "100%",
   },
   textAreaContainer: {
     borderWidth: 1,

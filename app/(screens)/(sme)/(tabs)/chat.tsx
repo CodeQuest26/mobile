@@ -133,7 +133,7 @@ const Chat = () => {
 
   return (
     <MainContainer safe>
-      <Text style={[styles.header, { color: theme.text }]}>Chat</Text>
+      <Text style={[styles.header, { color: theme.text }]}>Messages</Text>
 
       {/* Search */}
       <View

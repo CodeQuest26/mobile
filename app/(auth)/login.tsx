@@ -1,9 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +12,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
@@ -56,7 +55,7 @@ const InputField = ({
     >
       <Ionicons
         name={icon}
-        size={18}
+        size={24}
         color={theme.textSecondary}
         style={{ marginRight: 10 }}
       />
@@ -104,22 +103,22 @@ const LoginScreen = () => {
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      {/* Back */}
+      <TouchableOpacity
+        onPress={() => router.replace("/(onboarding)")}
+        style={[
+          styles.backBtn,
+          { backgroundColor: theme.cardBackground, marginHorizontal: 16 },
+        ]}
       >
+        <Ionicons name="chevron-back" size={20} color={theme.text} />
+      </TouchableOpacity>
+
+      <KeyboardAwareScrollView bottomOffset={100}>
+        <Spacer style={{ height: 25 }} />
+
         {/* Header */}
         <View style={styles.header}>
-          {/* Back */}
-          <TouchableOpacity
-            onPress={() => router.replace("/(onboarding)")}
-            style={[styles.backBtn, { backgroundColor: theme.cardBackground }]}
-          >
-            <Ionicons name="chevron-back" size={20} color={theme.text} />
-          </TouchableOpacity>
-
-          <Spacer style={{ height: 24 }} />
-
           {/* Role badge */}
           <View
             style={[
@@ -137,14 +136,13 @@ const LoginScreen = () => {
 
           <ThemedText
             style={{
-              fontSize: 23,
+              fontSize: 30,
               fontWeight: "bold",
             }}
           >
             Welcome back 👋
           </ThemedText>
 
-          <Spacer style={{ height: 6 }} />
           <ThemedText style={{ fontSize: 14, color: theme.textSecondary }}>
             {roleMeta.tagline}
           </ThemedText>
@@ -171,10 +169,13 @@ const LoginScreen = () => {
             secureTextEntry={!showPassword}
             theme={theme}
             rightSlot={
-              <Pressable onPress={() => setShowPassword((v) => !v)}>
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                style={{ height: "100%", justifyContent: "center" }}
+              >
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={18}
+                  size={20}
                   color={theme.textSecondary}
                 />
               </Pressable>
@@ -193,6 +194,8 @@ const LoginScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <Spacer style={{ height: 20 }} />
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -251,7 +254,7 @@ const LoginScreen = () => {
               },
             ]}
           >
-            <Text style={[styles.googleG, { color: theme.primary }]}>G</Text>
+            <Ionicons name="logo-google" size={16} color={theme.text} />
             <Text style={[styles.socialText, { color: theme.text }]}>
               Continue with Google
             </Text>
@@ -294,7 +297,7 @@ const LoginScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </MainContainer>
   );
 };
@@ -349,7 +352,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    height: 50,
   },
   input: {
     flex: 1,

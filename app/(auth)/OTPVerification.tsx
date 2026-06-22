@@ -481,7 +481,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
-    elevation: 3,
   },
   otpChar: {
     fontSize: 28,

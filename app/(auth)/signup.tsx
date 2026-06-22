@@ -2,8 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +12,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
@@ -58,20 +57,28 @@ const InputField = ({
     <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
       {label}
     </Text>
+
     <View
       style={[
         styles.inputRow,
-        { backgroundColor: theme.cardBackground, borderColor: theme.border },
+        {
+          backgroundColor: theme.cardBackground,
+          borderColor: theme.border,
+        },
       ]}
     >
       <Ionicons
         name={icon as any}
-        size={18}
+        size={24}
         color={theme.textSecondary}
         style={{ marginRight: 10 }}
       />
+
       <TextInput
-        style={[styles.input, { color: theme.text }]}
+        style={[
+          styles.input,
+          { color: theme.text, flex: 1, width: "100%", height: "100%" },
+        ]}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
@@ -80,6 +87,7 @@ const InputField = ({
         placeholderTextColor={theme.textSecondary + "80"}
         placeholder={label}
       />
+
       {rightSlot}
     </View>
   </View>
@@ -167,19 +175,19 @@ const SignupScreen = () => {
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={[
+          styles.backBtn,
+          { backgroundColor: theme.cardBackground, marginLeft: 16 },
+        ]}
       >
+        <Ionicons name="chevron-back" size={20} color={theme.text} />
+      </TouchableOpacity>
+
+      <KeyboardAwareScrollView bottomOffset={100}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[styles.backBtn, { backgroundColor: theme.cardBackground }]}
-          >
-            <Ionicons name="arrow-back" size={20} color={theme.text} />
-          </TouchableOpacity>
-
           <Spacer style={{ height: 24 }} />
 
           {/* Role badge */}
@@ -199,13 +207,13 @@ const SignupScreen = () => {
             </Text>
           </View>
 
-          <Spacer style={{ height: 12 }} />
+          <Spacer style={{ height: 15 }} />
 
-          <ThemedText style={{ fontSize: 28, fontWeight: "bold" }}>
-            Create account ✨
+          <ThemedText style={{ fontSize: 30, fontWeight: "bold" }}>
+            Create account
           </ThemedText>
 
-          <Spacer style={{ height: 6 }} />
+          {/* <Spacer style={{ height: 5 }} /> */}
 
           <ThemedText style={{ fontSize: 14, color: theme.textSecondary }}>
             {roleMeta.tagline}
@@ -223,7 +231,7 @@ const SignupScreen = () => {
             theme={theme}
           />
 
-          <Spacer style={{ height: 16 }} />
+          <Spacer style={{ height: 15 }} />
 
           <InputField
             label="Phone Number (optional)"
@@ -234,7 +242,7 @@ const SignupScreen = () => {
             theme={theme}
           />
 
-          <Spacer style={{ height: 16 }} />
+          <Spacer style={{ height: 15 }} />
 
           <InputField
             label="Password"
@@ -244,17 +252,20 @@ const SignupScreen = () => {
             secureTextEntry={!showPassword}
             theme={theme}
             rightSlot={
-              <Pressable onPress={() => setShowPassword((v) => !v)}>
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                style={{ height: "100%", justifyContent: "center" }}
+              >
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={18}
+                  size={20}
                   color={theme.textSecondary}
                 />
               </Pressable>
             }
           />
 
-          <Spacer style={{ height: 8 }} />
+          <Spacer style={{ height: 10 }} />
           <PasswordStrength password={password} theme={theme} />
         </View>
 
@@ -266,7 +277,10 @@ const SignupScreen = () => {
             activeOpacity={0.9}
             style={[
               styles.button,
-              { backgroundColor: canSubmit ? theme.primary : theme.border },
+              {
+                backgroundColor: canSubmit ? theme.primary : theme.border,
+                marginTop: 20,
+              },
             ]}
             onPress={handleSignup}
           >
@@ -291,7 +305,7 @@ const SignupScreen = () => {
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
           </View>
 
-          <Spacer style={{ height: 16 }} />
+          <Spacer style={{ height: 20 }} />
 
           {/* Google */}
           <TouchableOpacity
@@ -304,13 +318,13 @@ const SignupScreen = () => {
               },
             ]}
           >
-            <Text style={[styles.googleG, { color: theme.primary }]}>G</Text>
+            <Ionicons name="logo-google" size={16} color={theme.text} />
             <Text style={[styles.socialText, { color: theme.text }]}>
               Continue with Google
             </Text>
           </TouchableOpacity>
 
-          <Spacer style={{ height: 12 }} />
+          <Spacer style={{ height: 10 }} />
 
           {/* Apple */}
           <TouchableOpacity
@@ -349,7 +363,7 @@ const SignupScreen = () => {
 
           <Spacer style={{ height: 24 }} />
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </MainContainer>
   );
 };
@@ -359,7 +373,7 @@ export default SignupScreen;
 // --- Styles ---
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 15,
     paddingTop: 16,
     paddingBottom: 8,
   },
@@ -386,8 +400,8 @@ const styles = StyleSheet.create({
 
   form: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingHorizontal: 15,
+    paddingTop: 20,
   },
 
   fieldWrapper: {
@@ -404,7 +418,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    height: 50,
   },
   input: {
     flex: 1,
@@ -435,7 +449,7 @@ const styles = StyleSheet.create({
   },
 
   footer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 15,
     paddingBottom: 16,
     paddingTop: 8,
     marginBottom: 16,

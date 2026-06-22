@@ -285,14 +285,15 @@ export default function ManufacturerHome() {
 
                 <TouchableOpacity
                   onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/bids" as any)
+                    router.push("/(screens)/(manufacturer)/(tabs)/jobs" as any)
                   }
                 >
                   <Text style={[styles.seeAll, { color: theme.primary }]}>
-                    Browse all
+                    See all
                   </Text>
                 </TouchableOpacity>
               </View>
+
               <Animated.ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -303,7 +304,7 @@ export default function ManufacturerHome() {
                 ))}
                 <TouchableOpacity
                   onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/bids" as any)
+                    router.push("/(screens)/(manufacturer)/(tabs)/jobs" as any)
                   }
                   style={[
                     styles.jobPeekCard,

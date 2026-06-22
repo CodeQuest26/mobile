@@ -1,25 +1,25 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import {
-    AVATAR_COLORS,
-    formatDateLabel,
-    formatTime,
-    Message,
+  AVATAR_COLORS,
+  formatDateLabel,
+  formatTime,
+  Message,
 } from "@/constants/contacts";
 import { useChatConversations } from "@/hooks/useChatConversations";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -236,9 +236,27 @@ const ChatRoom = () => {
               backgroundColor: theme.background,
               borderTopColor: theme.border,
               paddingBottom: insets.bottom + 8,
+              justifyContent: "center",
+              alignContent: "center",
             },
           ]}
         >
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => console.log("open attachment menu")}
+            style={{
+              // backgroundColor: theme.iconBackground,
+              minHeight: 42,
+              maxHeight: 100,
+              width: 42,
+              borderRadius: 21,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Ionicons name="add" size={30} color={theme.icon} />
+          </TouchableOpacity>
+
           <TextInput
             style={[
               styles.input,

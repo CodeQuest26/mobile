@@ -172,13 +172,16 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           <Ionicons name="call-outline" size={40} color={theme.primary} />
         </View>
       </View>
+
       <Text style={[styles.title, { color: theme.text }]}>
         Forgot Password?
       </Text>
+
       <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
         Enter your phone number or email address. We'll send a verification code
         to reset your password.
       </Text>
+
       <View style={[styles.inputContainer, { borderColor: theme.border }]}>
         <Ionicons
           name="phone-portrait-outline"
@@ -219,7 +222,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   );
 
   const renderVerifyStep = () => (
-    <Animated.View style={{ opacity: fadeAnim, width: "100%" }}>
+    <>
       <View style={styles.iconContainer}>
         <View
           style={[styles.iconCircle, { backgroundColor: theme.primary + "15" }]}
@@ -278,11 +281,11 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           </Text>
         </TouchableOpacity>
       </View>
-    </Animated.View>
+    </>
   );
 
   const renderResetStep = () => (
-    <Animated.View style={{ opacity: fadeAnim, width: "100%" }}>
+    <>
       <View style={styles.iconContainer}>
         <View
           style={[styles.iconCircle, { backgroundColor: theme.primary + "15" }]}
@@ -345,11 +348,11 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           <Text style={styles.buttonText}>Reset Password</Text>
         )}
       </TouchableOpacity>
-    </Animated.View>
+    </>
   );
 
   return (
-    <MainContainer>
+    <MainContainer safe>
       <KeyboardAvoidingView
         style={[styles.container]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -361,6 +364,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
         >
           <Ionicons name="chevron-back" size={28} color={theme.text} />
         </TouchableOpacity>
+
         <View style={styles.content}>
           {step === "request" && renderRequestStep()}
           {step === "verify" && renderVerifyStep()}
@@ -374,17 +378,14 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   backButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 20,
     left: 16,
-    zIndex: 10,
     padding: 8,
   },
   content: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 15,
   },
   iconContainer: { alignItems: "center", marginBottom: 24 },
   iconCircle: {
@@ -416,7 +417,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     height: 54,
   },
-  input: { flex: 1, marginLeft: 12, fontSize: 16 },
+  input: { flex: 1, marginLeft: 12, fontSize: 16, height: "100%" },
   button: {
     borderRadius: 30,
     height: 54,
