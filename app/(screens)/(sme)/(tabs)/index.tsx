@@ -1,5 +1,6 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
+import ProductDetailsCard from "@/components/sme/ProductDetailsCard";
 import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +9,7 @@ import { router } from "expo-router";
 import React from "react";
 import {
   Dimensions,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,80 +19,6 @@ import {
 
 const { width } = Dimensions.get("window");
 
-// Summary stat card component
-interface StatCardProps {
-  icon: string;
-  label: string;
-  value: string;
-  color: string;
-  theme: any;
-  delay: number;
-}
-
-const StatCard = ({
-  icon,
-  label,
-  value,
-  color,
-  theme,
-  delay,
-}: StatCardProps) => (
-  <FadeIn delay={delay}>
-    <View
-      style={[styles.statCard, { backgroundColor: theme.cardBackground + 90 }]}
-    >
-      <View style={[styles.iconBox, { backgroundColor: color + "18" }]}>
-        <Ionicons name={icon as any} size={24} color={color} />
-      </View>
-      <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-        {label}
-      </Text>
-    </View>
-  </FadeIn>
-);
-
-// Activity item component
-interface ActivityItemProps {
-  icon: string;
-  title: string;
-  description: string;
-  time: string;
-  color: string;
-  theme: any;
-  delay: number;
-}
-
-const ActivityItem = ({
-  icon,
-  title,
-  description,
-  time,
-  color,
-  theme,
-  delay,
-}: ActivityItemProps) => (
-  <View
-    style={[
-      styles.activityItem,
-      { backgroundColor: theme.cardBackground, borderColor: theme.border },
-    ]}
-  >
-    <View style={[styles.activityIcon, { backgroundColor: color + "15" }]}>
-      <Ionicons name={icon as any} size={20} color={color} />
-    </View>
-    <View style={styles.activityContent}>
-      <Text style={[styles.activityTitle, { color: theme.text }]}>{title}</Text>
-      <Text style={[styles.activityDesc, { color: theme.textSecondary }]}>
-        {description}
-      </Text>
-    </View>
-    <Text style={[styles.activityTime, { color: theme.textSecondary }]}>
-      {time}
-    </Text>
-  </View>
-);
-
 const SMEHome = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
@@ -99,75 +27,105 @@ const SMEHome = () => {
   const greeting = time < 12 ? "morning" : time < 16 ? "afternoon" : "evening";
 
   return (
-    <MainContainer safe>
-      {/* Header */}
-      <FadeIn delay={0}>
-        <View style={styles.header}>
-          <View>
-            <ThemedText
-              style={[styles.greeting, { color: theme.textSecondary }]}
-            >
-              Good {greeting} 👋
-            </ThemedText>
-            <Text style={[styles.companyName, { color: theme.text }]}>
-              Company name
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() =>
-              router.push("/(screens)/(sme)/(screens)/notifications")
-            }
-            style={[styles.notificationIcon, { backgroundColor: theme.border }]}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={20}
-              color={theme.icon}
-            />
-          </TouchableOpacity>
-        </View>
-      </FadeIn>
-
-      {/* Post a Job Button */}
-      <TouchableOpacity
-        onPress={() => {
-          router.push("/(screens)/(sme)/(screens)/postJob");
+    <MainContainer>
+      <View
+        style={{
+          backgroundColor: theme.cardBackground,
+          paddingTop: 60,
+          marginBottom: 5,
         }}
-        activeOpacity={0.8}
       >
-        <LinearGradient
-          colors={[theme.primary, "#2E9D5F"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.postJobButton}
-        >
-          <Ionicons
-            name="add-circle"
-            size={24}
-            color={theme.onPrimary}
-            style={styles.postJobIcon}
-          />
-          <View>
-            <Text style={[styles.postJobTitle, { color: theme.onPrimary }]}>
-              Post a New Job
-            </Text>
-            <Text
+        {/* Header */}
+        <FadeIn delay={0}>
+          <View style={styles.header}>
+            <View>
+              <ThemedText
+                style={[styles.greeting, { color: theme.textSecondary }]}
+              >
+                Good {greeting} 👋
+              </ThemedText>
+              <Text style={[styles.companyName, { color: theme.text }]}>
+                Company name
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() =>
+                router.push("/(screens)/(sme)/(screens)/notifications")
+              }
               style={[
-                styles.postJobSubtitle,
-                { color: theme.onPrimary + "CC" },
+                styles.notificationIcon,
+                { backgroundColor: theme.border },
               ]}
             >
-              Get quotes from verified manufacturers
-            </Text>
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color={theme.icon}
+              />
+            </TouchableOpacity>
           </View>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={theme.onPrimary}
-            style={{ marginLeft: "auto" }}
-          />
-        </LinearGradient>
-      </TouchableOpacity>
+        </FadeIn>
+
+        {/* Post a Job Button */}
+        <TouchableOpacity
+          onPress={() => {
+            router.push("/(screens)/(sme)/(screens)/postJob");
+          }}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[theme.primary, "#2E9D5F"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.postJobButton, { shadowColor: theme.primary }]}
+          >
+            <Ionicons
+              name="add-circle"
+              size={24}
+              color={theme.onPrimary}
+              style={styles.postJobIcon}
+            />
+            <View>
+              <Text style={[styles.postJobTitle, { color: theme.onPrimary }]}>
+                Post a New Job
+              </Text>
+              <Text
+                style={[
+                  styles.postJobSubtitle,
+                  { color: theme.onPrimary + "CC" },
+                ]}
+              >
+                Get quotes from verified manufacturers
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={theme.onPrimary}
+              style={{ marginLeft: "auto" }}
+            />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* Ongoing Jobs */}
+      <ScrollView
+        showsHorizontalScrollIndicator={false}
+        // contentContainerStyle={{ marginTop: 5 }}
+      >
+        {/* Product name & quantity */}
+        <ProductDetailsCard
+          product={{
+            name: "Product Name",
+            manufacturer: "Manufacturing Co.",
+            quantity: 100,
+            currentStage: "Quality Check",
+            cost: 1000,
+          }}
+          theme={theme}
+          onMessagePress={() => {}}
+        />
+      </ScrollView>
     </MainContainer>
   );
 };
@@ -227,90 +185,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
-
-  // Stats Grid
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginHorizontal: 16,
-    marginVertical: 16,
-    marginTop: 12,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-around",
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  statCard: {
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: "500",
-    textAlign: "center",
-  },
-
-  // Activity Section
-  activityHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-  activityList: {
-    paddingHorizontal: 15,
-    gap: 12,
-    marginTop: 12,
-  },
-  activityItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    gap: 12,
-  },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  activityContent: {
-    flex: 1,
-    gap: 2,
-  },
-  activityTitle: {
+  productlable: {
     fontSize: 14,
-    fontWeight: "600",
-  },
-  activityDesc: {
-    fontSize: 12,
-    fontWeight: "400",
-  },
-  activityTime: {
-    fontSize: 11,
-    fontWeight: "500",
-    flexShrink: 0,
+    fontWeight: "300",
   },
 });

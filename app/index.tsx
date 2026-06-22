@@ -1,6 +1,6 @@
 import { router } from "expo-router";
-import React, { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useEffect } from "react";
+import { StyleSheet } from "react-native";
 
 const Index = () => {
   const loggedIn: boolean = true;
@@ -14,11 +14,7 @@ const Index = () => {
     } else router.replace("/(auth)/login");
   }, [loggedIn, role]);
 
-  return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" />
-    </View>
-  );
+  // return router.replace("/(onboarding)");
 };
 
 export default Index;
