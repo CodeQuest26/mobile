@@ -292,31 +292,39 @@ const ManufacturerProfile = () => {
         </FadeIn>
 
         {/* Stats Cards */}
-        <FadeIn delay={100}>
-          <View style={styles.statsContainer}>
-            <StatCard
-              icon="checkmark-circle-outline"
-              value={manufacturer.stats.onTimeDelivery}
-              label="On-Time Delivery"
-              theme={theme}
-              delay={0}
-            />
-            <StatCard
-              icon="star-outline"
-              value={manufacturer.stats.qualityRating}
-              label="Quality Rating"
-              theme={theme}
-              delay={50}
-            />
-            <StatCard
-              icon="time-outline"
-              value={manufacturer.stats.responseTime}
-              label="Response Time"
-              theme={theme}
-              delay={100}
-            />
-          </View>
-        </FadeIn>
+        <ScrollView
+          horizontal
+          contentContainerStyle={{
+            gap: 10,
+            marginLeft: 15,
+            marginBottom: 15,
+          }}
+          showsHorizontalScrollIndicator={false}
+        >
+          <StatCard
+            icon="checkmark-circle-outline"
+            value={manufacturer.stats.onTimeDelivery}
+            label="On-Time Delivery"
+            theme={theme}
+            delay={0}
+          />
+          <StatCard
+            icon="star-outline"
+            value={manufacturer.stats.qualityRating}
+            label="Quality Rating"
+            theme={theme}
+            delay={50}
+          />
+          <StatCard
+            icon="time-outline"
+            value={manufacturer.stats.responseTime}
+            label="Response Time"
+            theme={theme}
+            delay={100}
+          />
+
+          <View style={{ width: 15 }} />
+        </ScrollView>
 
         {/* About Section */}
         <FadeIn delay={150}>
@@ -509,7 +517,7 @@ const styles = StyleSheet.create({
 
   // Hero Section
   heroSection: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     marginBottom: 24,
   },
   heroContent: {
@@ -559,7 +567,6 @@ const styles = StyleSheet.create({
   // Stats
   statsContainer: {
     flexDirection: "row",
-    paddingHorizontal: 16,
     marginBottom: 24,
     gap: 12,
   },
@@ -591,7 +598,7 @@ const styles = StyleSheet.create({
 
   // Sections
   section: {
-    marginHorizontal: 16,
+    marginHorizontal: 15,
     marginBottom: 16,
     borderRadius: 16,
     borderWidth: 1,

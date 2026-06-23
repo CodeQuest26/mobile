@@ -1,10 +1,8 @@
-// app/(screens)/(sme)/(tabs)/myJobs.tsx
 import MainContainer from "@/components/MainContainer";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import {
   getBidsForJob,
-  getDaysUntilDeadline,
   JobStatus,
   SME_JOBS,
   SMEJob,
@@ -61,38 +59,6 @@ const FadeIn = ({
   );
 };
 
-//  Constants
-// const STATUS_CONFIG = {
-//   active: {
-//     color: "#00C48C",
-//     bg: "rgba(0,196,140,0.12)",
-//     label: "Active",
-//     icon: "radio-button-on" as const,
-//   },
-//   completed: {
-//     color: "#6366F1",
-//     bg: "rgba(99,102,241,0.12)",
-//     label: "Completed",
-//     icon: "checkmark-circle" as const,
-//   },
-//   draft: {
-//     color: "#F59E0B",
-//     bg: "rgba(245,158,11,0.12)",
-//     label: "Draft",
-//     icon: "ellipse-outline" as const,
-//   },
-// };
-
-// const CATEGORY_COLORS: Record<string, string> = {
-//   Packaging: "#3B82F6",
-//   Hardware: "#8B5CF6",
-//   Electronics: "#06B6D4",
-//   Textiles: "#EC4899",
-//   "Food Processing": "#F97316",
-// };
-
-// const getCategoryColor = (cat: string) => CATEGORY_COLORS[cat] ?? "#6B7280";
-
 //  Stat pill
 const StatPill = ({
   icon,
@@ -137,8 +103,6 @@ const JobCard = ({
   delay: number;
   isDark: boolean;
 }) => {
-  const daysLeft = getDaysUntilDeadline(job.deadline);
-  const isUrgent = daysLeft <= 7 && job.status === "active";
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const bids = getBidsForJob(job.id);
@@ -226,7 +190,7 @@ const JobCard = ({
               />
 
               {/* Stats */}
-              <View style={styles.statsRow}>
+              {/* <View style={styles.statsRow}>
                 <StatPill
                   icon="cash-outline"
                   label={job.budget}
@@ -238,7 +202,7 @@ const JobCard = ({
                   label={job.location}
                   theme={theme}
                 />
-              </View>
+              </View> */}
 
               {/* Footer */}
               <View style={styles.cardFooter}>

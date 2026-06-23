@@ -11,7 +11,7 @@ interface StarRatingProps {
 const StarRating = ({
   rating,
   color = "#F59E0B",
-  size = 13,
+  size = 15,
 }: StarRatingProps) => (
   <View style={{ flexDirection: "row", gap: 2 }}>
     {[1, 2, 3, 4, 5].map((star) => (

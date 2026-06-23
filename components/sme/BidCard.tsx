@@ -108,6 +108,7 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
                     >
                       {manufacturer.name}
                     </Text>
+
                     {manufacturer.verified && (
                       <Ionicons
                         name="checkmark-circle"
@@ -117,32 +118,44 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
                     )}
                   </View>
 
-                  <View style={styles.bidRatingRow}>
-                    <StarRating rating={manufacturer.rating} />
-                    <Text
-                      style={[
-                        styles.bidRatingText,
-                        { color: theme.textSecondary },
-                      ]}
+                  <View
+                    style={[
+                      styles.bidRatingRow,
+                      { alignItems: "baseline", gap: 10 },
+                    ]}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                      }}
                     >
-                      {manufacturer.rating}
-                    </Text>
-                  </View>
+                      <StarRating rating={manufacturer.rating} />
+                      <Text
+                        style={[
+                          styles.bidRatingText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {manufacturer.rating}
+                      </Text>
+                    </View>
 
-                  <View style={styles.bidLocationRow}>
-                    <Ionicons
-                      name="location-outline"
-                      size={15}
-                      color={theme.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.bidLocationText,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {manufacturer.location}
-                    </Text>
+                    <View style={styles.bidLocationRow}>
+                      <Ionicons
+                        name="location-outline"
+                        size={15}
+                        color={theme.textSecondary}
+                      />
+
+                      <Text
+                        style={[
+                          styles.bidLocationText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {manufacturer.location}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -266,14 +279,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
   },
-  bidRatingText: { fontSize: 12, fontWeight: "600" },
+  bidRatingText: { fontSize: 14, fontWeight: 500, marginLeft: 5 },
   bidLocationRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 5,
     gap: 3,
   },
-  bidLocationText: { fontSize: 12, flex: 1 },
+  bidLocationText: { fontSize: 13, flex: 1, fontWeight: 500 },
   bidStatusPill: {
     flexDirection: "row",
     alignItems: "center",

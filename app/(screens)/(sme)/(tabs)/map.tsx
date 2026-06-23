@@ -18,9 +18,6 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-// react-native-maps can throw when native module isn't linked.
-// We'll dynamically require it at runtime so the app doesn't crash
-// when the native module is missing (useful for certain dev setups).
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -193,7 +190,6 @@ const Map = () => {
   useEffect(() => {
     let mounted = true;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const mod = require("react-native-maps");
       if (mounted) setMapsModule(mod);
     } catch (e) {
@@ -283,6 +279,7 @@ const Map = () => {
             ) : null}
           </View>
         )}
+
         {/* MAP */}
         <MapsModule.default
           ref={mapRef}
@@ -351,56 +348,78 @@ const Map = () => {
           <Pressable style={styles.modalBackdrop} onPress={closeModal}>
             {/* Inner Pressable blocks propagation so tapping card doesn't close */}
             <Pressable
-              style={[styles.modalCard, { height: SCREEN_HEIGHT * 0.5 }]}
+              style={[
+                styles.modalCard,
+                {
+                  height: SCREEN_HEIGHT * 0.5,
+                  backgroundColor: theme.cardBackground,
+                },
+              ]}
               onPress={() => {}}
             >
               {/* Handle bar */}
-              <View style={styles.handle} />
+              <View style={[styles.handle, { backgroundColor: theme.icon }]} />
 
               {/* Close button */}
-              <TouchableOpacity style={styles.closeBtn} onPress={closeModal}>
-                <Text style={styles.closeBtnText}>✕</Text>
+              <TouchableOpacity
+                style={[
+                  styles.closeBtn,
+                  { backgroundColor: theme.iconBackground },
+                ]}
+                onPress={closeModal}
+              >
+                <Ionicons name="close" size={20} color={theme.icon} />
               </TouchableOpacity>
 
               {selectedCompany && (
                 <View style={styles.modalContent}>
-                  <Text style={styles.title}>{selectedCompany.name}</Text>
+                  <Text style={[styles.title, { color: theme.text }]}>
+                    {selectedCompany.name}
+                  </Text>
 
-                  <View style={styles.divider} />
+                  <View
+                    style={[
+                      styles.divider,
+                      { backgroundColor: theme.textSecondary + 50 },
+                    ]}
+                  />
 
-                  <View style={styles.row}>
-                    <Text style={styles.rowIcon}>⭐</Text>
-                    <Text style={styles.rowText}>
+                  <View style={[styles.row]}>
+                    <Text style={[styles.rowIcon, { color: theme.text }]}>
+                      ⭐
+                    </Text>
+                    <Text style={[styles.rowText, { color: theme.text }]}>
                       {selectedCompany.rating} Rating
                     </Text>
                   </View>
 
                   <View style={styles.row}>
-                    <Text style={styles.rowIcon}>📍</Text>
-                    <Text style={styles.rowText}>
+                    <Text style={[styles.rowIcon, { color: theme.text }]}>
+                      📍
+                    </Text>
+                    <Text style={[styles.rowText, { color: theme.text }]}>
                       {selectedCompany.address}
                     </Text>
                   </View>
 
                   <View style={styles.row}>
-                    <Text style={styles.rowIcon}>🗺️</Text>
-                    <Text style={styles.rowText}>
+                    <Text style={[styles.rowIcon, { color: theme.text }]}>
+                      🛣️
+                    </Text>
+                    <Text style={[styles.rowText, { color: theme.text }]}>
                       {(selectedCompany.distance / 1000).toFixed(1)} km away
                     </Text>
                   </View>
 
                   <View style={styles.row}>
-                    <Text style={styles.rowIcon}>
+                    <Text style={[styles.rowIcon, { color: theme.text }]}>
                       {selectedCompany.verified ? "✅" : "❌"}
                     </Text>
                     <Text
                       style={[
                         styles.rowText,
                         {
-                          color: selectedCompany.verified
-                            ? "#2e7d32"
-                            : "#c62828",
-                          fontWeight: "600",
+                          color: theme.text,
                         },
                       ]}
                     >
@@ -409,12 +428,13 @@ const Map = () => {
                   </View>
 
                   <TouchableOpacity
-                    style={styles.ctaBtn}
-                    onPress={() =>
-                      router.push(
+                    style={[styles.ctaBtn, { backgroundColor: theme.primary }]}
+                    onPress={() => {
+                      return router.push(
                         "/(screens)/(sme)/(screens)/manufacturerProfile",
-                      )
-                    }
+                      );
+                      // closeModal()
+                    }}
                   >
                     <Text style={styles.ctaBtnText}>View Details</Text>
                   </TouchableOpacity>
@@ -518,7 +538,6 @@ const styles = StyleSheet.create({
   handle: {
     width: 44,
     height: 5,
-    backgroundColor: "#ddd",
     borderRadius: 3,
     alignSelf: "center",
     marginBottom: 8,
@@ -531,13 +550,11 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "#f0f0f0",
     justifyContent: "center",
     alignItems: "center",
   },
   closeBtnText: {
     fontSize: 13,
-    color: "#555",
     fontWeight: "600",
   },
 
@@ -549,14 +566,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111",
     marginBottom: 12,
     marginRight: 36,
   },
 
   divider: {
     height: 1,
-    backgroundColor: "#eee",
     marginBottom: 16,
   },
 
@@ -577,7 +592,6 @@ const styles = StyleSheet.create({
 
   ctaBtn: {
     marginTop: "auto",
-    backgroundColor: "#111",
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",

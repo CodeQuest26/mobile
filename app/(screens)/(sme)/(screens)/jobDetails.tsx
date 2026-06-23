@@ -23,16 +23,6 @@ import {
   View,
 } from "react-native";
 
-// ─── Constants (only those needed in this file) ───────────────────────────────
-const CATEGORY_COLORS: Record<string, string> = {
-  Packaging: "#3B82F6",
-  Hardware: "#8B5CF6",
-  Electronics: "#06B6D4",
-  Textiles: "#EC4899",
-  "Food Processing": "#F97316",
-};
-const getCategoryColor = (cat: string) => CATEGORY_COLORS[cat] ?? "#6B7280";
-
 // Info row component (unchanged)
 const InfoRow = ({ icon, label, value, theme, valueColor }: any) => (
   <View style={styles.infoRow}>
@@ -187,7 +177,10 @@ const JobDetails = () => {
                 {job.image && (
                   <Image
                     source={{ uri: job.image }}
-                    style={[styles.heroImage]}
+                    style={[
+                      styles.heroImage,
+                      { borderWidth: 1, borderColor: theme.border },
+                    ]}
                     resizeMode="contain"
                   />
                 )}
