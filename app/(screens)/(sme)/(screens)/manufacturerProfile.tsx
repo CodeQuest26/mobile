@@ -223,26 +223,21 @@ const ManufacturerProfile = () => {
 
   return (
     <MainContainer safe>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Factory Profile
+        </Text>
+        <View style={{ width: 32 }} />
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Header */}
-        <FadeIn delay={0}>
-          <View style={styles.header}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backBtn}
-            >
-              <Ionicons name="chevron-back" size={24} color={theme.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>
-              Factory Profile
-            </Text>
-            <View style={{ width: 32 }} />
-          </View>
-        </FadeIn>
-
         {/* Hero Section */}
         <FadeIn delay={50}>
           <View style={styles.heroSection}>
@@ -292,7 +287,7 @@ const ManufacturerProfile = () => {
         </FadeIn>
 
         {/* Stats Cards */}
-        <ScrollView
+        {/* <ScrollView
           horizontal
           contentContainerStyle={{
             gap: 10,
@@ -324,7 +319,7 @@ const ManufacturerProfile = () => {
           />
 
           <View style={{ width: 15 }} />
-        </ScrollView>
+        </ScrollView> */}
 
         {/* About Section */}
         <FadeIn delay={150}>
@@ -395,7 +390,7 @@ const ManufacturerProfile = () => {
         </FadeIn>
 
         {/* Certifications */}
-        <FadeIn delay={250}>
+        {/* <FadeIn delay={250}>
           <View
             style={[
               styles.section,
@@ -418,21 +413,27 @@ const ManufacturerProfile = () => {
               ))}
             </View>
           </View>
-        </FadeIn>
+        </FadeIn> */}
 
         {/* Photos */}
         {manufacturer.photos.length > 0 && (
           <FadeIn delay={300}>
             <View
               style={[
-                styles.section,
+                // styles.section,
+
                 {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
+                  paddingVertical: 15,
+                  marginBottom: 15,
                 },
               ]}
             >
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.text, marginLeft: 30 },
+                ]}
+              >
                 Facility Photos
               </Text>
               <FlatList
@@ -500,8 +501,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 8,
+    paddingVertical: 10,
   },
   backBtn: {
     width: 32,
@@ -663,6 +663,7 @@ const styles = StyleSheet.create({
   // Photos
   photosList: {
     paddingRight: 16,
+    marginLeft: 15,
   },
   photoContainer: {
     marginRight: 12,

@@ -1,25 +1,25 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import {
-  AVATAR_COLORS,
-  formatDateLabel,
-  formatTime,
-  Message,
+    AVATAR_COLORS,
+    formatDateLabel,
+    formatTime,
+    Message,
 } from "@/constants/contacts";
 import { useChatConversations } from "@/hooks/useChatConversations";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -33,8 +33,15 @@ type DateSeparator = {
 type ChatItem = Message | DateSeparator;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const getAvatarColor = (id: string) =>
-  AVATAR_COLORS[parseInt(id) % AVATAR_COLORS.length];
+const getAvatarColor = (id: string) => {
+  const numeric = parseInt(id.replace(/\D/g, ""), 10);
+  const index = Number.isFinite(numeric)
+    ? numeric % AVATAR_COLORS.length
+    : Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0) %
+      AVATAR_COLORS.length;
+
+  return AVATAR_COLORS[index];
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 const Bubble = ({
@@ -111,6 +118,8 @@ const ChatRoom = () => {
       contactInitials: string;
       contactOnline: string;
     }>();
+
+  if (!contactId) return null;
 
   const { conversations, setConversations } = useChatConversations(
     userType ?? "manufacturer",

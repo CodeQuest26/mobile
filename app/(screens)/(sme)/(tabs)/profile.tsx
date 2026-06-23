@@ -1,5 +1,4 @@
 import MainContainer from "@/components/MainContainer";
-import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
@@ -53,7 +52,6 @@ const Profile = () => {
           setIsLoading(true);
           setTimeout(() => {
             setIsLoading(false);
-            // Handle logout logic
           }, 1000);
         },
       },
@@ -73,7 +71,6 @@ const Profile = () => {
             setIsLoading(true);
             setTimeout(() => {
               setIsLoading(false);
-              // Handle account deletion logic
             }, 1000);
           },
         },
@@ -82,167 +79,149 @@ const Profile = () => {
   };
 
   return (
-    <MainContainer>
+    <MainContainer safe>
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Cover Image */}
-        <View style={[styles.coverImage, { backgroundColor: theme.primary }]} />
-
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          {/* Profile Image */}
+        {/* Identity Band */}
+        <View
+          style={[styles.identityBand, { borderBottomColor: theme.border }]}
+        >
+          {/* Monogram Avatar */}
           <View
-            style={[
-              styles.profileImageContainer,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}
+            style={[styles.monogram, { backgroundColor: theme.iconBackground }]}
           >
-            <View
-              style={[
-                styles.profileImage,
-                { backgroundColor: theme.iconBackground },
-              ]}
-            >
-              <Ionicons name="person" size={50} color={theme.primary} />
+            <Text style={[styles.monogramText, { color: theme.primary }]}>
+              CN
+            </Text>
+          </View>
+
+          {/* Company Info */}
+          <View style={styles.identityText}>
+            <Text style={[styles.companyName, { color: theme.text }]}>
+              Company Name
+            </Text>
+            <View style={styles.locationRow}>
+              <Ionicons
+                name="location-outline"
+                size={12}
+                color={theme.textSecondary}
+              />
+              <Text
+                style={[styles.locationText, { color: theme.textSecondary }]}
+              >
+                Location
+              </Text>
             </View>
           </View>
 
-          {/* User Info */}
-          <Text style={[styles.userName, { color: theme.text }]}>
-            Company name
-          </Text>
-
-          <View style={{ flexDirection: "row" }}>
+          {/* Edit Button */}
+          <TouchableOpacity
+            style={[styles.editBtn, { borderColor: theme.border }]}
+          >
             <Ionicons
-              name="location-outline"
-              size={15}
+              name="pencil-outline"
+              size={13}
               color={theme.textSecondary}
             />
-            <Text style={[{ color: theme.textSecondary, fontWeight: 600 }]}>
-              location
+            <Text style={[styles.editBtnText, { color: theme.textSecondary }]}>
+              Edit
             </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Account Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            Account
+          </Text>
+
+          <View
+            style={[
+              styles.sectionCard,
+              { backgroundColor: theme.cardBackground },
+            ]}
+          >
+            {/* Email */}
+            <View style={styles.row}>
+              <View
+                style={[
+                  styles.rowIcon,
+                  { backgroundColor: theme.iconBackground },
+                ]}
+              >
+                <Ionicons name="mail" size={16} color={theme.icon} />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
+                  Email
+                </Text>
+                <Text style={[styles.rowValue, { color: theme.text }]}>
+                  user@example.com
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            {/* Phone */}
+            <View style={styles.row}>
+              <View
+                style={[
+                  styles.rowIcon,
+                  { backgroundColor: theme.iconBackground },
+                ]}
+              >
+                <Ionicons name="call" size={16} color={theme.icon} />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
+                  Phone
+                </Text>
+                <Text style={[styles.rowValue, { color: theme.text }]}>
+                  +233 55 123 4567
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        <View style={{ height: 15 }} />
+        {/* Preferences Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            Preferences
+          </Text>
 
-        <View style={{ paddingHorizontal: 15 }}>
-          {/* Account Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Account
-            </Text>
-            <Spacer style={{ height: 15 }} />
-
-            {/* Email */}
-            <View
-              style={[
-                styles.accountItem,
-                {
-                  backgroundColor: theme.cardBackground,
-                },
-              ]}
-            >
-              <View style={styles.itemContent}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: theme.iconBackground },
-                  ]}
-                >
-                  <Ionicons name="mail" size={20} color={theme.icon} />
-                </View>
-                <View style={styles.textContent}>
-                  <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    Email
-                  </Text>
-                  <Text style={[styles.value, { color: theme.text }]}>
-                    user@example.com
-                  </Text>
-                </View>
+          <View
+            style={[
+              styles.sectionCard,
+              { backgroundColor: theme.cardBackground },
+            ]}
+          >
+            {/* Dark Mode */}
+            <View style={styles.row}>
+              <View
+                style={[
+                  styles.rowIcon,
+                  { backgroundColor: theme.iconBackground },
+                ]}
+              >
+                <Ionicons
+                  name={isDarkMode ? "moon" : "sunny"}
+                  size={16}
+                  color={theme.icon}
+                />
               </View>
-            </View>
-
-            <Spacer style={{ height: 15 }} />
-
-            {/* Phone */}
-            <View
-              style={[
-                styles.accountItem,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View style={styles.itemContent}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: theme.iconBackground },
-                  ]}
-                >
-                  <Ionicons name="call" size={20} color={theme.icon} />
-                </View>
-                <View style={styles.textContent}>
-                  <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    Phone
-                  </Text>
-                  <Text style={[styles.value, { color: theme.text }]}>
-                    +1 (555) 123-4567
-                  </Text>
-                </View>
+              <View style={styles.rowBody}>
+                <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
+                  Appearance
+                </Text>
+                <Text style={[styles.rowValue, { color: theme.text }]}>
+                  Dark mode
+                </Text>
               </View>
-            </View>
-          </View>
-
-          <Spacer style={{ height: 25 }} />
-
-          {/* Preferences Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Preferences
-            </Text>
-            <View style={{ height: 10 }} />
-
-            {/* Theme Toggle */}
-            <View
-              style={[
-                styles.preferenceItem,
-                {
-                  backgroundColor: theme.cardBackground,
-                },
-              ]}
-            >
-              <View style={styles.itemContent}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: theme.iconBackground },
-                  ]}
-                >
-                  <Ionicons
-                    name={isDarkMode ? "moon" : "sunny"}
-                    size={20}
-                    color={theme.icon}
-                  />
-                </View>
-                <View style={styles.textContent}>
-                  <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    Dark Mode
-                  </Text>
-                  <Text style={[styles.value, { color: theme.text }]}>
-                    {isDarkMode ? "Enabled" : "Disabled"}
-                  </Text>
-                </View>
-              </View>
-
               <Switch
                 value={isDarkMode}
                 onValueChange={setIsDarkMode}
@@ -251,42 +230,31 @@ const Profile = () => {
               />
             </View>
 
-            <Spacer style={{ height: 15 }} />
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-            {/* Notifications Toggle */}
-            <View
-              style={[
-                styles.preferenceItem,
-                {
-                  backgroundColor: theme.cardBackground,
-                },
-              ]}
-            >
-              <View style={styles.itemContent}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: theme.iconBackground },
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      notificationsEnabled
-                        ? "notifications"
-                        : "notifications-off"
-                    }
-                    size={20}
-                    color={theme.icon}
-                  />
-                </View>
-                <View style={styles.textContent}>
-                  <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    Notifications
-                  </Text>
-                  <Text style={[styles.value, { color: theme.text }]}>
-                    {notificationsEnabled ? "Enabled" : "Disabled"}
-                  </Text>
-                </View>
+            {/* Notifications */}
+            <View style={styles.row}>
+              <View
+                style={[
+                  styles.rowIcon,
+                  { backgroundColor: theme.iconBackground },
+                ]}
+              >
+                <Ionicons
+                  name={
+                    notificationsEnabled ? "notifications" : "notifications-off"
+                  }
+                  size={16}
+                  color={theme.icon}
+                />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
+                  Notifications
+                </Text>
+                <Text style={[styles.rowValue, { color: theme.text }]}>
+                  {notificationsEnabled ? "Push & email" : "Disabled"}
+                </Text>
               </View>
               <Switch
                 value={notificationsEnabled}
@@ -296,114 +264,126 @@ const Profile = () => {
               />
             </View>
 
-            <Spacer style={{ height: 15 }} />
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
             {/* Reset Password */}
             <TouchableOpacity
               disabled={isLoading}
               onPress={handleResetPassword}
-              style={[
-                styles.accountItem,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
+              style={styles.row}
             >
-              <View style={styles.itemContent}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: theme.iconBackground },
-                  ]}
-                >
-                  <Ionicons name="key" size={20} color={theme.icon} />
-                </View>
-                <View style={styles.textContent}>
-                  <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    Reset Password
-                  </Text>
-                  <Text style={[styles.value, { color: theme.text }]}>
-                    Change your password
-                  </Text>
-                </View>
+              <View
+                style={[
+                  styles.rowIcon,
+                  { backgroundColor: theme.iconBackground },
+                ]}
+              >
+                <Ionicons name="key" size={16} color={theme.icon} />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
+                  Security
+                </Text>
+                <Text style={[styles.rowValue, { color: theme.text }]}>
+                  Reset password
+                </Text>
               </View>
               <Ionicons
                 name="chevron-forward"
-                size={20}
+                size={16}
                 color={theme.textSecondary}
               />
             </TouchableOpacity>
           </View>
+        </View>
 
-          <Spacer style={{ height: 25 }} />
+        {/* Account Actions Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            Account actions
+          </Text>
 
-          {/* Account Actions Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Account Actions
-            </Text>
-            <Spacer style={{ height: 10 }} />
-
-            {/* Logout Button */}
+          <View
+            style={[
+              styles.sectionCard,
+              { backgroundColor: theme.cardBackground },
+            ]}
+          >
+            {/* Log Out */}
             <TouchableOpacity
               disabled={isLoading}
               onPress={handleLogout}
-              style={[
-                styles.actionButton,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.primary,
-                  opacity: isLoading ? 0.7 : 1,
-                },
-              ]}
+              style={[styles.row, { opacity: isLoading ? 0.6 : 1 }]}
             >
               {isLoading ? (
-                <ActivityIndicator color={theme.primary} />
+                <ActivityIndicator
+                  color={theme.primary}
+                  style={styles.actionLoader}
+                />
               ) : (
                 <>
-                  <Ionicons name="log-out" size={20} color={theme.primary} />
-                  <Text
-                    style={[styles.actionButtonText, { color: theme.primary }]}
+                  <View
+                    style={[
+                      styles.rowIcon,
+                      { backgroundColor: theme.iconBackground },
+                    ]}
                   >
-                    Log Out
-                  </Text>
+                    <Ionicons name="log-out" size={16} color={theme.primary} />
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={[styles.rowValue, { color: theme.primary }]}>
+                      Log out
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
                 </>
               )}
             </TouchableOpacity>
 
-            <Spacer style={{ height: 15 }} />
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-            {/* Delete Account Button */}
+            {/* Delete Account */}
             <TouchableOpacity
               disabled={isLoading}
               onPress={handleDeleteAccount}
-              style={[
-                styles.actionButton,
-                {
-                  // backgroundColor: theme.error,
-                  borderColor: theme.error,
-                  opacity: isLoading ? 0.7 : 1,
-                },
-              ]}
+              style={[styles.row, { opacity: isLoading ? 0.6 : 1 }]}
             >
               {isLoading ? (
-                <ActivityIndicator color={theme.error} />
+                <ActivityIndicator
+                  color={theme.error}
+                  style={styles.actionLoader}
+                />
               ) : (
                 <>
-                  <Ionicons name="trash" size={20} color={theme.error} />
-                  <Text
-                    style={[styles.actionButtonText, { color: theme.error }]}
+                  <View
+                    style={[
+                      styles.rowIcon,
+                      { backgroundColor: theme.iconBackground },
+                    ]}
                   >
-                    Delete Account
-                  </Text>
+                    <Ionicons name="trash" size={16} color={theme.error} />
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={[styles.rowValue, { color: theme.error }]}>
+                      Delete account
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
                 </>
               )}
             </TouchableOpacity>
           </View>
-
-          <Spacer style={{ height: 100 }} />
         </View>
+
+        <View style={{ height: 60 }} />
       </ScrollView>
     </MainContainer>
   );
@@ -416,112 +396,115 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    // paddingHorizontal: 16,
-    paddingTop: 0,
     paddingBottom: 32,
   },
-  coverImage: {
-    height: 200,
-    width: "100%",
-  },
-  profileSection: {
+
+  /* Identity band */
+  identityBand: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: -50,
-    marginBottom: 24,
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  profileImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    padding: 3,
-    borderWidth: 3,
+  monogram: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    flexShrink: 0,
   },
-  profileImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 50,
+  monogramText: {
+    fontSize: 20,
+    fontWeight: "600",
+  },
+  identityText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  companyName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 3,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  locationText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    flexShrink: 0,
+  },
+  editBtnText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  /* Sections */
+  section: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+  sectionCard: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+
+  /* Rows */
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
+    flexShrink: 0,
   },
-  userName: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 4,
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
   },
-  userRole: {
+  rowLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginBottom: 1,
+  },
+  rowValue: {
     fontSize: 14,
     fontWeight: "500",
   },
-  header: {
-    marginBottom: 8,
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 58,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  section: {
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  accountItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  preferenceItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  itemContent: {
-    flexDirection: "row",
-    alignItems: "center",
+  actionLoader: {
     flex: 1,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  textContent: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "500",
-    marginBottom: 4,
-  },
-  value: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    paddingVertical: 4,
   },
 });

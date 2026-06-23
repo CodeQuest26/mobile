@@ -63,7 +63,6 @@ const FadeIn = ({
 const StatPill = ({
   icon,
   label,
-  color,
   theme,
 }: {
   icon: string;
@@ -71,19 +70,10 @@ const StatPill = ({
   color?: string;
   theme: any;
 }) => (
-  <View
-    style={[
-      styles.statPill,
-      { backgroundColor: theme.cardBackground, borderColor: theme.border },
-    ]}
-  >
-    <Ionicons
-      name={icon as any}
-      size={13}
-      color={color ?? theme.textSecondary}
-    />
+  <View style={[styles.statPill, { backgroundColor: theme.cardBackground }]}>
+    <Ionicons name={icon as any} size={13} color={theme.textSecondary} />
     <Text
-      style={[styles.statPillText, { color: color ?? theme.textSecondary }]}
+      style={[styles.statPillText, { color: theme.textSecondary }]}
       numberOfLines={1}
     >
       {label}
@@ -136,7 +126,14 @@ const JobCard = ({
           activeOpacity={1}
         >
           <View
-            style={[styles.card, { backgroundColor: theme.cardBackground }]}
+            style={[
+              styles.card,
+              {
+                backgroundColor: theme.cardBackground,
+                borderWidth: 1,
+                borderColor: theme.border,
+              },
+            ]}
           >
             <View style={styles.cardInner}>
               {/* Top row */}
@@ -154,6 +151,12 @@ const JobCard = ({
                   >
                     {job.quantity}
                   </Text>
+
+                  <StatPill
+                    icon="cash-outline"
+                    label={job.budget}
+                    theme={theme}
+                  />
                 </View>
 
                 {job.image ? (
@@ -580,10 +583,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
-    borderWidth: 1,
     maxWidth: width * 0.45,
   },
   statPillText: { fontSize: 12, fontWeight: "600", flexShrink: 1 },

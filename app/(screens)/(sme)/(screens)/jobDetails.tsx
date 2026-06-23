@@ -79,6 +79,7 @@ const JobDetails = () => {
 
   const daysLeft = getDaysUntilDeadline(job.deadline);
   const isUrgent = daysLeft <= 7 && job.status === "active";
+  const visibleBids = job.bids.filter((bid) => bid.status !== "rejected");
 
   const handleAcceptBid = () => {
     if (!selectedBid) return;
@@ -247,7 +248,7 @@ const JobDetails = () => {
               </View>
             </View>
 
-            {job.bids.length === 0 ? (
+            {visibleBids.length === 0 ? (
               <View
                 style={[
                   styles.noBidsBox,
@@ -269,7 +270,7 @@ const JobDetails = () => {
                 </Text>
               </View>
             ) : (
-              job.bids.map((bid, i) => (
+              visibleBids.map((bid, i) => (
                 <BidCard
                   key={bid.id}
                   bid={bid}

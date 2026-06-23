@@ -1,5 +1,6 @@
 import { BidStatus, BidWithManufacturer } from "@/constants/Jobstore";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React from "react";
 import {
   Image,
@@ -309,33 +310,63 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
 
                 <TouchableOpacity
                   onPress={onAccept}
-                  style={[styles.acceptBtn, { backgroundColor: theme.primary }]}
+                  style={[
+                    styles.acceptBtn,
+                    {
+                      backgroundColor: theme.cardBackground,
+                      borderWidth: 1,
+                      borderColor: theme.primary,
+                    },
+                  ]}
                 >
                   <Ionicons
                     name="checkmark-circle-outline"
                     size={18}
-                    color="#fff"
+                    color={theme.primary}
                   />
-                  <Text style={styles.acceptBtnText}>Accept Bid</Text>
+                  <Text
+                    style={[styles.acceptBtnText, { color: theme.primary }]}
+                  >
+                    Accept Bid
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {/* Contact */}
             <TouchableOpacity
+              onPress={() => {
+                onClose();
+                setTimeout(() => {
+                  router.push({
+                    pathname: "/ChatRoom",
+                    params: {
+                      userType: "sme",
+                      contactId: manufacturer.id,
+                      contactName: manufacturer.name,
+                      contactInitials: manufacturer.name
+                        .split(" ")
+                        .map((w) => w[0])
+                        .join("")
+                        .slice(0, 2),
+                      contactOnline: "0",
+                    },
+                  });
+                }, 120);
+              }}
               style={[
                 styles.contactBtn,
                 {
-                  backgroundColor: theme.cardBackground,
+                  backgroundColor: theme.primary,
                 },
               ]}
             >
               <Ionicons
                 name="chatbubble-ellipses-outline"
                 size={18}
-                color={theme.primary}
+                color={theme.onPrimary}
               />
-              <Text style={[styles.contactBtnText, { color: theme.primary }]}>
+              <Text style={[styles.contactBtnText, { color: theme.onPrimary }]}>
                 Message {manufacturer.name}
               </Text>
             </TouchableOpacity>
@@ -473,7 +504,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
   },
-  acceptBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  acceptBtnText: { fontSize: 15, fontWeight: "700" },
   contactBtn: {
     flexDirection: "row",
     alignItems: "center",
