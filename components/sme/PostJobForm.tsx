@@ -1,9 +1,14 @@
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,7 +22,6 @@ import {
 import FadeIn from "../common/FadeIn";
 import CategoryModal from "./CategoryModal";
 
-// Job categories with icons
 const JOB_CATEGORIES = [
   { name: "Packaging", icon: "cube-outline" },
   { name: "Hardware", icon: "build-outline" },
@@ -40,8 +44,9 @@ interface FormData {
   budget: string;
   location: string;
   description: string;
-  deadline: string;
+  deadline: Date | null;
   requirements: string[];
+  images: string[];
 }
 
 const PostJobForm = () => {
@@ -55,16 +60,56 @@ const PostJobForm = () => {
     budget: "",
     location: "",
     description: "",
-    deadline: "",
-    requirements: [""],
+    deadline: null,
+    requirements: [],
+    images: [],
   });
+
+  // Real-time error indicator states
+  const [quantityError, setQuantityError] = useState("");
+  const [budgetError, setBudgetError] = useState("");
 
   const [currentRequirement, setCurrentRequirement] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const updateFormData = (field: keyof FormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Handles text normalization depending on strict field constraints
+  const handleNumericInput = (field: "quantity" | "budget", text: string) => {
+    if (field === "quantity") {
+      // Quantity allows numbers only
+      const hasNonNumeric = /[^0-9]/.test(text);
+      if (hasNonNumeric) {
+        setQuantityError("Quantity accepts numbers only");
+      } else {
+        setQuantityError("");
+      }
+      const cleanNumber = text.replace(/[^0-9]/g, "");
+      updateFormData("quantity", cleanNumber);
+    } else {
+      // Budget allows numbers and up to a single decimal point separator
+      const isValidDecimalInput = /^[0-9]*\.?[0-9]*$/.test(text);
+      if (!isValidDecimalInput) {
+        setBudgetError("Budget accepts decimal numbers only");
+        return; // Prevent adding secondary periods or invalid text strings
+      } else {
+        setBudgetError("");
+      }
+      updateFormData("budget", text);
+    }
+  };
+
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS !== "ios") {
+      setShowDatePicker(false);
+    }
+    if (selectedDate) {
+      updateFormData("deadline", selectedDate);
+    }
   };
 
   const addRequirement = () => {
@@ -82,6 +127,52 @@ const PostJobForm = () => {
     updateFormData("requirements", newRequirements);
   };
 
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "We need access to your photos to attach imagery.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const uris = result.assets.map((asset) => asset.uri);
+      updateFormData("images", [...formData.images, ...uris]);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "We need access to your camera to snap job references.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      updateFormData("images", [...formData.images, result.assets[0].uri]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = formData.images.filter((_, i) => i !== index);
+    updateFormData("images", newImages);
+  };
+
   const validateForm = (): boolean => {
     if (!formData.category) {
       Alert.alert("Missing Category", "Please select a job category.");
@@ -92,23 +183,35 @@ const PostJobForm = () => {
       return false;
     }
     if (!formData.quantity.trim()) {
-      Alert.alert("Missing Quantity", "Please specify the quantity needed.");
+      Alert.alert(
+        "Missing Quantity",
+        "Please specify the numerical quantity needed.",
+      );
       return false;
     }
-    if (!formData.budget.trim()) {
-      Alert.alert("Missing Budget", "Please set your budget for this job.");
+    if (!formData.budget.trim() || isNaN(Number(formData.budget))) {
+      Alert.alert(
+        "Invalid Budget",
+        "Please set a clean valid financial budget for this job.",
+      );
       return false;
     }
     if (!formData.location.trim()) {
       Alert.alert("Missing Location", "Please enter the delivery location.");
       return false;
     }
-    // if (!formData.description.trim()) {
-    //   Alert.alert("Missing Description", "Please provide a job description.");
-    //   return false;
-    // }r
+    if (!formData.description.trim()) {
+      Alert.alert(
+        "Missing Description",
+        "Please provide a job specification description.",
+      );
+      return false;
+    }
     if (!formData.deadline) {
-      Alert.alert("Missing Deadline", "Please set a deadline for the job.");
+      Alert.alert(
+        "Missing Deadline",
+        "Please set a structural deadline for the job.",
+      );
       return false;
     }
     return true;
@@ -120,8 +223,7 @@ const PostJobForm = () => {
     setIsSubmitting(true);
 
     try {
-      // TODO: Submit to API
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       Alert.alert(
         "Job Posted Successfully!",
@@ -152,16 +254,14 @@ const PostJobForm = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        {/* Header */}
+        {/* Original Restored Header Layout Tree */}
         <View
-          style={[
-            {
-              paddingHorizontal: 15,
-              marginBottom: 20,
-              flexDirection: "row",
-              alignItems: "center",
-            },
-          ]}
+          style={{
+            paddingHorizontal: 15,
+            marginBottom: 20,
+            flexDirection: "row",
+            alignItems: "center",
+          }}
         >
           <TouchableOpacity
             activeOpacity={0.7}
@@ -257,7 +357,7 @@ const PostJobForm = () => {
             </View>
           </FadeIn>
 
-          {/* Quantity & Budget Row */}
+          {/* Quantity & Budget Row (With Dynamic Decimal Validation support) */}
           <FadeIn delay={150}>
             <View style={styles.section}>
               <View style={styles.row}>
@@ -268,49 +368,59 @@ const PostJobForm = () => {
                   <View
                     style={[
                       styles.inputContainer,
-                      { borderColor: theme.border },
+                      { borderColor: quantityError ? "#EF4444" : theme.border },
                     ]}
                   >
                     <Ionicons
                       name="calculator-outline"
                       size={20}
-                      color={theme.textSecondary}
+                      color={quantityError ? "#EF4444" : theme.textSecondary}
                     />
                     <TextInput
                       style={[styles.input, { color: theme.text }]}
-                      placeholder="e.g., 10,000 units"
+                      placeholder="10000"
                       placeholderTextColor={theme.textSecondary}
                       value={formData.quantity}
                       onChangeText={(value) =>
-                        updateFormData("quantity", value)
+                        handleNumericInput("quantity", value)
                       }
+                      keyboardType="number-pad"
                     />
                   </View>
+                  {!!quantityError && (
+                    <Text style={styles.errorLabelText}>{quantityError}</Text>
+                  )}
                 </View>
+
                 <View style={styles.halfInput}>
                   <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                    Budget
+                    Budget (GH₵)
                   </Text>
                   <View
                     style={[
                       styles.inputContainer,
-                      { borderColor: theme.border },
+                      { borderColor: budgetError ? "#EF4444" : theme.border },
                     ]}
                   >
                     <Ionicons
                       name="cash-outline"
                       size={20}
-                      color={theme.textSecondary}
+                      color={budgetError ? "#EF4444" : theme.textSecondary}
                     />
                     <TextInput
                       style={[styles.input, { color: theme.text }]}
-                      placeholder="e.g., GH₵ 50,000"
+                      placeholder="50000.00"
                       placeholderTextColor={theme.textSecondary}
                       value={formData.budget}
-                      onChangeText={(value) => updateFormData("budget", value)}
-                      keyboardType="numeric"
+                      onChangeText={(value) =>
+                        handleNumericInput("budget", value)
+                      }
+                      keyboardType="decimal-pad"
                     />
                   </View>
+                  {!!budgetError && (
+                    <Text style={styles.errorLabelText}>{budgetError}</Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -341,14 +451,105 @@ const PostJobForm = () => {
             </View>
           </FadeIn>
 
-          {/* Deadline */}
+          {/* Description Input Field */}
+          <FadeIn delay={250}>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Job Specifications & Description
+              </Text>
+              <View
+                style={[
+                  styles.textAreaContainer,
+                  { borderColor: theme.border },
+                ]}
+              >
+                <TextInput
+                  style={[styles.textArea, { color: theme.text }]}
+                  placeholder="Provide precise details regarding structural specifications, structural dimensions, materials required, or specific production constraints..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={formData.description}
+                  onChangeText={(value) => updateFormData("description", value)}
+                  multiline
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+          </FadeIn>
+
+          {/* Media Grid with Pro Arrangement Layout */}
+          <FadeIn delay={280}>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Supporting Media & Blueprints
+              </Text>
+              <View style={styles.mediaRow}>
+                <TouchableOpacity
+                  style={[styles.mediaPickerBox, { borderColor: theme.border }]}
+                  onPress={pickImage}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="images-outline"
+                    size={18}
+                    color={theme.primary}
+                  />
+                  <Text style={[styles.mediaPickerText, { color: theme.text }]}>
+                    Library
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.mediaPickerBox, { borderColor: theme.border }]}
+                  onPress={takePhoto}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="camera-outline"
+                    size={18}
+                    color={theme.primary}
+                  />
+                  <Text style={[styles.mediaPickerText, { color: theme.text }]}>
+                    Camera
+                  </Text>
+                </TouchableOpacity>
+
+                {formData.images.map((uri, index) => (
+                  <View key={index} style={styles.imageThumbnailWrap}>
+                    <Image
+                      source={{ uri }}
+                      style={[styles.thumbnail, { borderColor: theme.border }]}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.removeBadge,
+                        { backgroundColor: theme.cardBackground || "#FFF" },
+                      ]}
+                      onPress={() => removeImage(index)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name="close-outline"
+                        size={14}
+                        color="#EF4444"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </FadeIn>
+
+          {/* Native Platform Date Calendar Picker Field */}
           <FadeIn delay={300}>
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Deadline
               </Text>
 
-              <View
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                activeOpacity={0.9}
                 style={[styles.inputContainer, { borderColor: theme.border }]}
               >
                 <Ionicons
@@ -356,19 +557,53 @@ const PostJobForm = () => {
                   size={20}
                   color={theme.textSecondary}
                 />
+                <Text
+                  style={[
+                    styles.dropdownText,
+                    {
+                      color: formData.deadline
+                        ? theme.text
+                        : theme.textSecondary,
+                    },
+                  ]}
+                >
+                  {formData.deadline
+                    ? formData.deadline.toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : "Select a deadline date"}
+                </Text>
+              </TouchableOpacity>
 
-                <TextInput
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="e.g., 2025-05-15"
-                  placeholderTextColor={theme.textSecondary}
-                  value={formData.deadline}
-                  onChangeText={(value) => updateFormData("deadline", value)}
+              {showDatePicker && (
+                <DateTimePicker
+                  value={formData.deadline || new Date()}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  minimumDate={new Date()}
+                  onChange={onDateChange}
                 />
-              </View>
+              )}
+
+              {Platform.OS === "ios" && showDatePicker && (
+                <TouchableOpacity
+                  style={[
+                    styles.iosDoneButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>
+                    Confirm Date
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </FadeIn>
 
-          {/* Requirements */}
+          {/* Requirements List Section */}
           <FadeIn delay={350}>
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -394,7 +629,11 @@ const PostJobForm = () => {
                       onPress={() => removeRequirement(index)}
                       style={styles.removeBtn}
                     >
-                      <Ionicons name="close-circle" size={20} color="#EF4444" />
+                      <Ionicons
+                        name="trash-outline"
+                        size={18}
+                        color="#EF4444"
+                      />
                     </TouchableOpacity>
                   </View>
                 ) : null,
@@ -444,7 +683,7 @@ const PostJobForm = () => {
             </View>
           </FadeIn>
 
-          {/* Submit Button */}
+          {/* Submit Action Button */}
           <FadeIn delay={400}>
             <View style={styles.submitSection}>
               <TouchableOpacity
@@ -461,13 +700,9 @@ const PostJobForm = () => {
                 ]}
               >
                 {isSubmitting ? (
-                  <View style={styles.loadingContainer}>
-                    <Text
-                      style={[styles.submitText, { color: theme.onPrimary }]}
-                    >
-                      Posting Job...
-                    </Text>
-                  </View>
+                  <Text style={[styles.submitText, { color: theme.onPrimary }]}>
+                    Posting Job...
+                  </Text>
                 ) : (
                   <>
                     <Ionicons
@@ -476,7 +711,6 @@ const PostJobForm = () => {
                       color={theme.onPrimary}
                       style={styles.submitIcon}
                     />
-
                     <Text
                       style={[styles.submitText, { color: theme.onPrimary }]}
                     >
@@ -502,8 +736,6 @@ const PostJobForm = () => {
   );
 };
 
-export default PostJobForm;
-
 const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
@@ -519,7 +751,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     marginBottom: 12,
   },
-  // Inputs
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -534,19 +765,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     height: "100%",
   },
+  errorLabelText: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
   textAreaContainer: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    height: 120,
+    minHeight: 120,
   },
   textArea: {
     fontSize: 16,
     lineHeight: 24,
+    flex: 1,
   },
-
-  // Row layout
   row: {
     flexDirection: "row",
     gap: 12,
@@ -554,13 +791,56 @@ const styles = StyleSheet.create({
   halfInput: {
     flex: 1,
   },
-
-  // Requirements
+  mediaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  mediaPickerBox: {
+    width: 62,
+    height: 62,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mediaPickerText: {
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  imageThumbnailWrap: {
+    position: "relative",
+  },
+  thumbnail: {
+    width: 62,
+    height: 62,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  removeBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   requirementItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
     paddingRight: 8,
+    justifyContent: "space-between",
   },
   requirementText: {
     flex: 1,
@@ -568,7 +848,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   removeBtn: {
-    marginLeft: 8,
+    marginLeft: 12,
+    padding: 4,
   },
   addBtn: {
     width: 32,
@@ -578,8 +859,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 8,
   },
-
-  // Submit
+  iosDoneButton: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   submitSection: {
     paddingHorizontal: 16,
     marginTop: 16,
@@ -602,90 +888,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  // Dropdown styles
   dropdownText: {
     flex: 1,
     fontSize: 16,
     marginLeft: 12,
   },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "70%",
-    paddingBottom: 40,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0, 0, 0, 0.1)",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
-  },
-  categoryOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 20,
-    paddingHorizontal: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0, 0, 0, 0.08)",
-    minHeight: 60,
-  },
-  categoryOptionLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-  },
-  categoryOptionText: {
-    fontSize: 16,
-    fontWeight: "500",
-    letterSpacing: -0.3,
-    flex: 1,
-  },
-  checkmarkContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
 });
+
+export default PostJobForm;

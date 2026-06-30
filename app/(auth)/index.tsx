@@ -293,14 +293,14 @@ const styles = StyleSheet.create({
   },
   button: {
     paddingVertical: 18,
-    borderRadius: 15,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
-    // shadowColor: "#000",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    // elevation: 5,
   },
   buttonText: {
     fontSize: 17,
