@@ -24,15 +24,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const sys = rnUseColorScheme();
-  const [colorScheme, setColorScheme] = useState<ColorScheme>(
+
+  // Tracks if the user has manually changed the theme via their Profile screen
+  const [hasUserOverridden, setHasUserOverridden] = useState(false);
+
+  const [colorScheme, setInternalColorScheme] = useState<ColorScheme>(
     (sys as ColorScheme) ?? defaultScheme,
   );
 
+  // Sync with native OS changes ONLY if the user hasn't chosen manually
   useEffect(() => {
-    // when system changes and user hasn't overridden, sync
-    if (!colorScheme) setColorScheme((sys as ColorScheme) ?? defaultScheme);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sys]);
+    if (sys && !hasUserOverridden) {
+      setInternalColorScheme(sys as ColorScheme);
+    }
+  }, [sys, hasUserOverridden]);
+
+  // Wrapper function to set the state and flag the manual override
+  const setColorScheme = (s: ColorScheme) => {
+    setHasUserOverridden(true);
+    setInternalColorScheme(s);
+  };
 
   const value: ThemeContextValue = {
     theme: Colors[colorScheme],

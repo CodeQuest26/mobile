@@ -117,13 +117,29 @@ const SMEHome = () => {
         <ProductDetailsCard
           product={{
             name: "Product Name",
+            manufacturerId: "m1",
             manufacturer: "Manufacturing Co.",
             quantity: 100,
             currentStage: "Quality Check",
             cost: 1000,
           }}
           theme={theme}
-          onMessagePress={() => {}}
+          onMessagePress={(product: any) => {
+            router.push({
+              pathname: "/ChatRoom",
+              params: {
+                userType: "sme",
+                contactId: product.manufacturerId || "manufacturer-1",
+                contactName: product.manufacturer,
+                contactInitials: product.manufacturer
+                  .split(" ")
+                  .map((w: string) => w[0])
+                  .join("")
+                  .slice(0, 2),
+                contactOnline: "0",
+              },
+            });
+          }}
         />
       </ScrollView>
     </MainContainer>

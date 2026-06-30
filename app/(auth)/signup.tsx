@@ -146,12 +146,14 @@ const SignupScreen = () => {
   const roleMeta = ROLE_META[role] ?? ROLE_META.sme;
 
   const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.length >= 6;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSubmit = emailValid && password.length >= 8;
 
   const handleSignup = () => {
     if (!canSubmit) return;
@@ -163,7 +165,7 @@ const SignupScreen = () => {
       // Falls back to email if no phone was provided.
       const hasPhone = phone.trim().length > 0;
       router.push({
-        pathname: "/otp-verify",
+        pathname: "/OTPVerification",
         params: {
           contact: hasPhone ? phone.trim() : email.trim(),
           type: hasPhone ? "phone" : "email",
@@ -213,8 +215,6 @@ const SignupScreen = () => {
             Create account
           </ThemedText>
 
-          {/* <Spacer style={{ height: 5 }} /> */}
-
           <ThemedText style={{ fontSize: 14, color: theme.textSecondary }}>
             {roleMeta.tagline}
           </ThemedText>
@@ -222,6 +222,16 @@ const SignupScreen = () => {
 
         {/* Form */}
         <View style={styles.form}>
+          <InputField
+            label="Company Name"
+            icon="business-outline"
+            value={companyName}
+            onChangeText={setCompanyName}
+            autoCapitalize="words"
+            theme={theme}
+          />
+
+          <Spacer style={{ height: 15 }} />
           <InputField
             label="Email Address"
             icon="mail-outline"
@@ -231,7 +241,7 @@ const SignupScreen = () => {
             theme={theme}
           />
 
-          <Spacer style={{ height: 15 }} />
+          {/* <Spacer style={{ height: 15 }} />
 
           <InputField
             label="Phone Number (optional)"
@@ -240,7 +250,7 @@ const SignupScreen = () => {
             onChangeText={setPhone}
             keyboardType="phone-pad"
             theme={theme}
-          />
+          /> */}
 
           <Spacer style={{ height: 15 }} />
 
@@ -456,8 +466,9 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 15,
+    height: 54,
+    justifyContent: "center",
     alignItems: "center",
   },
   buttonText: {

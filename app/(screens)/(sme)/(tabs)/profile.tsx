@@ -201,7 +201,7 @@ const Profile = () => {
             ]}
           >
             {/* Dark Mode */}
-            <View style={styles.row}>
+            {/* <View style={styles.row}>
               <View
                 style={[
                   styles.rowIcon,
@@ -214,6 +214,7 @@ const Profile = () => {
                   color={theme.icon}
                 />
               </View>
+
               <View style={styles.rowBody}>
                 <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
                   Appearance
@@ -222,13 +223,14 @@ const Profile = () => {
                   Dark mode
                 </Text>
               </View>
+
               <Switch
                 value={isDarkMode}
                 onValueChange={setIsDarkMode}
                 trackColor={{ false: "#E0E0E0", true: theme.primary }}
                 thumbColor={isDarkMode ? theme.onPrimary : "#F0F0F0"}
               />
-            </View>
+            </View> */}
 
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 

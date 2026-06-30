@@ -31,6 +31,18 @@ const ROLE_META = {
   },
 };
 
+interface InputFieldProps {
+  label: string;
+  icon: any;
+  value: string;
+  onChangeText: any;
+  secureTextEntry: any;
+  keyboardType: string;
+  autoCapitalize: string;
+  rightSlot: any;
+  theme: any;
+}
+
 // --- Input Field ---
 const InputField = ({
   label,
@@ -42,7 +54,7 @@ const InputField = ({
   autoCapitalize,
   rightSlot,
   theme,
-}) => (
+}: InputFieldProps) => (
   <View style={styles.fieldWrapper}>
     <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
       {label}
@@ -88,7 +100,8 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.length >= 6;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSubmit = emailValid && password.length >= 8;
 
   const handleLogin = () => {
     if (!canSubmit) return;
@@ -151,7 +164,7 @@ const LoginScreen = () => {
         {/* Form */}
         <View style={styles.form}>
           <InputField
-            label="Email address or Phone number"
+            label="Email address"
             icon="mail-outline"
             value={email}
             onChangeText={setEmail}
@@ -159,7 +172,7 @@ const LoginScreen = () => {
             theme={theme}
           />
 
-          <Spacer style={{ height: 16 }} />
+          <Spacer style={{ height: 15 }} />
 
           <InputField
             label="Password"
@@ -377,8 +390,9 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    height: 54,
+    borderRadius: 15,
+    justifyContent: "center",
     alignItems: "center",
   },
   buttonText: {

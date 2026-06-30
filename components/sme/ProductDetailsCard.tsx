@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 
 const ProductDetailsCard = ({ product, theme, onMessagePress }: any) => {
@@ -267,7 +267,9 @@ const ProductDetailsCard = ({ product, theme, onMessagePress }: any) => {
                     ]}
                     onPress={() => {
                       handleCloseModal();
-                      if (onMessagePress) onMessagePress();
+                      if (onMessagePress) {
+                        onMessagePress(product);
+                      }
                     }}
                     activeOpacity={0.8}
                   >

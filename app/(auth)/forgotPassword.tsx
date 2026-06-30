@@ -318,6 +318,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           secureTextEntry
         />
       </View>
+
       <View style={[styles.inputContainer, { borderColor: theme.border }]}>
         <Ionicons
           name="checkmark-done-outline"
@@ -333,9 +334,11 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           secureTextEntry
         />
       </View>
+
       {error ? (
-        <Text style={[styles.errorText, { color: "#EF4444" }]}>{error}</Text>
+        <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
       ) : null}
+
       <TouchableOpacity
         style={[styles.button, { backgroundColor: theme.primary }]}
         onPress={handleResetPassword}
@@ -419,7 +422,7 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, marginLeft: 12, fontSize: 16, height: "100%" },
   button: {
-    borderRadius: 30,
+    borderRadius: 15,
     height: 54,
     justifyContent: "center",
     alignItems: "center",

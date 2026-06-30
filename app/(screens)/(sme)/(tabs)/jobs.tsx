@@ -130,8 +130,6 @@ const JobCard = ({
               styles.card,
               {
                 backgroundColor: theme.cardBackground,
-                borderWidth: 1,
-                borderColor: theme.border,
               },
             ]}
           >
@@ -166,6 +164,8 @@ const JobCard = ({
                       styles.cardImage,
                       {
                         backgroundColor: theme.background,
+                        borderWidth: 1,
+                        borderColor: theme.border,
                       },
                     ]}
                     resizeMode="contain"

@@ -1,24 +1,57 @@
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { StyleSheet } from "react-native";
 
-const Index = () => {
-  const loggedIn: boolean = true;
-  const role: string = "sme";
+import { hasCompletedOnboarding } from "@/storage/storage";
+import { useAuthStore } from "@/store/auth";
+
+import { getSavedRole, hasSelectedRole } from "@/storage/storage";
+
+export default function Index() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
-    if (loggedIn) {
-      if (role === "manufacturer")
+    if (!hasHydrated) return;
+
+    const onboarded = hasCompletedOnboarding();
+    const rolePicked = hasSelectedRole();
+    const savedRole = getSavedRole();
+
+    // 1. ROLE SELECTION FIRST
+    if (!rolePicked) {
+      router.replace("/(auth)");
+      return;
+    }
+
+    // 2. ONBOARDING
+    if (!onboarded) {
+      router.replace("/(onboarding)");
+      return;
+    }
+
+    // 3. NOT LOGGED IN
+    if (!isAuthenticated) {
+      router.replace("/(auth)/login");
+      return;
+    }
+
+    // 4. ROLE ROUTING
+    switch (user?.role || savedRole) {
+      case "manufacturer":
         router.replace("/(screens)/(manufacturer)/(tabs)");
-      else if (role === "sme") router.replace("/(screens)/(sme)/(tabs)");
-    } else router.replace("/(auth)/login");
-  }, [loggedIn, role]);
+        break;
 
-  // return router.replace("/(onboarding)");
-};
+      case "sme":
+        router.replace("/(screens)/(sme)/(tabs)");
+        break;
 
-export default Index;
+      default:
+        router.replace("/(auth)/login");
+    }
+  }, [hasHydrated, isAuthenticated, user]);
 
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-});
+  return null;
+}

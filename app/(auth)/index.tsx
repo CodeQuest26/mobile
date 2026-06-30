@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import { setSelectedRole } from "@/storage/storage";
 import MainContainer from "../../components/MainContainer";
 import Colors from "../../constants/colors";
 
@@ -82,10 +83,12 @@ const RoleCard = ({
         >
           {title}
         </Text>
+
         <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>
           {description}
         </Text>
       </View>
+
       {isSelected && (
         <View style={styles.checkmark}>
           <Ionicons name="checkmark-circle" size={28} color={theme.primary} />
@@ -103,8 +106,10 @@ export default function RoleSelection() {
 
   const handleContinue = () => {
     if (!role) return;
-    if (Platform.OS !== "web")
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSelectedRole(role as any);
+
     router.replace({ pathname: "/(onboarding)", params: { role } });
   };
 
@@ -227,7 +232,7 @@ const styles = StyleSheet.create({
   },
   welcome: {
     fontSize: 28,
-    fontWeight: "700",
+    fontWeight: "500",
     textAlign: "center",
     letterSpacing: -0.5,
     marginBottom: 8,
@@ -288,10 +293,10 @@ const styles = StyleSheet.create({
   },
   button: {
     paddingVertical: 18,
-    borderRadius: 40,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    // shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,

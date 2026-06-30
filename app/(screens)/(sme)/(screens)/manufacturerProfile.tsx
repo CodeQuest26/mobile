@@ -146,37 +146,6 @@ const MOCK_MANUFACTURERS = [
   },
 ];
 
-interface StatCardProps {
-  icon: string;
-  value: string;
-  label: string;
-  theme: any;
-  delay: number;
-}
-
-const StatCard = ({ icon, value, label, theme, delay }: StatCardProps) => {
-  return (
-    <FadeIn delay={delay}>
-      <View
-        style={[
-          styles.statCard,
-          { backgroundColor: theme.cardBackground, borderColor: theme.border },
-        ]}
-      >
-        <View
-          style={[styles.statIcon, { backgroundColor: theme.primary + "20" }]}
-        >
-          <Ionicons name={icon as any} size={20} color={theme.primary} />
-        </View>
-        <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
-        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-          {label}
-        </Text>
-      </View>
-    </FadeIn>
-  );
-};
-
 interface CertificationBadgeProps {
   certification: string;
   theme: any;
@@ -285,41 +254,6 @@ const ManufacturerProfile = () => {
             </View>
           </View>
         </FadeIn>
-
-        {/* Stats Cards */}
-        {/* <ScrollView
-          horizontal
-          contentContainerStyle={{
-            gap: 10,
-            marginLeft: 15,
-            marginBottom: 15,
-          }}
-          showsHorizontalScrollIndicator={false}
-        >
-          <StatCard
-            icon="checkmark-circle-outline"
-            value={manufacturer.stats.onTimeDelivery}
-            label="On-Time Delivery"
-            theme={theme}
-            delay={0}
-          />
-          <StatCard
-            icon="star-outline"
-            value={manufacturer.stats.qualityRating}
-            label="Quality Rating"
-            theme={theme}
-            delay={50}
-          />
-          <StatCard
-            icon="time-outline"
-            value={manufacturer.stats.responseTime}
-            label="Response Time"
-            theme={theme}
-            delay={100}
-          />
-
-          <View style={{ width: 15 }} />
-        </ScrollView> */}
 
         {/* About Section */}
         <FadeIn delay={150}>
@@ -462,6 +396,7 @@ const ManufacturerProfile = () => {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
               Contact Information
             </Text>
+
             <View style={styles.contactContainer}>
               <TouchableOpacity style={styles.contactRow}>
                 <Ionicons name="call-outline" size={20} color={theme.primary} />
@@ -469,18 +404,21 @@ const ManufacturerProfile = () => {
                   {manufacturer.contact.phone}
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity style={styles.contactRow}>
                 <Ionicons name="mail-outline" size={20} color={theme.primary} />
                 <Text style={[styles.contactText, { color: theme.text }]}>
                   {manufacturer.contact.email}
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity style={styles.contactRow}>
                 <Ionicons
                   name="globe-outline"
                   size={20}
                   color={theme.primary}
                 />
+
                 <Text style={[styles.contactText, { color: theme.text }]}>
                   {manufacturer.contact.website}
                 </Text>

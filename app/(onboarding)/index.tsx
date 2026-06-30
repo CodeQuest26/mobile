@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { storage } from "@/store/mmkv";
 import MainContainer from "../../components/MainContainer";
 import Colors from "../../constants/colors";
 
@@ -224,18 +225,30 @@ const OnboardingScreen = () => {
     setActiveIndex(index);
   };
 
+  const finishOnboarding = () => {
+    storage.set("has_launched", true);
+
+    router.replace({
+      pathname: "/(auth)/login",
+      params: { role },
+    });
+  };
+
   const goNext = () => {
     if (isLast) {
-      router.replace({ pathname: "/login", params: { role } });
+      finishOnboarding();
       return;
     }
+
     flatListRef.current?.scrollToIndex({
       index: activeIndex + 1,
       animated: true,
     });
   };
 
-  const skip = () => router.replace({ pathname: "/login", params: { role } });
+  const skip = () => {
+    finishOnboarding();
+  };
 
   const handleSwitchRole = () => {
     router.replace("/(auth)");

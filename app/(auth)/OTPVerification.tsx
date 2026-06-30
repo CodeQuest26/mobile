@@ -21,7 +21,7 @@ import Colors from "../../constants/colors";
 const OTP_LENGTH = 4;
 const RESEND_COUNTDOWN = 30;
 
-// --- Single OTP box ---
+// --- Single OTP Box ---
 const OtpBox = ({
   value,
   focused,
@@ -41,15 +41,15 @@ const OtpBox = ({
     if (value) {
       Animated.sequence([
         Animated.timing(filledScale, {
-          toValue: 1.18,
-          duration: 80,
+          toValue: 1.12,
+          duration: 90,
           useNativeDriver: true,
         }),
         Animated.spring(filledScale, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 200,
-          friction: 8,
+          tension: 220,
+          friction: 9,
         }),
       ]).start();
     }
@@ -60,13 +60,13 @@ const OtpBox = ({
     : focused
       ? theme.primary
       : value
-        ? theme.primary + "60"
+        ? theme.primary + "90"
         : theme.border;
 
   const bgColor = hasError
-    ? "#EF444415"
+    ? "#EF44440D"
     : focused
-      ? theme.primary + "0D"
+      ? theme.primary + "08"
       : theme.cardBackground;
 
   return (
@@ -95,12 +95,12 @@ const OtpBox = ({
   );
 };
 
-// --- Screen ---
+// --- Main Screen ---
 export default function OtpVerifyScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
+  const isDark = colorScheme === "dark";
 
-  // contact & type are forwarded from signup with the user's actual number/email
   const {
     contact = "+233 ** *** 4521",
     type = "phone",
@@ -121,12 +121,19 @@ export default function OtpVerifyScreen() {
 
   const inputRef = useRef<TextInput>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const successScale = useRef(new Animated.Value(0)).current;
+
+  // Modernized Success Animation Refs
+  const successOpacity = useRef(new Animated.Value(0)).current;
+  const iconScale = useRef(new Animated.Value(0.4)).current;
+  const pulseRingScale = useRef(new Animated.Value(0.8)).current;
+  const pulseRingOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslateY = useRef(new Animated.Value(15)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Focus the hidden input on mount
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 300);
+    setTimeout(() => inputRef.current?.focus(), 400);
     startCountdown();
     return () => clearTimer();
   }, []);
@@ -152,7 +159,6 @@ export default function OtpVerifyScreen() {
   };
 
   const handleChange = (text: string) => {
-    // Allow only digits
     const digits = text.replace(/\D/g, "").slice(0, OTP_LENGTH);
     setOtp(digits);
     setHasError(false);
@@ -166,28 +172,28 @@ export default function OtpVerifyScreen() {
   const triggerShake = () => {
     Animated.sequence([
       Animated.timing(shakeAnim, {
-        toValue: 10,
-        duration: 50,
+        toValue: 8,
+        duration: 40,
         useNativeDriver: true,
       }),
       Animated.timing(shakeAnim, {
-        toValue: -10,
-        duration: 50,
+        toValue: -8,
+        duration: 40,
         useNativeDriver: true,
       }),
       Animated.timing(shakeAnim, {
-        toValue: 7,
-        duration: 50,
+        toValue: 5,
+        duration: 40,
         useNativeDriver: true,
       }),
       Animated.timing(shakeAnim, {
-        toValue: -7,
-        duration: 50,
+        toValue: -5,
+        duration: 40,
         useNativeDriver: true,
       }),
       Animated.timing(shakeAnim, {
         toValue: 0,
-        duration: 50,
+        duration: 40,
         useNativeDriver: true,
       }),
     ]).start(() =>
@@ -196,35 +202,69 @@ export default function OtpVerifyScreen() {
         setOtp("");
         setFocusedIndex(0);
         inputRef.current?.focus();
-      }, 500),
+      }, 350),
     );
   };
 
   const triggerSuccess = () => {
-    Animated.spring(successScale, {
+    // 1. Fade screen in
+    Animated.timing(successOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // 2. Icon Spring Pop
+    Animated.spring(iconScale, {
       toValue: 1,
       useNativeDriver: true,
-      tension: 55,
-      friction: 5,
-    }).start(() => {
-      // Forward to onboarding (or home) after verification
-      setTimeout(() => {
-        role == "sme"
-          ? router.replace({
-              pathname: "/(screens)/(sme)/(tabs)",
-              params: { role },
-            })
-          : router.replace({
-              pathname: "/(screens)/(manufacturer)/(tabs)",
-              params: { role },
-            });
-      }, 600);
-    });
+      tension: 70,
+      friction: 7,
+    }).start();
+
+    // 3. Ambient out-ward pulse ring
+    Animated.parallel([
+      Animated.timing(pulseRingScale, {
+        toValue: 2.2,
+        duration: 900,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulseRingOpacity, {
+        toValue: 0,
+        duration: 900,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // 4. Staggered Text Reveal
+    Animated.sequence([
+      Animated.delay(150),
+      Animated.parallel([
+        Animated.timing(textOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(textTranslateY, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Hand-off route swap
+    setTimeout(() => {
+      const destination =
+        role === "sme"
+          ? "/(screens)/(sme)/(tabs)"
+          : "/(screens)/(manufacturer)/(tabs)";
+      router.replace({ pathname: destination, params: { role } });
+    }, 1800);
   };
 
   const verify = (code: string) => {
     setLoading(true);
-    // TODO: replace with your real OTP verification call
     setTimeout(() => {
       setLoading(false);
       const MOCK_OTP = "1234";
@@ -235,7 +275,7 @@ export default function OtpVerifyScreen() {
         setHasError(true);
         triggerShake();
       }
-    }, 900);
+    }, 850);
   };
 
   const handleResend = () => {
@@ -245,10 +285,7 @@ export default function OtpVerifyScreen() {
     setFocusedIndex(0);
     startCountdown();
     inputRef.current?.focus();
-    // TODO: call your resend OTP API
   };
-
-  const isPhone = type === "phone";
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
@@ -259,25 +296,28 @@ export default function OtpVerifyScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => router.replace("/login")}
             style={[styles.backBtn, { backgroundColor: theme.cardBackground }]}
           >
             <Ionicons name="chevron-back" size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
 
-        {/* Body */}
+        {/* Body Container */}
         <View style={styles.body}>
-          {/* Icon */}
+          <Spacer style={{ height: 16 }} />
+
           <View
             style={[
               styles.iconCircle,
-              { backgroundColor: theme.primary + "15" },
+              { backgroundColor: theme.primary + "12" },
             ]}
           >
             <Ionicons
-              name={isPhone ? "phone-portrait-outline" : "mail-outline"}
-              size={30}
+              name={
+                type === "phone" ? "phone-portrait-outline" : "mail-outline"
+              }
+              size={28}
               color={theme.primary}
             />
           </View>
@@ -285,21 +325,21 @@ export default function OtpVerifyScreen() {
           <Spacer style={{ height: 24 }} />
 
           <ThemedText style={styles.heading}>
-            Verify your {isPhone ? "number" : "email"}
+            Verify your {type === "phone" ? "number" : "email"}
           </ThemedText>
           <Spacer style={{ height: 8 }} />
           <ThemedText
             style={[styles.subheading, { color: theme.textSecondary }]}
           >
-            We sent a 4-digit code to{" "}
-            <Text style={{ color: theme.text, fontWeight: "700" }}>
+            We sent a 4-digit verification code to{"\n"}
+            <Text style={{ color: theme.text, fontWeight: "600" }}>
               {contact}
             </Text>
           </ThemedText>
 
-          <Spacer style={{ height: 44 }} />
+          <Spacer style={{ height: 40 }} />
 
-          {/* OTP boxes + hidden input */}
+          {/* OTP Fields Grid */}
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => inputRef.current?.focus()}
@@ -317,7 +357,7 @@ export default function OtpVerifyScreen() {
             ))}
           </TouchableOpacity>
 
-          {/* Invisible input that captures keyboard */}
+          {/* Invisible Input Receiver */}
           <TextInput
             ref={inputRef}
             value={otp}
@@ -332,9 +372,9 @@ export default function OtpVerifyScreen() {
             onBlur={() => setFocusedIndex(-1)}
           />
 
-          <Spacer style={{ heigth: 16 }} />
+          <Spacer style={{ height: 24 }} />
 
-          {/* Error / loading hint */}
+          {/* Verification Indicators */}
           {hasError && (
             <Text style={styles.errorText}>
               Incorrect code. Please try again.
@@ -342,13 +382,13 @@ export default function OtpVerifyScreen() {
           )}
           {loading && (
             <Text style={[styles.hintText, { color: theme.textSecondary }]}>
-              Verifying…
+              Verifying entry...
             </Text>
           )}
 
-          <Spacer style={{ height: 36 }} />
+          <Spacer style={{ height: 24 }} />
 
-          {/* Resend */}
+          {/* Counter Controls */}
           <View style={styles.resendRow}>
             <Text style={[styles.resendPrompt, { color: theme.textSecondary }]}>
               Didn't receive a code?{" "}
@@ -364,7 +404,7 @@ export default function OtpVerifyScreen() {
                 style={[styles.resendCountdown, { color: theme.textSecondary }]}
               >
                 Resend in{" "}
-                <Text style={{ color: theme.primary, fontWeight: "700" }}>
+                <Text style={{ color: theme.primary, fontWeight: "600" }}>
                   {countdown}s
                 </Text>
               </Text>
@@ -372,11 +412,11 @@ export default function OtpVerifyScreen() {
           </View>
         </View>
 
-        {/* Verify button */}
+        {/* Footer Submit CTA */}
         <View style={styles.footer}>
           <TouchableOpacity
             disabled={otp.length < OTP_LENGTH || loading || verified}
-            activeOpacity={0.9}
+            activeOpacity={0.85}
             onPress={() => verify(otp)}
             style={[
               styles.button,
@@ -384,7 +424,7 @@ export default function OtpVerifyScreen() {
                 backgroundColor:
                   otp.length === OTP_LENGTH && !loading && !verified
                     ? theme.primary
-                    : theme.border,
+                    : theme.border + "A0",
               },
             ]}
           >
@@ -405,113 +445,150 @@ export default function OtpVerifyScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Success overlay */}
+      {/* Redesigned Success Interactive Overlay */}
       {verified && (
-        <View style={styles.successOverlay}>
-          <Animated.View
-            style={[
-              styles.successCircle,
-              { backgroundColor: theme.primary },
-              { transform: [{ scale: successScale }] },
-            ]}
-          >
-            <Ionicons name="checkmark" size={52} color="#fff" />
-          </Animated.View>
-        </View>
+        <Animated.View
+          style={[
+            styles.successOverlay,
+            {
+              backgroundColor: isDark
+                ? "rgba(10,10,12,0.96)"
+                : "rgba(255,255,255,0.97)",
+              opacity: successOpacity,
+            },
+          ]}
+        >
+          <View style={styles.successWrapper}>
+            {/* Outward Ring Component */}
+            <Animated.View
+              style={[
+                styles.pulseRing,
+                {
+                  borderColor: theme.primary,
+                  transform: [{ scale: pulseRingScale }],
+                  opacity: pulseRingOpacity,
+                },
+              ]}
+            />
+
+            {/* Scale Pop Icon Canvas */}
+            <Animated.View
+              style={[
+                styles.successIconCanvas,
+                {
+                  backgroundColor: theme.primary,
+                  transform: [{ scale: iconScale }],
+                },
+              ]}
+            >
+              <Ionicons name="checkmark-sharp" size={40} color="#FFFFFF" />
+            </Animated.View>
+
+            {/* Sliding Text Label Segment */}
+            <Animated.View
+              style={{
+                opacity: textOpacity,
+                transform: [{ translateY: textTranslateY }],
+                alignItems: "center",
+              }}
+            >
+              <Text style={[styles.newSuccessTitle, { color: theme.text }]}>
+                Verification Successful
+              </Text>
+              <Text
+                style={[styles.newSuccessSub, { color: theme.textSecondary }]}
+              >
+                Preparing your personal dashboard...
+              </Text>
+            </Animated.View>
+          </View>
+        </Animated.View>
       )}
     </MainContainer>
   );
 }
 
-// --- Styles ---
+// --- Style Framework sheet ---
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 4,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-
   body: {
     flex: 1,
     paddingHorizontal: 32,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start", // Changed to top-down for smoother keyboard experience
   },
-
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
+    width: 68,
+    height: 68,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-
   heading: {
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "700",
     textAlign: "center",
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   subheading: {
-    fontSize: 14.5,
+    fontSize: 14,
     textAlign: "center",
     lineHeight: 22,
   },
-
   otpRow: {
     flexDirection: "row",
-    gap: 14,
+    gap: 16,
   },
   otpBox: {
-    width: 64,
-    height: 68,
-    borderRadius: 16,
+    width: 60,
+    height: 64,
+    borderRadius: 14,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },
   otpBoxFocused: {
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
   },
   otpChar: {
-    fontSize: 28,
-    fontWeight: "700",
-    lineHeight: 34,
+    fontSize: 26,
+    fontWeight: "600",
   },
   cursor: {
     position: "absolute",
     width: 2,
-    height: 26,
+    height: 22,
     borderRadius: 1,
   },
-
   hiddenInput: {
     position: "absolute",
     width: 1,
     height: 1,
     opacity: 0,
   },
-
   errorText: {
-    fontSize: 13.5,
+    fontSize: 14,
     color: "#EF4444",
     fontWeight: "500",
     textAlign: "center",
   },
   hintText: {
-    fontSize: 13.5,
+    fontSize: 14,
     textAlign: "center",
   },
-
   resendRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -521,38 +598,69 @@ const styles = StyleSheet.create({
   },
   resendLink: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   resendCountdown: {
     fontSize: 14,
   },
-
   footer: {
     paddingHorizontal: 24,
-    paddingBottom: 36,
+    paddingBottom: Platform.OS === "ios" ? 34 : 24,
     paddingTop: 12,
   },
   button: {
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 
+  /* NEW REDESIGNED SUCCESS STYLES */
   successOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.35)",
+    zIndex: 999,
   },
-  successCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 35,
+  successWrapper: {
     alignItems: "center",
     justifyContent: "center",
+    width: "100%",
+    paddingHorizontal: 40,
+  },
+  pulseRing: {
+    position: "absolute",
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+  },
+  successIconCanvas: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  newSuccessTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  newSuccessSub: {
+    fontSize: 15,
+    textAlign: "center",
+    opacity: 0.8,
   },
 });

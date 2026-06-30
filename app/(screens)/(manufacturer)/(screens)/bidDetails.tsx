@@ -6,6 +6,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
+  Dimensions,
+  Image,
+  Modal,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -18,17 +21,21 @@ import {
 
 import { getJobById } from "@/constants/manufacturerData";
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
+const { width, height } = Dimensions.get("window");
 
 export default function BidDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
+  const isDark = colorScheme === "dark";
 
   const [job] = useState(() => getJobById(id));
   const [bidAmount, setBidAmount] = useState("");
   const [note, setNote] = useState("");
   const [bidSubmitted, setBidSubmitted] = useState(false);
+
+  // Lightbox Image State
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   if (!job) {
     return (
@@ -43,6 +50,12 @@ export default function BidDetailsScreen() {
     );
   }
 
+  const jobImages = job.images || [
+    "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=600",
+    "https://images.unsplash.com/photo-1563784462386-044fd95e9852?auto=format&fit=crop&q=80&w=400",
+    "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&q=80&w=400",
+  ];
+
   const handleSubmitBid = () => {
     if (!bidAmount.trim()) {
       Alert.alert("Missing amount", "Please enter your bid amount.");
@@ -53,15 +66,18 @@ export default function BidDetailsScreen() {
       Alert.alert("Invalid amount", "Please enter a valid bid amount.");
       return;
     }
-    // TODO: POST to API
     setBidSubmitted(true);
   };
 
   return (
-    <MainContainer safe>
-      <StatusBar barStyle="default" />
+    <MainContainer>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        translucent
+        backgroundColor="transparent"
+      />
 
-      {/* Header */}
+      {/* Clean Minimal Inline Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={theme.text} />
@@ -77,7 +93,7 @@ export default function BidDetailsScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Job overview card — mirrors JobPeekCard layout */}
+        {/* Job overview card */}
         <FadeIn delay={0}>
           <View
             style={[
@@ -85,6 +101,7 @@ export default function BidDetailsScreen() {
               {
                 backgroundColor: theme.cardBackground,
                 borderColor: theme.border,
+                marginHorizontal: 16,
               },
             ]}
           >
@@ -149,14 +166,44 @@ export default function BidDetailsScreen() {
           </View>
         </FadeIn>
 
+        {/* Reference Gallery Row */}
+        <FadeIn delay={60}>
+          <View style={[styles.card, { padding: 0 }]}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.text, marginLeft: 35 },
+              ]}
+            >
+              Reference Gallery
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.galleryContainer}
+            >
+              {jobImages.map((img, index) => (
+                <TouchableOpacity
+                  key={index}
+                  activeOpacity={0.9}
+                  onPress={() => setSelectedImage(img)}
+                >
+                  <Image source={{ uri: img }} style={styles.galleryImage} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </FadeIn>
+
         {/* Description */}
-        <FadeIn delay={80}>
+        <FadeIn delay={100}>
           <View
             style={[
               styles.card,
               {
                 backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
+                marginHorizontal: 16,
               },
             ]}
           >
@@ -170,13 +217,13 @@ export default function BidDetailsScreen() {
         </FadeIn>
 
         {/* Requirements */}
-        <FadeIn delay={120}>
+        <FadeIn delay={140}>
           <View
             style={[
               styles.card,
               {
                 backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
+                marginHorizontal: 16,
               },
             ]}
           >
@@ -200,13 +247,13 @@ export default function BidDetailsScreen() {
         </FadeIn>
 
         {/* Bid form */}
-        <FadeIn delay={160}>
+        <FadeIn delay={180}>
           <View
             style={[
               styles.card,
               {
                 backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
+                marginHorizontal: 16,
               },
             ]}
           >
@@ -305,15 +352,50 @@ export default function BidDetailsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Image Lightbox Portal */}
+      <Modal
+        visible={selectedImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <TouchableOpacity
+          style={styles.lightboxOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedImage(null)}
+        >
+          <StatusBar barStyle="light-content" />
+          <TouchableOpacity
+            style={styles.closeLightboxBtn}
+            onPress={() => setSelectedImage(null)}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {selectedImage && (
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.lightboxImage}
+              resizeMode="contain"
+            />
+          )}
+        </TouchableOpacity>
+      </Modal>
     </MainContainer>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  scrollContent: {
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 54,
+    paddingBottom: 12,
     paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingTop: 8,
     paddingBottom: 20,
   },
   notFound: {
@@ -321,13 +403,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginVertical: 16,
-    paddingHorizontal: 15,
   },
   backBtn: { padding: 8 },
   headerTitle: { fontSize: 20, fontWeight: "700" },
@@ -363,7 +438,18 @@ const styles = StyleSheet.create({
   },
   locText: { fontSize: 12 },
   postedAt: { fontSize: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  galleryContainer: {
+    gap: 10,
+    marginLeft: 16,
+    paddingRight: 16,
+  },
+  galleryImage: {
+    width: width * 0.4,
+    height: 95,
+    borderRadius: 12,
+    resizeMode: "cover",
+  },
   bodyText: { fontSize: 14, lineHeight: 21 },
   reqRow: {
     flexDirection: "row",
@@ -405,4 +491,23 @@ const styles = StyleSheet.create({
   },
   successTitle: { fontSize: 16, fontWeight: "700" },
   successSub: { fontSize: 14, textAlign: "center", lineHeight: 21 },
+
+  // Lightbox Specific Layout Styles
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeLightboxBtn: {
+    position: "absolute",
+    top: 54,
+    right: 24,
+    zIndex: 20,
+    padding: 8,
+  },
+  lightboxImage: {
+    width: width,
+    height: height * 0.75,
+  },
 });

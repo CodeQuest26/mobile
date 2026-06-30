@@ -17,7 +17,7 @@ import {
   View,
 } from "react-native";
 import { RectButton, Swipeable } from "react-native-gesture-handler";
-// Optional: import * as Haptics from 'expo-haptics';
+import Animated, { LinearTransition } from "react-native-reanimated";
 
 const { width } = Dimensions.get("window");
 
@@ -30,14 +30,13 @@ interface Notification {
   type: "order" | "bid" | "payment" | "system";
 }
 
-// Mock data – replace with API call
 const MOCK_NOTIFICATIONS: Notification[] = [
   {
     id: "1",
     title: "Order Update",
     message:
       "AfroDrinks Ltd has marked 'Aluminium Cans' as Quality Check completed.",
-    timestamp: "10 minutes ago",
+    timestamp: "10m ago",
     read: false,
     type: "order",
   },
@@ -45,7 +44,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     id: "2",
     title: "New Bid",
     message: "Your bid for 'Plastic Containers' has been accepted!",
-    timestamp: "1 hour ago",
+    timestamp: "1h ago",
     read: false,
     type: "bid",
   },
@@ -53,8 +52,8 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     id: "3",
     title: "Payment Received",
     message: "GH₵ 32,200 has been released from escrow for 'Steel Frames'.",
-    timestamp: "3 hours ago",
-    read: true,
+    timestamp: "3h ago",
+    read: false,
     type: "payment",
   },
   {
@@ -63,7 +62,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     message:
       "New features available: milestone tracking and chat enhancements.",
     timestamp: "Yesterday",
-    read: true,
+    read: false,
     type: "system",
   },
   {
@@ -76,39 +75,24 @@ const MOCK_NOTIFICATIONS: Notification[] = [
   },
 ];
 
-const getIcon = (type: string, read: boolean, theme: any) => {
-  let iconName = "notifications-outline";
-  let color = theme.textSecondary;
+const getIconName = (type: string) => {
   switch (type) {
     case "order":
-      iconName = "cube-outline";
-      color = "#6366F1";
-      break;
+      return "cube-outline";
     case "bid":
-      iconName = "hammer-outline";
-      color = "#F59E0B";
-      break;
+      return "hammer-outline";
     case "payment":
-      iconName = "wallet-outline";
-      color = "#22C55E";
-      break;
+      return "wallet-outline";
     case "system":
-      iconName = "settings-outline";
-      color = "#8B5CF6";
-      break;
+      return "settings-outline";
+    default:
+      return "notifications-outline";
   }
-  return (
-    <Ionicons
-      name={iconName as any}
-      size={22}
-      color={read ? theme.textSecondary : color}
-    />
-  );
 };
 
 export default function NotificationsScreen() {
   const colorScheme = useColorScheme();
-  const theme = Colors[colorScheme] || Colors.light;
+  const theme = Colors[colorScheme ?? "light"] || Colors.light;
   const isDark = colorScheme === "dark";
 
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
@@ -117,40 +101,35 @@ export default function NotificationsScreen() {
 
   const swipeableRefs = useRef(new Map<string, Swipeable>());
 
-  // Cleanup refs on unmount
   useEffect(() => {
     return () => {
       swipeableRefs.current.clear();
     };
   }, []);
 
-  const filteredNotifications =
-    activeTab === "all" ? notifications : notifications.filter((n) => !n.read);
+  const activeUnreadNotifications = notifications.filter((n) => !n.read);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const filteredNotifications =
+    activeTab === "all"
+      ? activeUnreadNotifications
+      : activeUnreadNotifications.filter((n) => n.type === "order");
+
+  const unreadCount = activeUnreadNotifications.length;
 
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif)),
     );
-    // Optional haptic feedback
-    // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
   const deleteNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    // Optional haptic
-    // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
   }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Replace with your actual API call
     try {
-      // Simulate network request
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      // If API call returns fresh data, update state here
-      // setNotifications(freshNotifications);
     } catch (error) {
       console.error("Refresh failed", error);
     } finally {
@@ -161,18 +140,16 @@ export default function NotificationsScreen() {
   const markAllAsRead = () => {
     if (unreadCount === 0) return;
     Alert.alert(
-      "Mark all as read",
-      `Mark ${unreadCount} notification${unreadCount > 1 ? "s" : ""} as read?`,
+      "Clear all notifications",
+      `Clear all ${unreadCount} active updates?`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Mark All",
+          text: "Clear All",
           onPress: () => {
             setNotifications((prev) =>
               prev.map((notif) => ({ ...notif, read: true })),
             );
-            // Optional haptic
-            // Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
         },
       ],
@@ -183,102 +160,105 @@ export default function NotificationsScreen() {
     (id: string) => {
       return (
         <RectButton
-          style={[styles.deleteButton, { backgroundColor: "#EF4444" }]}
+          style={[
+            styles.deleteButton,
+            { backgroundColor: isDark ? "#2A2A2A" : "#1A1A1A" },
+          ]}
           onPress={() => deleteNotification(id)}
         >
-          <Ionicons name="trash-outline" size={22} color="#fff" />
+          <Ionicons name="trash-outline" size={20} color="#fff" />
           <Text style={styles.deleteText}>Delete</Text>
         </RectButton>
       );
     },
-    [deleteNotification],
+    [deleteNotification, isDark],
   );
 
   const renderNotification = useCallback(
-    ({ item, index }: { item: Notification; index: number }) => (
-      <FadeIn delay={index * 30}>
-        <Swipeable
-          ref={(ref) => {
-            if (ref) swipeableRefs.current.set(item.id, ref);
-            else swipeableRefs.current.delete(item.id);
-          }}
-          renderRightActions={() => renderRightActions(item.id)}
-          onSwipeableOpen={() => {
-            // Close any other open swipeable
-            swipeableRefs.current.forEach((ref, key) => {
-              if (key !== item.id && ref) ref.close();
-            });
-          }}
-        >
-          <TouchableOpacity
-            style={[
-              styles.notificationItem,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-                opacity: item.read ? 0.7 : 1,
-              },
-            ]}
-            onPress={() => markAsRead(item.id)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.iconColumn}>
-              {getIcon(item.type, item.read, theme)}
-            </View>
-            <View style={styles.contentColumn}>
-              <Text
-                style={[styles.title, { color: theme.text }]}
-                numberOfLines={1}
+    ({ item, index }: { item: Notification; index: number }) => {
+      return (
+        <Animated.View layout={LinearTransition.springify().mass(0.8)}>
+          <FadeIn delay={index * 15}>
+            <Swipeable
+              ref={(ref) => {
+                if (ref) swipeableRefs.current.set(item.id, ref);
+                else swipeableRefs.current.delete(item.id);
+              }}
+              renderRightActions={() => renderRightActions(item.id)}
+              onSwipeableOpen={() => {
+                swipeableRefs.current.forEach((ref, key) => {
+                  if (key !== item.id && ref) ref.close();
+                });
+              }}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.notificationItem,
+                  {
+                    backgroundColor: theme.cardBackground,
+                  },
+                ]}
+                onPress={() => markAsRead(item.id)}
+                activeOpacity={0.85}
               >
-                {item.title}
-              </Text>
-              <Text
-                style={[styles.message, { color: theme.textSecondary }]}
-                numberOfLines={2}
-              >
-                {item.message}
-              </Text>
-              <Text style={[styles.timestamp, { color: theme.textSecondary }]}>
-                {item.timestamp}
-              </Text>
-            </View>
-            {!item.read && (
-              <View
-                style={[styles.unreadDot, { backgroundColor: theme.primary }]}
-              />
-            )}
-          </TouchableOpacity>
-        </Swipeable>
-      </FadeIn>
-    ),
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={getIconName(item.type) as any}
+                    size={18}
+                    color={theme.text}
+                  />
+                </View>
+
+                <View style={styles.contentColumn}>
+                  <View style={styles.contentRowHeader}>
+                    <Text
+                      style={[styles.itemTitle, { color: theme.text }]}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.timestamp,
+                        { color: theme.textSecondary + "75" },
+                      ]}
+                    >
+                      {item.timestamp}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[styles.message, { color: theme.textSecondary }]}
+                    numberOfLines={2}
+                  >
+                    {item.message}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </Swipeable>
+            <View
+              style={[
+                styles.itemDivider,
+                { backgroundColor: theme.border + "30" },
+              ]}
+            />
+          </FadeIn>
+        </Animated.View>
+      );
+    },
     [theme, markAsRead, renderRightActions],
   );
 
-  const getTabStyle = (tab: "all" | "unread") => ({
-    backgroundColor: activeTab === tab ? theme.primary : "transparent",
-    borderColor: activeTab === tab ? theme.primary : theme.border,
-  });
-
-  const getTabTextStyle = (tab: "all" | "unread") => ({
-    color: activeTab === tab ? "#fff" : theme.textSecondary,
-  });
-
   return (
     <>
-      <StatusBar barStyle={"default"} />
-      <MainContainer safe>
-        <View style={[styles.screen]}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        translucent
+        backgroundColor="transparent"
+      />
+      <MainContainer>
+        <View style={[styles.screen, { backgroundColor: theme.background }]}>
           {/* Header */}
-          <View
-            style={[
-              styles.header,
-              {
-                justifyContent:
-                  unreadCount == 0 ? "flex-start" : "space-between",
-                gap: unreadCount == 0 ? "9.5%" : 0,
-              },
-            ]}
-          >
+          <View style={styles.header}>
             <TouchableOpacity
               onPress={() => router.back()}
               style={styles.backBtn}
@@ -286,51 +266,82 @@ export default function NotificationsScreen() {
               <Ionicons name="chevron-back" size={24} color={theme.text} />
             </TouchableOpacity>
 
-            <Text
-              style={[
-                styles.title,
-                {
-                  color: theme.text,
-                  marginLeft: 70,
-                },
-              ]}
-            >
+            <Text style={[styles.headerTitle, { color: theme.text }]}>
               Notifications
             </Text>
 
-            {unreadCount > 0 && (
+            {unreadCount > 0 ? (
               <TouchableOpacity
                 style={styles.markAllBtn}
                 onPress={markAllAsRead}
               >
                 <Text style={[styles.markAllText, { color: theme.primary }]}>
-                  Mark all read
+                  Clear all
                 </Text>
               </TouchableOpacity>
+            ) : (
+              <View style={{ width: 40 }} />
             )}
           </View>
 
-          {/* Tabs */}
-          <View style={styles.tabBar}>
+          {/* Monochromatic Bordered Tab Bar */}
+          <View
+            style={[styles.tabContainerPill, { borderColor: theme.border }]}
+          >
             <TouchableOpacity
-              style={[styles.tab, getTabStyle("all")]}
+              style={[
+                styles.tabPill,
+                activeTab === "all" && {
+                  backgroundColor: theme.primary,
+                },
+              ]}
               onPress={() => setActiveTab("all")}
-              activeOpacity={0.7}
+              activeOpacity={0.9}
             >
-              <Text style={[styles.tabText, getTabTextStyle("all")]}>All</Text>
+              <Text
+                style={[
+                  styles.tabLabel,
+                  {
+                    color:
+                      activeTab === "all"
+                        ? theme.onPrimary
+                        : theme.textSecondary,
+                    fontWeight: activeTab === "all" ? "700" : "500",
+                  },
+                ]}
+              >
+                Inbox {unreadCount > 0 && `(${unreadCount})`}
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={[styles.tab, getTabStyle("unread")]}
+              style={[
+                styles.tabPill,
+                activeTab === "unread" && {
+                  backgroundColor: theme.primary,
+                },
+              ]}
               onPress={() => setActiveTab("unread")}
-              activeOpacity={0.7}
+              activeOpacity={0.9}
             >
-              <Text style={[styles.tabText, getTabTextStyle("unread")]}>
-                Unread {unreadCount > 0 && `(${unreadCount})`}
+              <Text
+                style={[
+                  styles.tabLabel,
+                  {
+                    color:
+                      activeTab === "unread"
+                        ? theme.onPrimary
+                        : theme.textSecondary,
+                    fontWeight: activeTab === "unread" ? "700" : "500",
+                  },
+                ]}
+              >
+                Orders
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Notifications List */}
+          {/* List Feed */}
           <FlatList
             data={filteredNotifications}
             keyExtractor={(item) => item.id}
@@ -341,20 +352,31 @@ export default function NotificationsScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={theme.primary}
+                tintColor={theme.text}
               />
             }
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Ionicons
-                  name="notifications-off-outline"
-                  size={64}
-                  color={theme.textSecondary + "50"}
-                />
-                <Text
-                  style={[styles.emptyText, { color: theme.textSecondary }]}
+                <View
+                  style={[
+                    styles.emptyIconCircle,
+                    { borderColor: theme.border },
+                  ]}
                 >
-                  No {activeTab === "unread" ? "unread " : ""}notifications
+                  <Ionicons
+                    name="checkmark-outline"
+                    size={24}
+                    color={theme.text}
+                  />
+                </View>
+                <Text style={[styles.emptyText, { color: theme.text }]}>
+                  Inbox is empty
+                </Text>
+                <Text
+                  style={[styles.emptySubtext, { color: theme.textSecondary }]}
+                >
+                  Tapping modifications updates them out of your immediate
+                  workflow grid.
                 </Text>
               </View>
             }
@@ -372,106 +394,123 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingTop: 54,
+    paddingBottom: 14,
   },
-  backBtn: { padding: 4 },
-  title: {
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.5,
+  backBtn: {
+    padding: 6,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: -0.4,
   },
   markAllBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
   markAllText: {
     fontSize: 13,
     fontWeight: "600",
   },
-  tabBar: {
+  tabContainerPill: {
     flexDirection: "row",
     marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 30,
-    backgroundColor: "transparent",
-    gap: 12,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 30,
+    marginBottom: 20,
+    borderRadius: 24,
     borderWidth: 1,
+  },
+  tabPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "600",
+  tabLabel: {
+    fontSize: 13,
+    letterSpacing: -0.1,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 40,
   },
   notificationItem: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 12,
-    marginBottom: 10,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
   },
-  iconColumn: {
-    marginRight: 12,
-    width: 40,
+  iconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
   },
   contentColumn: {
     flex: 1,
   },
-  title: {
-    fontSize: 15,
-    fontWeight: "700",
+  contentRowHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
     marginBottom: 4,
+  },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
+    marginRight: 8,
+    letterSpacing: -0.1,
   },
   message: {
     fontSize: 13,
     lineHeight: 18,
-    marginBottom: 6,
   },
   timestamp: {
     fontSize: 11,
+    fontWeight: "400",
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 10,
+  itemDivider: {
+    height: 1,
+    marginHorizontal: 16,
   },
   deleteButton: {
     justifyContent: "center",
     alignItems: "center",
     width: 80,
-    height: "90%",
-    // marginTop: 0,
-    // marginBottom: 10,
-    marginLeft: 10,
-    borderRadius: 12,
+    height: "100%",
   },
   deleteText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
-    marginTop: 4,
+    marginTop: 2,
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 80,
-    gap: 12,
+    paddingVertical: 120,
+    paddingHorizontal: 40,
+  },
+  emptyIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
   },
 });
