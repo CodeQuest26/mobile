@@ -136,6 +136,11 @@ export default function RoleSelection() {
             style={styles.logoGradient}
           >
             <Ionicons name="rocket-outline" size={48} color="#fff" />
+
+            {/* <Image
+              source={require("../../assets/images/icon.png")}
+              style={styles.logo}
+            /> */}
           </LinearGradient>
         </View>
 
@@ -237,6 +242,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 8,
   },
+  logo: {
+    width: 80,
+    height: 80,
+    resizeMode: "contain",
+  },
   tagline: {
     fontSize: 15,
     textAlign: "center",
@@ -293,7 +303,7 @@ const styles = StyleSheet.create({
   },
   button: {
     paddingVertical: 18,
-    borderRadius: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",

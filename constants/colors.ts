@@ -8,8 +8,8 @@ export type Theme = {
   cardBackground: string;
   icon: string;
   iconBackground: string;
-  primary: string; // #28C76F
-  onPrimary: string; // #FFFFFF
+  primary: string;
+  onPrimary: string;
   border: string;
   shadow: string;
   info: string;

@@ -1,5 +1,4 @@
 import Colors from "@/constants/colors";
-import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,6 +17,7 @@ import {
   Switch,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from "react-native";
 
@@ -141,8 +141,13 @@ const Section = ({
 
 // ── Main Screen ──────────────────────────────────────────────
 export default function ManufacturerProfile() {
-  const { theme, colorScheme, setColorScheme } = useTheme();
+  // useColorScheme() returns the system's current scheme directly
+  // ("light" | "dark" | null) — it is NOT a [value, setter] pair.
+  // Falling back to "light" keeps us safe if the OS reports null.
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? "light"];
   const isDark = colorScheme === "dark";
+
   const [notifications, setNotifications] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
   const p = MANUFACTURER_PROFILE;
@@ -224,6 +229,7 @@ export default function ManufacturerProfile() {
         >
           <Ionicons name="chevron-back" size={20} color={theme.text} />
         </TouchableOpacity>
+
         <TouchableOpacity
           onPress={() =>
             router.push("/(screens)/(manufacturer)/(screens)/editProfile")
@@ -428,15 +434,7 @@ export default function ManufacturerProfile() {
                 },
               ]}
             >
-              <View
-                style={[
-                  styles.toggleConfigRow,
-                  {
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border + "40",
-                  },
-                ]}
-              >
+              <View style={styles.toggleConfigRow}>
                 <View style={styles.toggleLeft}>
                   <View
                     style={[
@@ -465,36 +463,14 @@ export default function ManufacturerProfile() {
                 />
               </View>
 
-              <View style={styles.toggleConfigRow}>
-                <View style={styles.toggleLeft}>
-                  <View
-                    style={[
-                      styles.configIconWrap,
-                      { backgroundColor: theme.primary + "0A" },
-                    ]}
-                  >
-                    <Ionicons
-                      name={isDark ? "moon" : "sunny"}
-                      size={16}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <Text style={[styles.configLabel, { color: theme.text }]}>
-                    Dark Interface
-                  </Text>
-                </View>
-                <Switch
-                  value={isDark}
-                  onValueChange={(val) =>
-                    setColorScheme(val ? "dark" : "light")
-                  }
-                  trackColor={{
-                    false: theme.border,
-                    true: theme.primary + "60",
-                  }}
-                  thumbColor={isDark ? theme.primary : "#F4F3F4"}
-                />
-              </View>
+              {/*
+                Dark mode now follows the system setting automatically via
+                useColorScheme(). A manual override toggle is intentionally
+                omitted here — if you want a user-level "Force dark/light"
+                preference later, that requires actual persisted state
+                (e.g. Zustand + MMKV) rather than useColorScheme's return
+                value, since that hook only reflects the OS setting.
+              */}
             </View>
           </Section>
 
@@ -502,10 +478,12 @@ export default function ManufacturerProfile() {
           <TouchableOpacity
             onPress={handleLogout}
             activeOpacity={0.8}
-            style={[styles.signOutAction, { borderColor: "#EF444450" }]}
+            style={[styles.signOutAction, { borderColor: theme.error + "50" }]}
           >
-            <Ionicons name="log-out-outline" size={16} color="#EF4444" />
-            <Text style={styles.signOutLabel}>Sign Out Account</Text>
+            <Ionicons name="log-out-outline" size={18} color={theme.error} />
+            <Text style={[styles.signOutLabel, { color: theme.error }]}>
+              Sign Out Account
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -556,7 +534,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 2,
   },
   coverContainer: {
     position: "absolute",
@@ -771,7 +748,7 @@ const styles = StyleSheet.create({
   signOutAction: {
     marginTop: 12,
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 15,
     paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -781,6 +758,5 @@ const styles = StyleSheet.create({
   signOutLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#EF4444",
   },
 });

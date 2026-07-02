@@ -159,7 +159,12 @@ export default function OrderDetailScreen() {
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Progress
               </Text>
-              <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBarContainer,
+                  { backgroundColor: "#f0f0f0" },
+                ]}
+              >
                 <View
                   style={[
                     styles.progressBar,
@@ -395,7 +400,6 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: "#e0e0e0",
     borderRadius: 4,
     overflow: "hidden",
     marginBottom: 8,
@@ -463,7 +467,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   messageBubble: {
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "red",
     borderRadius: 16,
     padding: 12,
     marginBottom: 12,
@@ -481,7 +485,7 @@ const styles = StyleSheet.create({
   },
   chatBtn: {
     borderWidth: 1,
-    borderRadius: 30,
+    borderRadius: 15,
     paddingVertical: 10,
     alignItems: "center",
     marginTop: 8,
@@ -497,8 +501,9 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
-    borderRadius: 30,
-    paddingVertical: 12,
+    borderRadius: 15,
+    height: 50,
+    justifyContent: "center",
     alignItems: "center",
   },
   actionBtnText: {

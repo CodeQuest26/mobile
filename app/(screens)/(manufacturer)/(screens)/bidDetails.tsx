@@ -343,7 +343,11 @@ export default function BidDetailsScreen() {
                   onPress={handleSubmitBid}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.submitBtnText}>Submit Bid</Text>
+                  <Text
+                    style={[styles.submitBtnText, { color: theme.onPrimary }]}
+                  >
+                    Submit Bid
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -478,12 +482,13 @@ const styles = StyleSheet.create({
     minHeight: 100,
   },
   submitBtn: {
-    borderRadius: 30,
+    borderRadius: 15,
     paddingVertical: 14,
     alignItems: "center",
     marginTop: 16,
   },
-  submitBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  submitBtnText: { fontSize: 15, fontWeight: "700" },
+
   successBox: {
     alignItems: "center",
     paddingVertical: 16,
