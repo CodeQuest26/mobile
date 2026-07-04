@@ -854,14 +854,7 @@ export default function SMEProfile() {
       >
         <View style={styles.mainCardPositioner}>
           {/* Main Integrated Profile Master Card */}
-          <View
-            style={[
-              styles.profileMasterCard,
-              {
-                backgroundColor: theme.cardBackground,
-              },
-            ]}
-          >
+          <View style={styles.profileMasterCard}>
             {/* Avatar Section Frame */}
             <View
               style={[

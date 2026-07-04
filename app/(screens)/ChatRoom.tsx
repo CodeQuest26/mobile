@@ -1,25 +1,25 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import {
-    AVATAR_COLORS,
-    formatDateLabel,
-    formatTime,
-    Message,
+  AVATAR_COLORS,
+  formatDateLabel,
+  formatTime,
+  Message,
 } from "@/constants/contacts";
 import { useChatConversations } from "@/hooks/useChatConversations";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

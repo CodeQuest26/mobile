@@ -1,4 +1,3 @@
-// src/app/(tabs)/manufacturer/Orders.tsx
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import OrderCard from "@/components/OrderCard"; // adjust path if needed
@@ -206,14 +205,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 20,
     marginVertical: 16,
-    borderRadius: 30,
     backgroundColor: "transparent",
     gap: 12,
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 30,
+    borderRadius: 15,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",

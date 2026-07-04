@@ -13,7 +13,7 @@
     "expo-env.d.ts",
     "constants/colors.ts",
     "app/(screens)/(manufacturer)/(screens)/profile.tsx",
-    "app/(screens)/(manufacturer)/(tabs)/profile.tsxx",
-    "app/(screens)/(manufacturer)/(tabs)/bids.stsx"
+    "app/(screens)/(manufacturer)/(tabs)/bids.stsx",
+    "app/(screens)/(manufacturer)/(screens)/ChatRoom.ttsx"
   ]
 }
