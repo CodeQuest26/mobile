@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,8 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { useAuthStore } from "@/store/auth";
+import { storage } from "@/store/mmkv";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
@@ -145,9 +148,12 @@ const SignupScreen = () => {
   const { role } = useLocalSearchParams<{ role: string }>();
   const roleMeta = ROLE_META[role] ?? ROLE_META.sme;
 
+  const { register } = useAuthStore();
+
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -155,24 +161,31 @@ const SignupScreen = () => {
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const canSubmit = emailValid && password.length >= 8;
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
+    const selectedRole = storage.getString("selectedRole");
     if (!canSubmit) return;
     setLoading(true);
-    // TODO: call your auth/register service here
-    setTimeout(() => {
-      setLoading(false);
-      // Route to OTP using the phone number entered at signup.
-      // Falls back to email if no phone was provided.
-      const hasPhone = phone.trim().length > 0;
-      router.push({
-        pathname: "/OTPVerification",
-        params: {
-          contact: hasPhone ? phone.trim() : email.trim(),
-          type: hasPhone ? "phone" : "email",
-          role,
-        },
+
+    try {
+      await register({
+        email: email.trim(),
+        password,
+        fullName: fullName.trim(),
+        phoneNumber: phoneNumber.trim() || "+233257485570",
+        role: selectedRole as "sme" | "manufacturer",
       });
-    }, 1500);
+      router.replace({
+        pathname: "/OTPVerification",
+        params: { role: selectedRole },
+      });
+    } catch (error: any) {
+      Alert.alert(
+        "Registration Failed",
+        error.message || "An error occurred during registration.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -224,9 +237,9 @@ const SignupScreen = () => {
         <View style={styles.form}>
           <InputField
             label="Company Name"
-            icon="business-outline"
-            value={companyName}
-            onChangeText={setCompanyName}
+            icon="person-outline"
+            value={fullName}
+            onChangeText={setFullName}
             autoCapitalize="words"
             theme={theme}
           />

@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,8 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { useAuthStore } from "@/store/auth";
+import { storage } from "@/store/mmkv";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
@@ -19,12 +22,12 @@ import Colors from "../../constants/colors";
 
 // --- Role meta ---
 const ROLE_META = {
-  sme: {
+  SME_OWNER: {
     label: "Business Owner",
     icon: "briefcase-outline",
     tagline: "Manage your business, on the go.",
   },
-  manufacturer: {
+  FACTORY_OWNER: {
     label: "Manufacturer",
     icon: "settings-outline",
     tagline: "Oversee production & supply chain.",
@@ -92,8 +95,8 @@ const LoginScreen = () => {
   const theme = Colors[colorScheme] || Colors.light;
 
   // Role passed from RoleSelection via router params
-  const { role } = useLocalSearchParams<{ role: string }>();
-  const roleMeta = ROLE_META[role] ?? ROLE_META.sme;
+  const selectedRole = storage.getString("selectedRole");
+  const roleMeta = ROLE_META[selectedRole];
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -103,15 +106,27 @@ const LoginScreen = () => {
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const canSubmit = emailValid && password.length >= 8;
 
-  const handleLogin = () => {
+  const { login, error } = useAuthStore();
+
+  const handleLogin = async () => {
     if (!canSubmit) return;
     setLoading(true);
-    // TODO: call your auth service here
-    setTimeout(() => {
-      setLoading(false);
 
-      router.replace({ pathname: "/OTPVerification", params: { role } });
-    }, 1500);
+    try {
+      await login(email, password);
+      router.replace({
+        pathname: "/OTPVerification",
+        params: { selectedRole },
+      });
+    } catch (error: any) {
+      Alert.alert(
+        "Login Failed",
+        error.message || "An error occurred during login.",
+      );
+      console.error("Login failed:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -170,6 +185,9 @@ const LoginScreen = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             theme={theme}
+            secureTextEntry={undefined}
+            autoCapitalize={"none"}
+            rightSlot={undefined}
           />
 
           <Spacer style={{ height: 15 }} />
@@ -193,6 +211,8 @@ const LoginScreen = () => {
                 />
               </Pressable>
             }
+            keyboardType={"default"}
+            autoCapitalize={"none"}
           />
 
           <Spacer style={{ height: 10 }} />
@@ -292,7 +312,7 @@ const LoginScreen = () => {
             </Text>
           </TouchableOpacity>
 
-          <Spacer style={{ heigh: 28 }} />
+          <Spacer style={{ height: 28 }} />
 
           {/* Sign up */}
           <View style={styles.signupRow}>
@@ -301,7 +321,10 @@ const LoginScreen = () => {
             </Text>
             <TouchableOpacity
               onPress={() =>
-                router.push({ pathname: "/signup", params: { role } })
+                router.push({
+                  pathname: "/signup",
+                  params: { role: selectedRole },
+                })
               }
             >
               <Text style={[styles.signupLink, { color: theme.primary }]}>
@@ -317,7 +340,6 @@ const LoginScreen = () => {
 
 export default LoginScreen;
 
-// --- Styles ---
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,

@@ -14,6 +14,7 @@ import {
 } from "react-native";
 
 import { setSelectedRole } from "@/storage/storage";
+import { storage } from "@/store/mmkv";
 import MainContainer from "../../components/MainContainer";
 import Colors from "../../constants/colors";
 
@@ -108,6 +109,7 @@ export default function RoleSelection() {
     if (!role) return;
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    storage.set("selectedRole", role);
     setSelectedRole(role as any);
 
     router.replace({ pathname: "/(onboarding)", params: { role } });
@@ -158,7 +160,7 @@ export default function RoleSelection() {
 
       <View style={styles.cardsContainer}>
         <RoleCard
-          roleKey="sme"
+          roleKey="SME_OWNER"
           title="Business Owner (SME)"
           description="Partner with manufacturers, track orders, and scale your business."
           icon="business-outline"
@@ -170,7 +172,7 @@ export default function RoleSelection() {
         <View style={{ height: 20 }} />
 
         <RoleCard
-          roleKey="manufacturer"
+          roleKey="FACTORY_OWNER"
           title="Manufacturer"
           description="Manage production, inventory, and connect with SMEs."
           icon="build-outline"

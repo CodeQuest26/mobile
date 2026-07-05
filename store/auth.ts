@@ -1,23 +1,24 @@
-import { api, handleApiError } from "@/services/api";
+import { api } from "@/services/api";
 import { mmkvStorage } from "@/store/mmkv";
+import axios from "axios";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface User {
   id: string;
-  name: string;
+  fullName: string;
   email: string;
-  phone?: string;
+  phoneNumber?: string;
   role: "sme" | "manufacturer";
   verified: boolean;
   location?: string;
 }
 
 interface RegisterPayload {
-  name: string;
+  fullName: string;
   email: string;
   password: string;
-  phone?: string;
+  phoneNumber?: string;
   role: "sme" | "manufacturer";
   location?: string;
 }
@@ -41,6 +42,26 @@ interface AuthState {
   setHasHydrated: (value: boolean) => void;
   clearError: () => void;
 }
+
+const BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? "https://api.makershub.com/v1";
+
+const handleApiError = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (data?.violations?.length) {
+      return data.violations.map((v: any) => v.message).join("\n");
+    }
+    return (
+      data?.detail ??
+      data?.message ??
+      data?.error ??
+      error.message ??
+      "Something went wrong"
+    );
+  }
+  return "An unexpected error occurred";
+};
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -79,11 +100,12 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
 
-          const { data } = await api.post("/auth/login", {
+          const { data } = await axios.post(`${BASE_URL}auth/login`, {
             email,
             password,
           });
 
+          console.log(data);
           api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
 
           set({
@@ -91,7 +113,8 @@ export const useAuthStore = create<AuthState>()(
             token: data.token,
             isAuthenticated: true,
           });
-        } catch (error) {
+        } catch (error: any) {
+          console.log(error.response?.data);
           const message = handleApiError(error);
 
           set({
@@ -113,9 +136,12 @@ export const useAuthStore = create<AuthState>()(
             isLoading: true,
             error: null,
           });
-
-          const { data } = await api.post("/auth/register", payload);
-
+          console.log(payload);
+          const { data } = await axios.post(
+            `${BASE_URL}auth/register`,
+            payload,
+          );
+          console.log(data);
           api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
 
           set({
@@ -123,7 +149,8 @@ export const useAuthStore = create<AuthState>()(
             token: data.token,
             isAuthenticated: true,
           });
-        } catch (error) {
+        } catch (error: any) {
+          console.log(error.response?.data);
           const message = handleApiError(error);
 
           set({
@@ -148,7 +175,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: true,
           });
 
-          const { data } = await api.get("/auth/me");
+          const { data } = await api.get("auth/me");
 
           set({
             user: data.user,
@@ -172,7 +199,7 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
 
-          const { data } = await api.patch("/auth/me", fields);
+          const { data } = await api.patch("auth/me", fields);
 
           set((state) => ({
             user: state.user
@@ -201,7 +228,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
-          await api.post("/auth/logout").catch(() => {});
+          await api.post("auth/logout").catch(() => {});
         } finally {
           delete api.defaults.headers.common.Authorization;
 

@@ -96,11 +96,12 @@ api.interceptors.response.use(
 
 export const handleApiError = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (data?.violations?.length) {
+      return data.violations.map((v: any) => v.message).join("\n");
+    }
     return (
-      error.response?.data?.message ??
-      error.response?.data?.error ??
-      error.message ??
-      "Something went wrong"
+      data?.message ?? data?.error ?? error.message ?? "Something went wrong"
     );
   }
   return "An unexpected error occurred";
