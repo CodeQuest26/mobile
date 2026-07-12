@@ -482,7 +482,7 @@ export default function ManufacturerProfile() {
           >
             <Ionicons name="log-out-outline" size={18} color={theme.error} />
             <Text style={[styles.signOutLabel, { color: theme.error }]}>
-              Sign Out Account
+              Sign Out
             </Text>
           </TouchableOpacity>
         </View>

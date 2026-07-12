@@ -49,7 +49,8 @@ export default function Index() {
         break;
 
       default:
-        router.replace("/(auth)/login");
+        // router.replace("/(auth)/login");
+        router.replace("/(screens)/(sme)/(tabs)");
     }
   }, [hasHydrated, isAuthenticated, user]);
 

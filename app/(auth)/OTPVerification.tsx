@@ -102,12 +102,12 @@ export default function OtpVerifyScreen() {
   const isDark = colorScheme === "dark";
 
   const {
-    contact = "+233 ** *** 4521",
+    contact = "user email",
     type = "phone",
     role,
   } = useLocalSearchParams<{
     contact?: string;
-    type?: "phone" | "email";
+    type?: "email";
     role?: string;
   }>();
 
@@ -382,7 +382,7 @@ export default function OtpVerifyScreen() {
           )}
           {loading && (
             <Text style={[styles.hintText, { color: theme.textSecondary }]}>
-              Verifying entry...
+              Verifying account
             </Text>
           )}
 
