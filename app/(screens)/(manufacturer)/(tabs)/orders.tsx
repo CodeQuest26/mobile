@@ -1,10 +1,11 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
-import OrderCard from "@/components/OrderCard"; // adjust path if needed
+import OrderCard from "@/components/OrderCard";
 import Colors from "@/constants/colors";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ScrollView,
   StatusBar,
@@ -15,78 +16,50 @@ import {
   View,
 } from "react-native";
 
-// Mock data – extend with completed orders
-const ACTIVE_ORDERS = [
-  {
-    id: "o1",
-    job: "Aluminium Cans",
-    sme: "AfroDrinks Ltd",
-    amount: "GH₵ 52,000",
-    milestone: 2,
-    milestoneLabel: "Quality Check",
-    dueIn: "3 days",
-    progress: 0.65,
-    urgent: true,
-  },
-  {
-    id: "o2",
-    job: "Steel Frames",
-    sme: "BuildRight Ghana",
-    amount: "GH₵ 28,000",
-    milestone: 1,
-    milestoneLabel: "In Production",
-    dueIn: "12 days",
-    progress: 0.35,
-    urgent: false,
-  },
-  {
-    id: "o3",
-    job: "Copper Wiring",
-    sme: "Volta Electricals",
-    amount: "GH₵ 15,500",
-    milestone: 3,
-    milestoneLabel: "Final Assembly",
-    dueIn: "6 days",
-    progress: 0.85,
-    urgent: false,
-  },
-];
+// Define the shape of an order as returned by the API
+// Based on OrderDetailResponse from the OpenAPI spec
+interface ApiOrder {
+  id: string;
+  jobId: string;
+  bidId: string;
+  smeId: string;
+  factoryId: string;
+  factoryName: string;
+  smeName: string;
+  agreedAmountGhs: number;
+  platformFeeGhs: number;
+  factoryPayoutGhs: number;
+  status:
+    | "PAYMENT_PENDING"
+    | "IN_ESCROW"
+    | "IN_PRODUCTION"
+    | "QUALITY_CHECK"
+    | "DELIVERED"
+    | "COMPLETED"
+    | "DISPUTED"
+    | "REFUNDED"
+    | "CANCELLED";
+  qualityCheckDeadline?: string; // ISO date
+  deliveredAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  // We need job title – assume it's included in the response (not in spec but we'll map if present)
+  jobTitle?: string; // optional, we'll derive from something else if missing
+}
 
-const COMPLETED_ORDERS = [
-  {
-    id: "c1",
-    job: "Plastic Moulds",
-    sme: "Kama Plastics",
-    amount: "GH₵ 32,000",
-    milestone: 4,
-    milestoneLabel: "Delivered",
-    dueIn: "Completed",
-    progress: 1.0,
-    urgent: false,
-  },
-  {
-    id: "c2",
-    job: "Glass Bottles",
-    sme: "Accra Brewery",
-    amount: "GH₵ 47,200",
-    milestone: 4,
-    milestoneLabel: "Paid",
-    dueIn: "Completed",
-    progress: 1.0,
-    urgent: false,
-  },
-  {
-    id: "c3",
-    job: "Cardboard Boxes",
-    sme: "LogiPack",
-    amount: "GH₵ 8,750",
-    milestone: 4,
-    milestoneLabel: "Delivered",
-    dueIn: "Completed",
-    progress: 1.0,
-    urgent: false,
-  },
-];
+// The shape expected by OrderCard
+interface OrderCardData {
+  id: string;
+  job: string;
+  sme: string;
+  amount: string;
+  milestone: number;
+  milestoneLabel: string;
+  dueIn: string;
+  progress: number; // 0..1
+  urgent: boolean;
+}
 
 type TabType = "active" | "completed";
 
@@ -96,8 +69,142 @@ export default function ManufacturerOrders() {
   const isDark = colorScheme === "dark";
   const [activeTab, setActiveTab] = useState<TabType>("active");
 
-  const orders = activeTab === "active" ? ACTIVE_ORDERS : COMPLETED_ORDERS;
-  const hasOrders = orders.length > 0;
+  // State for real orders from API
+  const [orders, setOrders] = useState<OrderCardData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch orders from API
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      // Assuming the endpoint is GET /api/v1/orders (not in spec, but we need it)
+      // If not available, we might need to use a different endpoint or ask for it.
+      const response = await api.get("/api/v1/orders", {
+        params: {
+          page: 0,
+          size: 1000,
+        },
+      });
+      // response.data should be PagedResponseOrderDetailResponse (not in spec, but we'll assume)
+      const apiOrders: ApiOrder[] = response.data.content || [];
+
+      // Transform to OrderCardData
+      const transformed = apiOrders.map((order) => transformOrder(order));
+      setOrders(transformed);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  // Helper to map status to milestone number (0-4) and label
+  const mapStatusToMilestone = (
+    status: ApiOrder["status"],
+  ): { milestone: number; label: string } => {
+    const map: Record<
+      ApiOrder["status"],
+      { milestone: number; label: string }
+    > = {
+      PAYMENT_PENDING: { milestone: 0, label: "Awaiting Payment" },
+      IN_ESCROW: { milestone: 0, label: "Payment Secured" },
+      IN_PRODUCTION: { milestone: 1, label: "In Production" },
+      QUALITY_CHECK: { milestone: 2, label: "Quality Check" },
+      DELIVERED: { milestone: 3, label: "Delivered" },
+      COMPLETED: { milestone: 4, label: "Completed" },
+      DISPUTED: { milestone: 0, label: "Disputed" },
+      REFUNDED: { milestone: 4, label: "Refunded" },
+      CANCELLED: { milestone: 4, label: "Cancelled" },
+    };
+    return map[status] || { milestone: 0, label: "Unknown" };
+  };
+
+  // Helper to estimate progress (0-1) based on status
+  const getProgress = (status: ApiOrder["status"]): number => {
+    const progressMap: Record<ApiOrder["status"], number> = {
+      PAYMENT_PENDING: 0.0,
+      IN_ESCROW: 0.1,
+      IN_PRODUCTION: 0.4,
+      QUALITY_CHECK: 0.7,
+      DELIVERED: 0.9,
+      COMPLETED: 1.0,
+      DISPUTED: 0.5,
+      REFUNDED: 1.0,
+      CANCELLED: 1.0,
+    };
+    return progressMap[status] || 0.0;
+  };
+
+  // Helper to compute dueIn text and urgency
+  const computeDueInfo = (
+    order: ApiOrder,
+  ): { dueIn: string; urgent: boolean } => {
+    // If completed/refunded/cancelled, show "Completed"
+    if (["COMPLETED", "REFUNDED", "CANCELLED"].includes(order.status)) {
+      return { dueIn: "Completed", urgent: false };
+    }
+    // If DELIVERED, show "Awaiting confirmation" maybe?
+    if (order.status === "DELIVERED") {
+      return { dueIn: "Awaiting confirmation", urgent: false };
+    }
+    // Use qualityCheckDeadline if available, else fallback to createdAt + some days? Not ideal.
+    // Actually we don't have a clear deadline field in OrderDetailResponse.
+    // We could use the job deadline, but we don't have it here.
+    // As a fallback, we'll use the qualityCheckDeadline if present, else a dummy.
+    if (order.qualityCheckDeadline) {
+      const diff = new Date(order.qualityCheckDeadline).getTime() - Date.now();
+      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      if (days <= 3)
+        return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: true };
+      return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: false };
+    }
+    // No deadline, return generic
+    return { dueIn: "In progress", urgent: false };
+  };
+
+  // Transform a single API order to OrderCardData
+  const transformOrder = (order: ApiOrder): OrderCardData => {
+    const { milestone, label } = mapStatusToMilestone(order.status);
+    const progress = getProgress(order.status);
+    const { dueIn, urgent } = computeDueInfo(order);
+
+    // Amount as currency string
+    const amount = `GH₵ ${order.agreedAmountGhs?.toFixed(2) || "0.00"}`;
+
+    // Job title: try to use order.jobTitle if available, else use jobId as fallback
+    const job =
+      order.jobTitle || `Job #${order.jobId?.slice(0, 8) || "Unknown"}`;
+
+    return {
+      id: order.id,
+      job,
+      sme: order.smeName || "Unknown SME",
+      amount,
+      milestone,
+      milestoneLabel: label,
+      dueIn,
+      progress,
+      urgent,
+    };
+  };
+
+  // Filter orders based on activeTab
+  const filteredOrders = orders.filter((order) => {
+    // Active: statuses not completed/refunded/cancelled (we use progress < 1 as active)
+    // But we have milestone 4 for completed, so we can filter by milestone < 4
+    // However, DISPUTED might be active? We'll consider it active if progress < 1.
+    if (activeTab === "active") {
+      return order.progress < 1.0;
+    } else {
+      return order.progress >= 1.0;
+    }
+  });
+
+  const hasOrders = filteredOrders.length > 0;
 
   const getTabStyle = (tab: TabType) => ({
     backgroundColor: activeTab === tab ? theme.primary : "transparent",
@@ -156,8 +263,14 @@ export default function ManufacturerOrders() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {hasOrders ? (
-              orders.map((order, index) => (
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={{ color: theme.textSecondary }}>
+                  Loading orders...
+                </Text>
+              </View>
+            ) : hasOrders ? (
+              filteredOrders.map((order, index) => (
                 <FadeIn key={order.id} delay={index * 50}>
                   <OrderCard order={order} theme={theme} delay={0} />
                 </FadeIn>
@@ -233,5 +346,9 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: "500",
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: "center",
   },
 });

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -22,15 +22,15 @@ import Colors from "../../constants/colors";
 
 // --- Role meta ---
 const ROLE_META = {
-  sme: {
+  SME_OWNER: {
     label: "Business Owner",
     icon: "briefcase-outline",
-    tagline: "Let's set up your business account.",
+    tagline: "Manage your business, on the go.",
   },
-  manufacturer: {
+  FACTORY_OWNER: {
     label: "Manufacturer",
     icon: "settings-outline",
-    tagline: "Let's set up your manufacturer account.",
+    tagline: "Oversee production & supply chain.",
   },
 };
 
@@ -145,12 +145,11 @@ const SignupScreen = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
 
-  const { role } = useLocalSearchParams<{ role: string }>();
-  const roleMeta = ROLE_META[role] ?? ROLE_META.sme;
+  const selectedRole = storage.getString("selectedRole");
+  const roleMeta = ROLE_META[selectedRole];
 
   const { register } = useAuthStore();
 
-  const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -158,8 +157,8 @@ const SignupScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSubmit = emailValid && password.length >= 8;
+  // const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSubmit = phoneNumber.length >= 10 && password.length >= 8;
 
   const handleSignup = async () => {
     const selectedRole = storage.getString("selectedRole");
@@ -168,15 +167,16 @@ const SignupScreen = () => {
 
     try {
       await register({
-        email: email.trim(),
+        phoneNumber: phoneNumber.trim(),
         password,
         fullName: fullName.trim(),
-        phoneNumber: phoneNumber.trim() || "+233257485570",
         role: selectedRole as "sme" | "manufacturer",
+        region: "Greater Accra",
+        town: "East Legon",
       });
       router.replace({
         pathname: "/OTPVerification",
-        params: { role: selectedRole },
+        params: { role: selectedRole, phoneNumber },
       });
     } catch (error: any) {
       Alert.alert(
@@ -246,24 +246,13 @@ const SignupScreen = () => {
 
           <Spacer style={{ height: 15 }} />
           <InputField
-            label="Email Address"
-            icon="mail-outline"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            theme={theme}
-          />
-
-          {/* <Spacer style={{ height: 15 }} />
-
-          <InputField
-            label="Phone Number (optional)"
+            label="Phone Number"
             icon="call-outline"
-            value={phone}
-            onChangeText={setPhone}
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
             keyboardType="phone-pad"
             theme={theme}
-          /> */}
+          />
 
           <Spacer style={{ height: 15 }} />
 
@@ -375,7 +364,7 @@ const SignupScreen = () => {
             </Text>
             <TouchableOpacity
               onPress={() =>
-                router.push({ pathname: "/login", params: { role } })
+                router.push({ pathname: "/login", params: { selectedRole } })
               }
             >
               <Text style={[styles.loginLink, { color: theme.primary }]}>

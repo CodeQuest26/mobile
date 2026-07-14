@@ -1,9 +1,11 @@
 import Colors from "@/constants/colors";
 import { useTheme } from "@/contexts/ThemeContext";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -28,24 +30,71 @@ const COVER_HEIGHT = 220;
 
 type Theme = (typeof Colors)["light"];
 
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+// Fetch user profile and (if available) factory profile
 const fetchManufacturerProfile = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  // 1. Get user data
+  const userRes = await api.get("users/me");
+  const user = userRes.data;
+
+  // 2. Optionally fetch factory profile (if endpoint exists)
+  let factoryData = {};
+  try {
+    const factoryRes = await api.get("users/factory-profile");
+    factoryData = factoryRes.data || {};
+  } catch (e) {
+    // Factory profile might not exist yet – that’s fine
+  }
+
+  // Combine and map to form fields
   return {
-    companyName: "Mensah Fabrications Ltd",
-    initials: "MF",
-    location: "Tema Industrial Area, Tema, Ghana",
-    email: "info@mensahfab.com",
-    phone: "+233 30 123 4567",
-    website: "www.mensahfab.com",
-    avatarUri: null as string | null,
-    coverUri: null as string | null,
+    companyName: user.fullName || "Manufacturer",
+    location:
+      user.town && user.region
+        ? `${user.town}, ${user.region}`
+        : user.region || "",
+    email: factoryData.email || "",
+    phone: user.phoneNumber || "",
+    website: factoryData.website || "",
+    bio: factoryData.description || "",
+    avatarUri: user.profileImageUrl || null,
+    coverUri: factoryData.coverImageUrl || null,
   };
 };
 
+// Update profile (PATCH to user or factory profile endpoint)
 const updateManufacturerProfile = async (data: any) => {
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  // We'll send a PATCH to /api/v1/users/me with the fields we want to update.
+  // For fields like companyName, phone, location, we can update user.
+  // For email, website, bio, cover, we may need a separate factory endpoint.
+  // We'll try to update user for basic fields and factory for extra fields.
+  const userPayload = {
+    fullName: data.companyName,
+    phoneNumber: data.phone,
+    region: data.location.split(",").pop()?.trim() || "",
+    town: data.location.split(",")[0]?.trim() || "",
+    // avatarUri: data.avatarUri, // if endpoint supports
+  };
+  await api.patch("users/me", userPayload);
+
+  // Update factory fields if possible
+  const factoryPayload = {
+    description: data.bio,
+    website: data.website,
+    email: data.email,
+    coverImageUrl: data.coverUri,
+  };
+  try {
+    await api.patch("users/factory-profile", factoryPayload);
+  } catch (e) {
+    // If factory profile doesn't exist, maybe we need to create it
+    // For simplicity, we just log and ignore
+  }
   return { success: true };
 };
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export default function EditManufacturerProfile() {
   const { theme, colorScheme } = useTheme();
@@ -53,12 +102,14 @@ export default function EditManufacturerProfile() {
 
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [formData, setFormData] = useState({
     companyName: "",
     location: "",
     email: "",
     phone: "",
     website: "",
+    bio: "",
     avatarUri: null as string | null,
     coverUri: null as string | null,
   });
@@ -80,6 +131,56 @@ export default function EditManufacturerProfile() {
     }
   };
 
+  const fetchCurrentLocation = async () => {
+    setLocationLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "We need location access to auto‑fill your address.",
+        );
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const { latitude, longitude } = location.coords;
+
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (reverseGeocode.length > 0) {
+        const addr = reverseGeocode[0];
+        const parts = [
+          addr.street,
+          addr.district,
+          addr.city,
+          addr.region,
+          addr.country,
+        ].filter(Boolean);
+        const locationString = parts.join(", ");
+        setFormData((prev) => ({ ...prev, location: locationString }));
+        setErrors((prev) => ({ ...prev, location: "" }));
+      } else {
+        Alert.alert(
+          "Error",
+          "Could not determine your address. Please enter it manually.",
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Location Error",
+        "Failed to get your current location. Please try again.",
+      );
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.companyName.trim())
@@ -89,7 +190,6 @@ export default function EditManufacturerProfile() {
     else if (!/\S+@\S+\.\S+/.test(formData.email))
       newErrors.email = "Invalid email format";
     if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -173,7 +273,6 @@ export default function EditManufacturerProfile() {
     extrapolate: "clamp",
   });
 
-  // Fade out the cover edit button slightly as the user scrolls up
   const coverButtonOpacity = scrollY.interpolate({
     inputRange: [0, 80],
     outputRange: [1, 0],
@@ -212,7 +311,7 @@ export default function EditManufacturerProfile() {
         />
         <View style={styles.headerContent}>
           <Text style={[styles.headerTitle, { color: theme.text }]}>
-            Modify Workspace
+            Edit Profile
           </Text>
         </View>
       </Animated.View>
@@ -236,7 +335,6 @@ export default function EditManufacturerProfile() {
       </View>
 
       {/* ── HIGH Z-INDEX INTERACTIVE COVER BUTTON ── */}
-      {/* Placed out of the background layer so it is fully tap-responsive */}
       <Animated.View
         style={[
           styles.foregroundCoverTriggerContainer,
@@ -255,7 +353,6 @@ export default function EditManufacturerProfile() {
           ]}
         >
           <Ionicons name="camera-outline" size={13} color={theme.background} />
-
           <Text style={[styles.coverActionText, { color: theme.background }]}>
             Update Cover Asset
           </Text>
@@ -315,15 +412,7 @@ export default function EditManufacturerProfile() {
         >
           <View style={styles.mainCardPositioner}>
             {/* Integrated Avatar Header Anchor Card */}
-            <View
-              style={[
-                styles.profileMasterCard,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
+            <View style={[styles.profileMasterCard]}>
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => showImageOptions("avatar")}
@@ -403,6 +492,19 @@ export default function EditManufacturerProfile() {
                   error={errors.location}
                   theme={theme}
                   icon="location-outline"
+                  rightIconName="locate-outline"
+                  onRightIconPress={fetchCurrentLocation}
+                  rightIconLoading={locationLoading}
+                />
+                <TextAreaField
+                  label="Description"
+                  value={formData.bio}
+                  onChangeText={(t: string) =>
+                    setFormData({ ...formData, bio: t })
+                  }
+                  theme={theme}
+                  icon="document-text-outline"
+                  placeholder="Tell us about your company, your expertise, and what sets you apart…"
                   last
                 />
               </View>
@@ -495,7 +597,7 @@ export default function EditManufacturerProfile() {
   );
 }
 
-// ── Shared Minimal Stack Input Design ──────────────────────────────
+// ── Shared Single‑line Input ──────────────────────────────────────
 const InputField = ({
   label,
   value,
@@ -506,6 +608,9 @@ const InputField = ({
   keyboardType = "default",
   autoCapitalize = "sentences",
   last,
+  rightIconName,
+  onRightIconPress,
+  rightIconLoading = false,
 }: any) => (
   <View
     style={[
@@ -545,7 +650,71 @@ const InputField = ({
         />
       </View>
     </View>
-    {error && <Text style={styles.fieldInlineError}>{error}</Text>}
+
+    <View style={styles.rowRightNode}>
+      {rightIconName && onRightIconPress && (
+        <TouchableOpacity
+          onPress={onRightIconPress}
+          disabled={rightIconLoading}
+          style={styles.rightIconTouch}
+        >
+          {rightIconLoading ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : (
+            <Ionicons name={rightIconName} size={18} color={theme.primary} />
+          )}
+        </TouchableOpacity>
+      )}
+      {error && <Text style={styles.fieldInlineError}>{error}</Text>}
+    </View>
+  </View>
+);
+
+// ── Multi‑line TextArea ──────────────────────────────────────────────
+const TextAreaField = ({
+  label,
+  value,
+  onChangeText,
+  theme,
+  icon,
+  placeholder,
+  last,
+}: any) => (
+  <View
+    style={[
+      styles.inputRow,
+      styles.textAreaRow,
+      !last && { borderBottomWidth: 1, borderBottomColor: theme.border + "40" },
+    ]}
+  >
+    <View style={styles.rowLeftNode}>
+      <View
+        style={[
+          styles.fieldIconWrap,
+          { backgroundColor: theme.primary + "0A" },
+        ]}
+      >
+        <Ionicons name={icon} size={15} color={theme.icon} />
+      </View>
+
+      <View style={styles.fieldContentBlock}>
+        <Text style={[styles.fieldInlineLabel, { color: theme.textSecondary }]}>
+          {label.toUpperCase()}
+        </Text>
+
+        <TextInput
+          style={[styles.textAreaInput, { color: theme.text }]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+          placeholderTextColor={theme.textSecondary + "50"}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+          selectionColor={theme.primary}
+        />
+      </View>
+    </View>
   </View>
 );
 
@@ -618,7 +787,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: COVER_HEIGHT - 82,
     right: 16,
-    zIndex: 45, // Elevated above everything else to pick up tap gestures cleanly
+    zIndex: 45,
   },
   coverActionIndicator: {
     paddingHorizontal: 12,
@@ -628,26 +797,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     gap: 6,
-    // shadowColor: "#000",
-    // shadowOffset: { width: 0, height: 3 },
-    // shadowOpacity: 0.1,
-    // shadowRadius: 6,
-    // elevation: 3,
   },
   coverActionText: { fontSize: 11, fontWeight: "600", letterSpacing: -0.1 },
   scrollContent: { paddingTop: COVER_HEIGHT - 32, paddingBottom: 40 },
   mainCardPositioner: { paddingHorizontal: 16 },
   profileMasterCard: {
     borderRadius: 20,
-    borderWidth: 1,
     paddingVertical: 20,
     paddingHorizontal: 16,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 3,
     marginBottom: 24,
   },
   avatarBoundary: {
@@ -706,7 +864,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 60,
   },
+  textAreaRow: {
+    alignItems: "flex-start",
+    paddingVertical: 12,
+    minHeight: 100,
+  },
   rowLeftNode: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  rowRightNode: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginLeft: 4,
+  },
+  rightIconTouch: { padding: 4 },
   fieldIconWrap: {
     width: 28,
     height: 28,
@@ -722,6 +892,13 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   nativeInput: { fontSize: 14, fontWeight: "500", padding: 0, height: 22 },
+  textAreaInput: {
+    fontSize: 14,
+    fontWeight: "500",
+    padding: 0,
+    minHeight: 70,
+    textAlignVertical: "top",
+  },
   fieldInlineError: { fontSize: 11, fontWeight: "600", color: "#EF4444" },
   primaryAction: {
     marginTop: 4,

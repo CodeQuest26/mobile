@@ -16,11 +16,12 @@ interface User {
 
 interface RegisterPayload {
   fullName: string;
-  email: string;
   password: string;
   phoneNumber?: string;
   role: "sme" | "manufacturer";
-  location?: string;
+  // location?: string;
+  region?: string;
+  town?: string;
 }
 
 interface AuthState {
@@ -32,7 +33,7 @@ interface AuthState {
   hasHydrated: boolean;
   error: string | null;
 
-  login: (email: string, password: string) => Promise<void>;
+  login: (phoneNumber: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   getMe: () => Promise<void>;
@@ -93,7 +94,7 @@ export const useAuthStore = create<AuthState>()(
 
       /* ---------------- Login ---------------- */
 
-      login: async (email, password) => {
+      login: async (phoneNumber, password) => {
         try {
           set({
             isLoading: true,
@@ -101,7 +102,7 @@ export const useAuthStore = create<AuthState>()(
           });
 
           const { data } = await axios.post(`${BASE_URL}auth/login`, {
-            email,
+            phoneNumber,
             password,
           });
 

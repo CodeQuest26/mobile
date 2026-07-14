@@ -1,9 +1,10 @@
 import Colors from "@/constants/colors";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -26,35 +27,26 @@ const COVER_HEIGHT = 200;
 
 type Theme = (typeof Colors)["light"];
 
-const MANUFACTURER_PROFILE = {
-  companyName: "Mensah Fabrications Ltd",
-  initials: "MF",
-  verified: true,
-  bio: "Precision metal fabrication for industrial and commercial clients across West Africa. ISO 9001 certified with a 6-year track record of on-time delivery.",
-  city: "Tema",
-  region: "Greater Accra",
-  country: "Ghana",
-  registrationNumber: "CS0123456789",
-  since: "2018",
-  category: "Metal Fabrication",
-  email: "info@mensahfab.com",
-  phone: "+233 30 123 4567",
-  website: "www.mensahfab.com",
-  bankName: "GCB Bank",
-  accountNumber: "****1234",
-  accountName: "Mensah Fabrications Ltd",
-  avatarUri: null as string | null,
-  coverUri: null as string | null,
-  averageRating: 4.8,
-  ratingCount: 94,
-  stats: {
-    totalOrders: 128,
-    completedOrders: 112,
-    totalEarned: "GH₵ 892K",
-  },
-};
+// ── API Types ──────────────────────────────────────────────────────────────
+interface ApiUser {
+  id: string;
+  phoneNumber: string;
+  fullName: string;
+  role: string;
+  isVerified: boolean;
+  region?: string;
+  town?: string;
+  profileImageUrl?: string;
+}
 
-// ── Star rating ──────────────────────────────────────────────
+interface ApiOrder {
+  id: string;
+  agreedAmountGhs: number;
+  status: string;
+  // ... other fields
+}
+
+// ── Star rating ──────────────────────────────────────────────────────────────
 const StarRating = ({ rating, count }: { rating: number; count: number }) => {
   const full = Math.floor(rating);
   const half = rating - full >= 0.5;
@@ -141,16 +133,93 @@ const Section = ({
 
 // ── Main Screen ──────────────────────────────────────────────
 export default function ManufacturerProfile() {
-  // useColorScheme() returns the system's current scheme directly
-  // ("light" | "dark" | null) — it is NOT a [value, setter] pair.
-  // Falling back to "light" keeps us safe if the OS reports null.
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"];
   const isDark = colorScheme === "dark";
 
   const [notifications, setNotifications] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const p = MANUFACTURER_PROFILE;
+
+  // State for real data
+  const [user, setUser] = useState<ApiUser | null>(null);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Stats derived from orders
+  const stats = {
+    totalOrders: 0,
+    completedOrders: 0,
+    totalEarned: 0,
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // 1. Fetch user
+        const userRes = await api.get("users/me");
+        setUser(userRes.data);
+
+        // 2. Fetch orders
+        const ordersRes = await api.get("orders", {
+          params: { page: 0, size: 1000 },
+        });
+        const allOrders: ApiOrder[] = ordersRes.data.content || [];
+        setOrders(allOrders);
+
+        // Compute stats
+        const completed = allOrders.filter((o) => o.status === "COMPLETED");
+        const totalEarned = completed.reduce(
+          (sum, o) => sum + (o.agreedAmountGhs || 0),
+          0,
+        );
+        stats.totalOrders = allOrders.length;
+        stats.completedOrders = completed.length;
+        stats.totalEarned = totalEarned;
+      } catch (error) {
+        console.error("Error fetching profile data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Build profile object from API data
+  const profile = {
+    companyName: user?.fullName || "Manufacturer",
+    initials: user?.fullName
+      ? user.fullName
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+      : "MF",
+    verified: user?.isVerified || false,
+    bio: "Short bio about the manufacturer.", //
+    city: user?.town || "City",
+    region: user?.region || "Region",
+    country: "Ghana",
+    registrationNumber: "N/A", // Not available from user endpoint
+    since: new Date().getFullYear().toString(), // Placeholder
+    category: "Manufacturing", // Placeholder – could be from sectorTags if we had factory profile
+    email: "N/A", // Not available from user endpoint
+    phone: user?.phoneNumber || "N/A",
+    website: "N/A",
+    bankName: "N/A",
+    accountNumber: "N/A",
+    accountName: "N/A",
+    avatarUri: user?.profileImageUrl || null,
+    coverUri: null,
+    averageRating: 0, // Could be computed from reviews if we had them
+    ratingCount: 0,
+    stats: {
+      totalOrders: stats.totalOrders,
+      completedOrders: stats.completedOrders,
+      totalEarned: `GH₵ ${(stats.totalEarned || 0).toLocaleString()}`,
+    },
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -161,7 +230,10 @@ export default function ManufacturerProfile() {
         {
           text: "Log out",
           style: "destructive",
-          onPress: () => router.replace("/(auth)/login"),
+          onPress: () => {
+            // Clear tokens and navigate to login
+            router.replace("/(auth)/login");
+          },
         },
       ],
     );
@@ -185,6 +257,25 @@ export default function ManufacturerProfile() {
     outputRange: [-100, 0, COVER_HEIGHT * 0.5],
     extrapolate: "clamp",
   });
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.screen,
+          {
+            backgroundColor: theme.background,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <Text style={{ color: theme.textSecondary }}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  const p = profile;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -390,6 +481,56 @@ export default function ManufacturerProfile() {
             </View>
           </View>
 
+          {/* Stats Card */}
+          <View
+            style={[
+              styles.groupedCard,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+                padding: 16,
+                borderRadius: 16,
+                borderWidth: 1,
+                marginBottom: 20,
+              },
+            ]}
+          >
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-around" }}
+            >
+              <View style={{ alignItems: "center" }}>
+                <Text style={[styles.statValue, { color: theme.text }]}>
+                  {p.stats.totalOrders}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.textSecondary }]}
+                >
+                  Orders
+                </Text>
+              </View>
+              <View style={{ alignItems: "center" }}>
+                <Text style={[styles.statValue, { color: theme.text }]}>
+                  {p.stats.completedOrders}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.textSecondary }]}
+                >
+                  Completed
+                </Text>
+              </View>
+              <View style={{ alignItems: "center" }}>
+                <Text style={[styles.statValue, { color: theme.text }]}>
+                  {p.stats.totalEarned}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.textSecondary }]}
+                >
+                  Earned
+                </Text>
+              </View>
+            </View>
+          </View>
+
           {/* Contact Details Module */}
           <Section title="Contact Channels" theme={theme}>
             <View
@@ -462,15 +603,6 @@ export default function ManufacturerProfile() {
                   thumbColor={notifications ? theme.primary : "#F4F3F4"}
                 />
               </View>
-
-              {/*
-                Dark mode now follows the system setting automatically via
-                useColorScheme(). A manual override toggle is intentionally
-                omitted here — if you want a user-level "Force dark/light"
-                preference later, that requires actual persisted state
-                (e.g. Zustand + MMKV) rather than useColorScheme's return
-                value, since that hook only reflects the OS setting.
-              */}
             </View>
           </Section>
 
@@ -758,5 +890,13 @@ const styles = StyleSheet.create({
   signOutLabel: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  statLabel: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });

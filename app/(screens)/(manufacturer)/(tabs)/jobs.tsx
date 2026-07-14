@@ -1,12 +1,11 @@
-import JobPeekCard from "@/components/JobPeekCard"; // adjust path as needed
+import JobPeekCard from "@/components/JobPeekCard";
 import MainContainer from "@/components/MainContainer";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
-import { JOBS, type Job } from "@/constants/manufacturerData";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Dimensions,
   FlatList,
   StyleSheet,
   Text,
@@ -16,7 +15,6 @@ import {
   View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
 const ALL = "All";
 
 // Helper: relative time from ISO date string
@@ -33,28 +31,53 @@ const getTimeAgo = (dateStr: string) => {
   return `${Math.floor(days / 7)}w ago`;
 };
 
-// Helper: generate random rating between 3.5 and 5.0
-const getRandomRating = () => {
-  return +(3.5 + Math.random() * 1.5).toFixed(1);
-};
+// Interface for the API's job response (subset of JobDetailResponse)
+interface ApiJob {
+  id: string;
+  title: string;
+  productType: string;
+  sectorTag: string;
+  quantity: number;
+  specifications?: string;
+  budgetMinGhs: number;
+  budgetMaxGhs: number;
+  deadline: string; // date string
+  deliveryAddress?: string;
+  attachmentUrls?: string[];
+  status: string;
+  createdAt: string; // ISO date
+  updatedAt: string;
+  smeName: string;
+  smeId: string;
+}
 
-// Helper: generate random bid count between 0 and 24
-const getRandomBids = () => {
-  return Math.floor(Math.random() * 25);
-};
+// Internal job type used for filtering/sorting/display
+interface Job {
+  id: string;
+  product: string; // from productType
+  quantity: number;
+  budget: string; // formatted budget range
+  location: string; // from deliveryAddress or fallback
+  category: string; // from sectorTag
+  postedAt: string; // from createdAt
+  deadline: string; // from deadline
+  sme: string; // from smeName
+  rating?: number; // not provided by API, default 0
+  bids?: number; // not provided by API, default 0
+}
 
-// Transform Job to EnhancedJobPeek
-const transformJob = (job: Job): EnhancedJobPeek => ({
-  id: job.id,
-  product: job.product,
-  quantity: job.quantity,
-  budget: job.budget,
-  location: job.location,
-  category: job.category,
-  timeAgo: getTimeAgo(job.postedAt),
-  rating: getRandomRating(),
-  bids: getRandomBids(),
-});
+// The shape expected by JobPeekCard
+interface EnhancedJobPeek {
+  id: string;
+  product: string;
+  quantity: number;
+  budget: string;
+  location: string;
+  category: string;
+  timeAgo: string;
+  rating: number;
+  bids: number;
+}
 
 export default function JobsScreen() {
   const colorScheme = useColorScheme();
@@ -68,11 +91,65 @@ export default function JobsScreen() {
   const [showSort, setShowSort] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
-  // Filter, search, and sort the original jobs
-  const filteredJobs = useMemo(() => {
-    let list = [...JOBS];
+  // State for real jobs from API
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    // Category filter
+  // Fetch jobs from API
+  const fetchJobs = async () => {
+    try {
+      setLoading(true);
+      // Request first page with a large page size to get all jobs at once
+      const response = await api.get("/api/v1/jobs", {
+        params: {
+          page: 0,
+          size: 1000,
+          // optionally add sectorTag filter? could be added later
+        },
+      });
+      // response.data should be PagedResponseJobDetailResponse
+      const apiJobs: ApiJob[] = response.data.content || [];
+
+      // Transform API jobs to internal Job format
+      const transformed: Job[] = apiJobs.map((job) => ({
+        id: job.id,
+        product: job.productType || "Unnamed Product",
+        quantity: job.quantity || 0,
+        budget: formatBudget(job.budgetMinGhs, job.budgetMaxGhs),
+        location: job.deliveryAddress || "Location not specified",
+        category: job.sectorTag || "Uncategorized",
+        postedAt: job.createdAt || new Date().toISOString(),
+        deadline: job.deadline || new Date().toISOString(),
+        sme: job.smeName || "Unknown Client",
+        rating: 0, // API does not provide rating on job list
+        bids: 0, // API does not provide bid count on job list
+      }));
+      setJobs(transformed);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper to format budget range
+  const formatBudget = (min: number, max: number) => {
+    if (!min && !max) return "GHS 0";
+    const minStr = min ? `GHS ${min.toLocaleString()}` : "";
+    const maxStr = max ? `GHS ${max.toLocaleString()}` : "";
+    if (minStr && maxStr) return `${minStr} - ${maxStr}`;
+    return minStr || maxStr;
+  };
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  // Filter, search, and sort the real jobs
+  const filteredJobs = useMemo(() => {
+    let list = [...jobs];
+
+    // Category filter (if not ALL)
     if (activeCategory !== ALL) {
       list = list.filter((j) => j.category === activeCategory);
     }
@@ -96,11 +173,13 @@ export default function JobsScreen() {
           new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
       );
     } else if (sortBy === "budget") {
-      list.sort(
-        (a, b) =>
-          parseFloat(b.budget.replace(/[^\d.]/g, "")) -
-          parseFloat(a.budget.replace(/[^\d.]/g, "")),
-      );
+      // Sort by budgetMinGhs (extract from budget string? Better to store numeric)
+      // We'll parse the budget string to get min numeric value
+      list.sort((a, b) => {
+        const aMin = extractBudgetMin(a.budget);
+        const bMin = extractBudgetMin(b.budget);
+        return bMin - aMin; // descending
+      });
     } else if (sortBy === "deadline") {
       list.sort(
         (a, b) =>
@@ -109,11 +188,31 @@ export default function JobsScreen() {
     }
 
     return list;
-  }, [search, activeCategory, sortBy]);
+  }, [search, activeCategory, sortBy, jobs]);
+
+  // Helper to extract numeric min from budget string like "GHS 1,500 - GHS 2,000"
+  const extractBudgetMin = (budgetStr: string) => {
+    const match = budgetStr.match(/GHS\s*([\d,]+)/);
+    if (match) {
+      return parseFloat(match[1].replace(/,/g, ""));
+    }
+    return 0;
+  };
 
   // Transform to EnhancedJobPeek for rendering
-  const jobsToRender = useMemo(
-    () => filteredJobs.map(transformJob),
+  const jobsToRender = useMemo<EnhancedJobPeek[]>(
+    () =>
+      filteredJobs.map((job) => ({
+        id: job.id,
+        product: job.product,
+        quantity: job.quantity,
+        budget: job.budget,
+        location: job.location,
+        category: job.category,
+        timeAgo: getTimeAgo(job.postedAt),
+        rating: job.rating ?? 0,
+        bids: job.bids ?? 0,
+      })),
     [filteredJobs],
   );
 
@@ -139,7 +238,9 @@ export default function JobsScreen() {
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: theme.text }]}>Job Board</Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            {jobsToRender.length} open job{jobsToRender.length !== 1 ? "s" : ""}
+            {loading
+              ? "Loading..."
+              : `${jobsToRender.length} open job${jobsToRender.length !== 1 ? "s" : ""}`}
           </Text>
         </View>
 
@@ -269,19 +370,30 @@ export default function JobsScreen() {
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons
-              name="search-outline"
-              size={40}
-              color={theme.textSecondary}
-            />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              No jobs found
-            </Text>
-            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-              Try a different search or category
-            </Text>
-          </View>
+          !loading ? (
+            <View style={styles.empty}>
+              <Ionicons
+                name="search-outline"
+                size={40}
+                color={theme.textSecondary}
+              />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                No Jobs Found
+              </Text>
+              <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+                New Jobs will appear here as they are posted.
+              </Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={{ color: theme.textSecondary }}>
+                Loading Jobs...
+              </Text>
+            </View>
+          ) : null
         }
       />
     </MainContainer>
@@ -383,5 +495,9 @@ const styles = StyleSheet.create({
   },
   emptySub: {
     fontSize: 13,
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: "center",
   },
 });

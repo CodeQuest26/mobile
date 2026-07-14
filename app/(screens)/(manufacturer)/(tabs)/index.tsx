@@ -16,31 +16,151 @@ import {
 
 import { FadeIn } from "@/components/FadeIn";
 import JobPeekCard from "@/components/JobPeekCard";
-import OrderCard from "@/components/OrderCard";
-import { ACTIVE_ORDERS, NEW_JOBS, USER } from "@/constants/manufacturerData";
-
 import MainContainer from "@/components/MainContainer";
+import OrderCard from "@/components/OrderCard";
 import Spacer from "@/components/Spacer";
+import { api } from "@/services/api";
 import { router } from "expo-router";
+
 const CardImg = require("../../../../assets/images/Production.jpeg");
 
-// const time = new Date().getHours();
-// const greeting = `Good ${
-//   time >= 5 && time < 12
-//     ? "morning"
-//     : time >= 12 && time < 16
-//       ? "afternoon"
-//       : time >= 16 && time < 21
-//         ? "evening"
-//         : "night"
-// }`;
+// --- Types from API ---
+interface ApiUser {
+  id: string;
+  phoneNumber: string;
+  fullName: string;
+  role: string;
+  isVerified: boolean;
+  region?: string;
+  town?: string;
+  profileImageUrl?: string;
+}
 
-//  HeroCard
+interface ApiJob {
+  id: string;
+  title: string;
+  productType: string;
+  sectorTag: string;
+  quantity: number;
+  specifications?: string;
+  budgetMinGhs: number;
+  budgetMaxGhs: number;
+  deadline: string;
+  deliveryAddress?: string;
+  attachmentUrls?: string[];
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  smeName: string;
+  smeId: string;
+}
+
+interface ApiOrder {
+  id: string;
+  jobId: string;
+  bidId: string;
+  smeId: string;
+  factoryId: string;
+  factoryName: string;
+  smeName: string;
+  agreedAmountGhs: number;
+  platformFeeGhs: number;
+  factoryPayoutGhs: number;
+  status:
+    | "PAYMENT_PENDING"
+    | "IN_ESCROW"
+    | "IN_PRODUCTION"
+    | "QUALITY_CHECK"
+    | "DELIVERED"
+    | "COMPLETED"
+    | "DISPUTED"
+    | "REFUNDED"
+    | "CANCELLED";
+  qualityCheckDeadline?: string;
+  deliveredAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- Helper functions ---
+const getTimeAgo = (dateStr: string) => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+};
+
+const formatBudget = (min: number, max: number) => {
+  if (!min && !max) return "GHS 0";
+  const minStr = min ? `GHS ${min.toLocaleString()}` : "";
+  const maxStr = max ? `GHS ${max.toLocaleString()}` : "";
+  if (minStr && maxStr) return `${minStr} - ${maxStr}`;
+  return minStr || maxStr;
+};
+
+const mapStatusToMilestone = (status: ApiOrder["status"]) => {
+  const map: Record<ApiOrder["status"], { milestone: number; label: string }> =
+    {
+      PAYMENT_PENDING: { milestone: 0, label: "Awaiting Payment" },
+      IN_ESCROW: { milestone: 0, label: "Payment Secured" },
+      IN_PRODUCTION: { milestone: 1, label: "In Production" },
+      QUALITY_CHECK: { milestone: 2, label: "Quality Check" },
+      DELIVERED: { milestone: 3, label: "Delivered" },
+      COMPLETED: { milestone: 4, label: "Completed" },
+      DISPUTED: { milestone: 0, label: "Disputed" },
+      REFUNDED: { milestone: 4, label: "Refunded" },
+      CANCELLED: { milestone: 4, label: "Cancelled" },
+    };
+  return map[status] || { milestone: 0, label: "Unknown" };
+};
+
+const getProgress = (status: ApiOrder["status"]) => {
+  const progressMap: Record<ApiOrder["status"], number> = {
+    PAYMENT_PENDING: 0.0,
+    IN_ESCROW: 0.1,
+    IN_PRODUCTION: 0.4,
+    QUALITY_CHECK: 0.7,
+    DELIVERED: 0.9,
+    COMPLETED: 1.0,
+    DISPUTED: 0.5,
+    REFUNDED: 1.0,
+    CANCELLED: 1.0,
+  };
+  return progressMap[status] || 0.0;
+};
+
+const computeDueInfo = (order: ApiOrder) => {
+  if (["COMPLETED", "REFUNDED", "CANCELLED"].includes(order.status)) {
+    return { dueIn: "Completed", urgent: false };
+  }
+  if (order.status === "DELIVERED") {
+    return { dueIn: "Awaiting confirmation", urgent: false };
+  }
+  if (order.qualityCheckDeadline) {
+    const diff = new Date(order.qualityCheckDeadline).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (days <= 3)
+      return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: true };
+    return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: false };
+  }
+  return { dueIn: "In progress", urgent: false };
+};
+
+// --- HeroCard Component ---
 interface HeroCardProps {
   theme: any;
   isDark: boolean;
   scrollY: Animated.Value;
   onCompanyLayout: (event: LayoutChangeEvent) => void;
+  user: ApiUser | null;
+  stats: { escrowHeld: number; released: number; rating: number };
 }
 
 const HeroCard = ({
@@ -48,6 +168,8 @@ const HeroCard = ({
   isDark,
   scrollY,
   onCompanyLayout,
+  user,
+  stats,
 }: HeroCardProps) => {
   const heroTranslateY = scrollY.interpolate({
     inputRange: [-200, 0, 200],
@@ -65,6 +187,20 @@ const HeroCard = ({
     outputRange: [40, -40],
     extrapolate: "clamp",
   });
+
+  const initials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "??";
+  const companyName = user?.fullName || "Manufacturer";
+  const location = user?.town
+    ? `${user.town}, ${user.region || ""}`
+    : user?.region || "Unknown location";
+  const isVerified = user?.isVerified || false;
 
   return (
     <FadeIn delay={0}>
@@ -99,13 +235,14 @@ const HeroCard = ({
           />
 
           <View style={styles.heroTopBar}>
-            <Text style={styles.heroDate}>
+            {/* <Text style={[styles.heroDate, { color: theme.onPrimary }]}>
               {new Date().toLocaleDateString("en-GB", {
                 weekday: "short",
                 day: "numeric",
                 month: "short",
               })}
-            </Text>
+            </Text> */}
+
             <TouchableOpacity
               onPress={() =>
                 router.push("/(screens)/(manufacturer)/(screens)/notification")
@@ -115,9 +252,17 @@ const HeroCard = ({
               <Ionicons
                 name="notifications-outline"
                 size={20}
-                color="rgba(255,255,255,0.9)"
+                color={theme.onPrimary + "CC"}
               />
-              <View style={styles.notifHeroDot} />
+              <View
+                style={[
+                  styles.notifHeroDot,
+                  {
+                    backgroundColor: theme.warning,
+                    borderColor: theme.onPrimary,
+                  },
+                ]}
+              />
             </TouchableOpacity>
           </View>
 
@@ -128,15 +273,20 @@ const HeroCard = ({
                 router.push("/(screens)/(manufacturer)/(screens)/profile")
               }
             >
-              <Text style={styles.heroLogoText}>{USER.initials}</Text>
+              <Text style={[styles.heroLogoText, { color: theme.onPrimary }]}>
+                {initials}
+              </Text>
             </Pressable>
 
             <View style={{ flex: 1 }}>
               <View style={styles.heroNameRow}>
-                <Text style={styles.heroCompany} numberOfLines={1}>
-                  {USER.company}
+                <Text
+                  style={[styles.heroCompany, { color: theme.onPrimary }]}
+                  numberOfLines={1}
+                >
+                  {companyName}
                 </Text>
-                {USER.verified && (
+                {isVerified && (
                   <Ionicons
                     name="checkmark-circle"
                     size={16}
@@ -150,21 +300,21 @@ const HeroCard = ({
                 <Ionicons
                   name="location-outline"
                   size={12}
-                  color="rgba(255,255,255,0.65)"
+                  color={theme.onPrimary + "CC"}
                 />
-                <Text style={styles.heroLocation}>{USER.location}</Text>
+                <Text
+                  style={[
+                    styles.heroLocation,
+                    { color: theme.onPrimary + "CC" },
+                  ]}
+                >
+                  {location}
+                </Text>
               </View>
             </View>
           </View>
 
           <Spacer style={{ height: 20 }} />
-
-          {/* <Text style={styles.heroTagline}>
-            {greeting}
-            {time > 5 && time < 21
-              ? " 👋, Here's your factory overview"
-              : " 😴"}
-          </Text> */}
         </ImageBackground>
 
         <View
@@ -181,7 +331,7 @@ const HeroCard = ({
               Escrow Held
             </Text>
             <Text style={[styles.escrowValue, { color: theme.text }]}>
-              GH₵ 52,000
+              GH₵ {stats.escrowHeld.toLocaleString()}
             </Text>
           </View>
 
@@ -194,7 +344,7 @@ const HeroCard = ({
               Released
             </Text>
             <Text style={[styles.escrowValue, { color: theme.text }]}>
-              GH₵ 32,200
+              GH₵ {stats.released.toLocaleString()}
             </Text>
           </View>
 
@@ -211,7 +361,7 @@ const HeroCard = ({
               <Ionicons name="star" size={12} color="#F59E0B" />
 
               <Text style={[styles.escrowValue, { color: theme.text }]}>
-                4.8
+                {stats.rating.toFixed(1)}
               </Text>
             </View>
           </View>
@@ -221,6 +371,7 @@ const HeroCard = ({
   );
 };
 
+// --- Main Component ---
 export default function ManufacturerHome() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
@@ -229,6 +380,98 @@ export default function ManufacturerHome() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const blurOpacity = useRef(new Animated.Value(0)).current;
   const [companyNameTop, setCompanyNameTop] = useState<number | null>(null);
+
+  const [user, setUser] = useState<ApiUser | null>(null);
+  const [activeOrders, setActiveOrders] = useState<any[]>([]);
+  const [newJobs, setNewJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const stats = {
+    escrowHeld: 0,
+    released: 0,
+    rating: 0,
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const userRes = await api.get("/api/v1/users/me");
+        setUser(userRes.data);
+
+        const ordersRes = await api.get("/api/v1/orders", {
+          params: { page: 0, size: 100 },
+        });
+        const orders: ApiOrder[] = ordersRes.data.content || [];
+
+        const active = orders.filter(
+          (o) => !["COMPLETED", "REFUNDED", "CANCELLED"].includes(o.status),
+        );
+        const transformedOrders = active.map((order) => {
+          const { milestone, label } = mapStatusToMilestone(order.status);
+          const progress = getProgress(order.status);
+          const { dueIn, urgent } = computeDueInfo(order);
+          return {
+            id: order.id,
+            job: order.jobId || `Job #${order.jobId?.slice(0, 8)}`,
+            sme: order.smeName || "Unknown",
+            amount: `GH₵ ${order.agreedAmountGhs?.toFixed(2) || "0.00"}`,
+            milestone,
+            milestoneLabel: label,
+            dueIn,
+            progress,
+            urgent,
+          };
+        });
+        setActiveOrders(transformedOrders);
+
+        let held = 0,
+          released = 0;
+        orders.forEach((o) => {
+          if (
+            o.status === "IN_ESCROW" ||
+            o.status === "IN_PRODUCTION" ||
+            o.status === "QUALITY_CHECK"
+          ) {
+            held += o.agreedAmountGhs || 0;
+          } else if (o.status === "DELIVERED" || o.status === "COMPLETED") {
+            released += o.agreedAmountGhs || 0;
+          }
+        });
+        stats.escrowHeld = held;
+        stats.released = released;
+
+        const jobsRes = await api.get("/api/v1/jobs", {
+          params: { page: 0, size: 10 },
+        });
+        const jobs: ApiJob[] = jobsRes.data.content || [];
+        const sorted = jobs.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+        const transformedJobs = sorted.slice(0, 10).map((job) => ({
+          id: job.id,
+          product: job.productType || "Unnamed",
+          quantity: job.quantity || 0,
+          budget: formatBudget(job.budgetMinGhs, job.budgetMaxGhs),
+          location: job.deliveryAddress || "N/A",
+          category: job.sectorTag || "Uncategorized",
+          timeAgo: getTimeAgo(job.createdAt),
+          rating: 0,
+          bids: 0,
+        }));
+        setNewJobs(transformedJobs);
+
+        stats.rating = 0; // placeholder
+      } catch (error) {
+        console.error("Error fetching home data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   useEffect(() => {
     if (companyNameTop === null) return;
@@ -264,6 +507,8 @@ export default function ManufacturerHome() {
           isDark={isDark}
           scrollY={scrollY}
           onCompanyLayout={handleCompanyLayout}
+          user={user}
+          stats={stats}
         />
 
         <Animated.ScrollView
@@ -275,81 +520,129 @@ export default function ManufacturerHome() {
             { useNativeDriver: true },
           )}
         >
-          {/* New Job Posts */}
-          <FadeIn delay={320}>
-            <View style={[styles.section, { paddingHorizontal: 0 }]}>
-              <View style={[styles.sectionHeader, { paddingHorizontal: 15 }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  New Job Posts
-                </Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={{ color: theme.textSecondary }}>Loading...</Text>
+            </View>
+          ) : (
+            <>
+              {newJobs.length > 0 && (
+                <FadeIn delay={320}>
+                  <View style={[styles.section, { paddingHorizontal: 0 }]}>
+                    <View
+                      style={[styles.sectionHeader, { paddingHorizontal: 15 }]}
+                    >
+                      <Text
+                        style={[styles.sectionTitle, { color: theme.text }]}
+                      >
+                        New Job Posts
+                      </Text>
 
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/jobs" as any)
-                  }
-                >
-                  <Text style={[styles.seeAll, { color: theme.primary }]}>
-                    See all
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                      <TouchableOpacity
+                        onPress={() =>
+                          router.push(
+                            "/(screens)/(manufacturer)/(tabs)/jobs" as any,
+                          )
+                        }
+                      >
+                        <Text style={[styles.seeAll, { color: theme.primary }]}>
+                          See all
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
 
-              <Animated.ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.jobsHScroll, { marginLeft: 15 }]}
-              >
-                {NEW_JOBS.map((j) => (
-                  <JobPeekCard key={j.id} job={j} theme={theme} />
-                ))}
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/jobs" as any)
-                  }
-                  style={[
-                    styles.jobPeekCard,
-                    styles.moreCard,
-                    {
-                      backgroundColor: theme.primary + "12",
-                      borderColor: theme.primary + "30",
-                    },
-                  ]}
-                >
+                    <Animated.ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={[
+                        styles.jobsHScroll,
+                        { marginLeft: 15 },
+                      ]}
+                    >
+                      {newJobs.map((j) => (
+                        <JobPeekCard key={j.id} job={j} theme={theme} />
+                      ))}
+                      <TouchableOpacity
+                        onPress={() =>
+                          router.push(
+                            "/(screens)/(manufacturer)/(tabs)/jobs" as any,
+                          )
+                        }
+                        style={[
+                          styles.jobPeekCard,
+                          styles.moreCard,
+                          {
+                            backgroundColor: theme.primary + "12",
+                            borderColor: theme.primary + "30",
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="grid-outline"
+                          size={28}
+                          color={theme.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.moreCardText,
+                            { color: theme.primary },
+                          ]}
+                        >
+                          View all posts
+                        </Text>
+                      </TouchableOpacity>
+                    </Animated.ScrollView>
+                  </View>
+                </FadeIn>
+              )}
+
+              {activeOrders.length > 0 && (
+                <FadeIn delay={240}>
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <Text
+                        style={[styles.sectionTitle, { color: theme.text }]}
+                      >
+                        Active Orders
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() =>
+                          router.push("/(screens)/(manufacturer)/(tabs)/orders")
+                        }
+                      >
+                        <Text style={[styles.seeAll, { color: theme.primary }]}>
+                          See all
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    {activeOrders.map((o, i) => (
+                      <OrderCard
+                        key={o.id}
+                        order={o}
+                        theme={theme}
+                        delay={i * 60}
+                      />
+                    ))}
+                  </View>
+                </FadeIn>
+              )}
+
+              {newJobs.length === 0 && activeOrders.length === 0 && (
+                <View style={styles.emptyState}>
                   <Ionicons
-                    name="grid-outline"
-                    size={28}
-                    color={theme.primary}
+                    name="cube-outline"
+                    size={64}
+                    color={theme.textSecondary + "50"}
                   />
-                  <Text style={[styles.moreCardText, { color: theme.primary }]}>
-                    View all posts
+                  <Text
+                    style={[styles.emptyText, { color: theme.textSecondary }]}
+                  >
+                    No jobs or orders yet
                   </Text>
-                </TouchableOpacity>
-              </Animated.ScrollView>
-            </View>
-          </FadeIn>
-
-          {/* Active Orders */}
-          <FadeIn delay={240}>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  Active Orders
-                </Text>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/(screens)/(manufacturer)/(tabs)/orders")
-                  }
-                >
-                  <Text style={[styles.seeAll, { color: theme.primary }]}>
-                    See all
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {ACTIVE_ORDERS.map((o, i) => (
-                <OrderCard key={o.id} order={o} theme={theme} delay={i * 60} />
-              ))}
-            </View>
-          </FadeIn>
+                </View>
+              )}
+            </>
+          )}
 
           <Spacer style={{ height: 70 }} />
         </Animated.ScrollView>
@@ -380,23 +673,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
   seeAll: { fontSize: 13, fontWeight: "600" },
-  quickActions: { flexDirection: "row", gap: 10 },
-  qaBtn: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 14,
-    alignItems: "center",
-    gap: 8,
-  },
-  qaIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  qaLabel: { fontSize: 11, fontWeight: "600", textAlign: "center" },
   jobsHScroll: { paddingRight: 16, gap: 10 },
   jobPeekCard: {
     width: 160,
@@ -417,9 +693,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   heroWrapper: { marginBottom: 24 },
-  heroBg: {
-    overflow: "hidden",
-  },
   heroBgImage: {
     paddingHorizontal: 20,
     paddingTop: 50,
@@ -452,13 +725,12 @@ const styles = StyleSheet.create({
   },
   heroTopBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
     marginBottom: 22,
   },
   heroDate: {
     fontSize: 12.5,
-    color: "rgba(255,255,255,0.65)",
     fontWeight: "500",
   },
   notifHero: {
@@ -475,9 +747,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#FCD34D",
     borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.3)",
   },
   heroCompanyRow: {
     flexDirection: "row",
@@ -498,14 +768,12 @@ const styles = StyleSheet.create({
   heroLogoText: {
     fontSize: 16,
     fontWeight: "900",
-    color: "#fff",
     letterSpacing: -0.5,
   },
   heroNameRow: { flexDirection: "row", alignItems: "center" },
   heroCompany: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#fff",
     letterSpacing: -0.4,
     flexShrink: 1,
   },
@@ -517,16 +785,8 @@ const styles = StyleSheet.create({
   },
   heroLocation: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.65)",
     fontWeight: "500",
     flexShrink: 1,
-  },
-  heroTagline: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "500",
-    lineHeight: 18,
-    textAlign: "center",
   },
   escrowFloat: {
     flexDirection: "row",
@@ -552,4 +812,18 @@ const styles = StyleSheet.create({
   escrowValue: { fontSize: 14, fontWeight: "800" },
   escrowDivider: { width: 1 },
   ratingRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: "center",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 80,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
 });

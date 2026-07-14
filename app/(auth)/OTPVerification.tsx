@@ -56,7 +56,7 @@ const OtpBox = ({
   }, [value]);
 
   const borderColor = hasError
-    ? "#EF4444"
+    ? theme.error
     : focused
       ? theme.primary
       : value
@@ -64,7 +64,7 @@ const OtpBox = ({
         : theme.border;
 
   const bgColor = hasError
-    ? "#EF44440D"
+    ? theme.error + "08"
     : focused
       ? theme.primary + "08"
       : theme.cardBackground;
@@ -82,7 +82,7 @@ const OtpBox = ({
       ]}
     >
       <Text
-        style={[styles.otpChar, { color: hasError ? "#EF4444" : theme.text }]}
+        style={[styles.otpChar, { color: hasError ? theme.error : theme.text }]}
       >
         {value ? "•" : ""}
       </Text>
@@ -101,13 +101,8 @@ export default function OtpVerifyScreen() {
   const theme = Colors[colorScheme] || Colors.light;
   const isDark = colorScheme === "dark";
 
-  const {
-    contact = "user email",
-    type = "phone",
-    role,
-  } = useLocalSearchParams<{
-    contact?: string;
-    type?: "email";
+  const { phoneNumber, role } = useLocalSearchParams<{
+    phoneNumber?: string;
     role?: string;
   }>();
 
@@ -296,7 +291,16 @@ export default function OtpVerifyScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.replace("/login")}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace({
+                  pathname: "/login",
+                  params: { role },
+                });
+              }
+            }}
             style={[styles.backBtn, { backgroundColor: theme.cardBackground }]}
           >
             <Ionicons name="chevron-back" size={20} color={theme.text} />
@@ -314,9 +318,7 @@ export default function OtpVerifyScreen() {
             ]}
           >
             <Ionicons
-              name={
-                type === "phone" ? "phone-portrait-outline" : "mail-outline"
-              }
+              name="phone-portrait-outline"
               size={28}
               color={theme.primary}
             />
@@ -324,16 +326,14 @@ export default function OtpVerifyScreen() {
 
           <Spacer style={{ height: 24 }} />
 
-          <ThemedText style={styles.heading}>
-            Verify your {type === "phone" ? "number" : "email"}
-          </ThemedText>
+          <ThemedText style={styles.heading}>Verify your number</ThemedText>
           <Spacer style={{ height: 8 }} />
           <ThemedText
             style={[styles.subheading, { color: theme.textSecondary }]}
           >
             We sent a 4-digit verification code to{"\n"}
             <Text style={{ color: theme.text, fontWeight: "600" }}>
-              {contact}
+              {phoneNumber}
             </Text>
           </ThemedText>
 
@@ -386,8 +386,6 @@ export default function OtpVerifyScreen() {
             </Text>
           )}
 
-          <Spacer style={{ height: 24 }} />
-
           {/* Counter Controls */}
           <View style={styles.resendRow}>
             <Text style={[styles.resendPrompt, { color: theme.textSecondary }]}>
@@ -439,7 +437,7 @@ export default function OtpVerifyScreen() {
                 },
               ]}
             >
-              {loading ? "Verifying…" : verified ? "Verified ✓" : "Verify"}
+              {loading ? "Verifying…" : verified ? "Verified" : "Verify"}
             </Text>
           </TouchableOpacity>
         </View>

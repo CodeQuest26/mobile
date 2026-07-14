@@ -1,12 +1,6 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
-import {
-  AVATAR_COLORS,
-  formatDateLabel,
-  formatTime,
-  Message,
-} from "@/constants/contacts";
-import { useChatConversations } from "@/hooks/useChatConversations";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -24,65 +18,130 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ApiOrder {
+  id: string;
+  jobId: string;
+  smeId: string;
+  smeName: string;
+  factoryId: string;
+  factoryName: string;
+  agreedAmountGhs: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApiMessage {
+  id: string;
+  orderId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  attachmentUrl?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 type DateSeparator = {
   id: string;
   separator: true;
   label: string;
 };
 
-type ChatItem = Message | DateSeparator;
+type ChatItem = ApiMessage | DateSeparator;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const AVATAR_COLORS = [
+  { bg: "#E0F2FE", text: "#0284C7" },
+  { bg: "#FCE7F3", text: "#DB2777" },
+  { bg: "#D1FAE5", text: "#059669" },
+  { bg: "#FEF3C7", text: "#D97706" },
+  { bg: "#E0E7FF", text: "#4F46E5" },
+  { bg: "#FFE4E6", text: "#E11D48" },
+];
+
 const getAvatarColor = (id: string) => {
   const numeric = parseInt(id.replace(/\D/g, ""), 10);
   const index = Number.isFinite(numeric)
     ? numeric % AVATAR_COLORS.length
     : Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0) %
       AVATAR_COLORS.length;
-
   return AVATAR_COLORS[index];
 };
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const formatTime = (iso: string) => {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now.getTime() - d.getTime()) / 60000;
+  if (diff < 1) return "Now";
+  if (diff < 60) return `${Math.floor(diff)}m`;
+  if (diff < 1440) return `${Math.floor(diff / 60)}h`;
+  if (diff < 10080) return `${Math.floor(diff / 1440)}d`;
+  return d.toLocaleDateString();
+};
+
+const formatDateLabel = (iso: string) => {
+  const d = new Date(iso);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (d >= today) return "Today";
+  if (d >= yesterday) return "Yesterday";
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
 const Bubble = ({
   item,
+  isCurrentUser,
   theme,
 }: {
-  item: Message;
+  item: ApiMessage;
+  isCurrentUser: boolean;
   theme: typeof Colors.light;
 }) => {
-  const isUser = item.sender === "user";
   return (
     <View
       style={[
         styles.messageRow,
-        isUser ? styles.messageRowRight : styles.messageRowLeft,
+        isCurrentUser ? styles.messageRowRight : styles.messageRowLeft,
       ]}
     >
       <View
         style={[
           styles.bubble,
-          isUser
+          isCurrentUser
             ? [styles.bubbleUser, { backgroundColor: theme.info }]
             : [styles.bubbleOther, { backgroundColor: theme.iconBackground }],
         ]}
       >
         <Text
-          style={[styles.bubbleText, { color: isUser ? "white" : theme.text }]}
+          style={[
+            styles.bubbleText,
+            { color: isCurrentUser ? "white" : theme.text },
+          ]}
         >
-          {item.text}
+          {item.content}
         </Text>
       </View>
 
-      {/* Timestamp outside the bubble */}
       <Text
         style={[
           styles.timestamp,
-          isUser ? styles.timestampRight : styles.timestampLeft,
+          isCurrentUser ? styles.timestampRight : styles.timestampLeft,
           { color: theme.textSecondary },
         ]}
       >
-        {formatTime(item.timestamp)}
+        {formatTime(item.createdAt)}
       </Text>
     </View>
   );
@@ -104,7 +163,8 @@ const DateSeparatorLine = ({
   </View>
 );
 
-// ─── Chat Room Screen ─────────────────────────────────────────────────────────
+// ─── Chat Room Screen ────────────────────────────────────────────────────────
+
 const ChatRoom = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
@@ -119,17 +179,78 @@ const ChatRoom = () => {
       contactOnline: string;
     }>();
 
-  if (!contactId) return null;
-
-  const { conversations, setConversations } = useChatConversations(
-    userType ?? "manufacturer",
-  );
+  const [messages, setMessages] = useState<ApiMessage[]>([]);
+  const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  const online = contactOnline === "1";
+  // Fetch current user and messages
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // 1. Get current user
+        const userRes = await api.get("users/me");
+        const user = userRes.data;
+        setCurrentUserId(user.id);
 
-  // Scroll to bottom
+        // 2. Fetch all orders for this manufacturer
+        const ordersRes = await api.get("orders", {
+          params: { page: 0, size: 100 },
+        });
+        const allOrders: ApiOrder[] = ordersRes.data.content || [];
+
+        // Filter orders for this SME (contactId)
+        const smeOrders = allOrders.filter((o) => o.smeId === contactId);
+        if (smeOrders.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        // Sort orders by createdAt descending
+        const sortedOrders = smeOrders.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+        // Use the most recent order as the active one for sending messages
+        const latestOrder = sortedOrders[0];
+        setActiveOrderId(latestOrder.id);
+
+        // 3. Fetch messages for all orders of this SME
+        const allMessages: ApiMessage[] = [];
+        for (const order of sortedOrders) {
+          try {
+            const msgsRes = await api.get(`messages/orders/${order.id}`, {
+              params: { page: 0, size: 100 },
+            });
+            const msgs: ApiMessage[] = msgsRes.data.content || [];
+            allMessages.push(...msgs);
+          } catch (err) {
+            console.warn(`Failed to fetch messages for order ${order.id}`, err);
+          }
+        }
+
+        // Sort messages by createdAt
+        allMessages.sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        );
+        setMessages(allMessages);
+      } catch (error) {
+        console.error("Error fetching chat data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (contactId) {
+      fetchData();
+    }
+  }, [contactId]);
+
+  // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
     if (flatListRef.current) {
       flatListRef.current.scrollToEnd({ animated: true });
@@ -137,52 +258,71 @@ const ChatRoom = () => {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(scrollToBottom, 100);
-    return () => clearTimeout(timeout);
-  }, [conversations, contactId, scrollToBottom]);
+    if (!loading) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [messages, loading, scrollToBottom]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = inputText.trim();
-    if (!trimmed || !contactId) return;
-    setConversations((prev) => ({
-      ...prev,
-      [contactId]: [
-        ...(prev[contactId] ?? []),
-        {
-          id: Date.now().toString(),
-          text: trimmed,
-          sender: "user",
-          timestamp: Date.now(),
-        },
-      ],
-    }));
+    if (!trimmed || !contactId || !activeOrderId || !currentUserId) return;
+
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const newMsg: ApiMessage = {
+      id: tempId,
+      orderId: activeOrderId,
+      senderId: currentUserId,
+      senderName: "You",
+      content: trimmed,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, newMsg]);
     setInputText("");
+    scrollToBottom();
+
+    try {
+      // Send to API
+      const response = await api.post("messages", {
+        orderId: activeOrderId,
+        content: trimmed,
+        // attachmentUrl optional
+      });
+      const sentMsg = response.data;
+      // Replace temp message with real one
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? sentMsg : m)));
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      // Optionally revert or show error
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    }
   };
 
+  // Build chat items with date separators
   const getChatItems = useCallback((): ChatItem[] => {
-    if (!contactId) return [];
-    const msgs = conversations[contactId] ?? [];
     const items: ChatItem[] = [];
     let lastDate = "";
-    msgs.forEach((msg) => {
-      const label = formatDateLabel(msg.timestamp);
+    messages.forEach((msg) => {
+      const label = formatDateLabel(msg.createdAt);
       if (label !== lastDate) {
-        items.push({ id: `sep-${msg.timestamp}`, separator: true, label });
+        items.push({ id: `sep-${msg.createdAt}`, separator: true, label });
         lastDate = label;
       }
       items.push(msg);
     });
     return items;
-  }, [conversations, contactId]);
+  }, [messages]);
 
   if (!contactId) return null;
 
   const c = getAvatarColor(contactId);
   const chatItems = getChatItems();
+  const online = contactOnline === "1";
 
   return (
     <MainContainer safe>
-      {/* Header — outside KeyboardAvoidingView, stays fixed at top */}
+      {/* Header */}
       <View style={[styles.chatHeader, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={24} color={theme.icon} />
@@ -199,7 +339,7 @@ const ChatRoom = () => {
               {contactName}
             </Text>
             <Text style={[styles.chatStatus, { color: theme.textSecondary }]}>
-              {online ? "🟢 Online" : "Offline"}
+              {online ? "Online" : "Offline"}
             </Text>
           </View>
         </View>
@@ -213,86 +353,98 @@ const ChatRoom = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Content area — messages + input */}
+      {/* Messages + Input */}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
-        {/* Messages list */}
-        <FlatList
-          ref={flatListRef}
-          data={chatItems}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
-            if ("separator" in item) {
-              return <DateSeparatorLine label={item.label} theme={theme} />;
-            }
-            return <Bubble item={item} theme={theme} />;
-          }}
-          contentContainerStyle={styles.msgList}
-          onContentSizeChange={scrollToBottom}
-          onLayout={scrollToBottom}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={{ color: theme.textSecondary }}>
+              Loading messages...
+            </Text>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={chatItems}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => {
+                if ("separator" in item) {
+                  return <DateSeparatorLine label={item.label} theme={theme} />;
+                }
+                const isCurrentUser = item.senderId === currentUserId;
+                return (
+                  <Bubble
+                    item={item}
+                    isCurrentUser={isCurrentUser}
+                    theme={theme}
+                  />
+                );
+              }}
+              contentContainerStyle={styles.msgList}
+              onContentSizeChange={scrollToBottom}
+              onLayout={scrollToBottom}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Text style={{ color: theme.textSecondary }}>
+                    No messages yet. Start a conversation!
+                  </Text>
+                </View>
+              }
+            />
 
-        {/* Input bar — safe area inset applied to bottom padding */}
-        <View
-          style={[
-            styles.inputBar,
-            {
-              backgroundColor: theme.background,
-              borderTopColor: theme.border,
-              paddingBottom: insets.bottom + 8,
-              justifyContent: "center",
-              alignContent: "center",
-            },
-          ]}
-        >
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => console.log("open attachment menu")}
-            style={{
-              // backgroundColor: theme.iconBackground,
-              minHeight: 42,
-              maxHeight: 100,
-              width: 42,
-              borderRadius: 21,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Ionicons name="add" size={30} color={theme.icon} />
-          </TouchableOpacity>
+            <View
+              style={[
+                styles.inputBar,
+                {
+                  backgroundColor: theme.background,
+                  borderTopColor: theme.border,
+                  paddingBottom: insets.bottom + 8,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => console.log("open attachment menu")}
+                style={styles.attachBtn}
+              >
+                <Ionicons name="add" size={30} color={theme.icon} />
+              </TouchableOpacity>
 
-          <TextInput
-            style={[
-              styles.input,
-              { backgroundColor: theme.cardBackground, color: theme.text },
-            ]}
-            placeholder="Message..."
-            placeholderTextColor={theme.textSecondary}
-            value={inputText}
-            onChangeText={setInputText}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-            multiline
-            blurOnSubmit={false}
-          />
+              <TextInput
+                style={[
+                  styles.input,
+                  { backgroundColor: theme.cardBackground, color: theme.text },
+                ]}
+                placeholder="Message..."
+                placeholderTextColor={theme.textSecondary}
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={handleSend}
+                returnKeyType="send"
+                multiline
+                blurOnSubmit={false}
+              />
 
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              { backgroundColor: theme.primary },
-              !inputText.trim() && styles.sendBtnDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim()}
-          >
-            <Ionicons name="send" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  { backgroundColor: theme.primary },
+                  !inputText.trim() && styles.sendBtnDisabled,
+                ]}
+                onPress={handleSend}
+                disabled={!inputText.trim()}
+              >
+                <Ionicons name="send" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </KeyboardAvoidingView>
     </MainContainer>
   );
@@ -300,7 +452,6 @@ const ChatRoom = () => {
 
 export default ChatRoom;
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   chatHeader: {
@@ -338,8 +489,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     flexGrow: 1,
   },
-
-  // Message row — wraps bubble + timestamp
   messageRow: {
     marginBottom: 8,
     maxWidth: "76%",
@@ -350,8 +499,6 @@ const styles = StyleSheet.create({
   messageRowRight: {
     alignSelf: "flex-end",
   },
-
-  // Bubble
   bubble: {
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -364,8 +511,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 5,
   },
   bubbleText: { fontSize: 15, lineHeight: 21 },
-
-  // Timestamp — outside bubble
   timestamp: {
     fontSize: 10,
     marginTop: 3,
@@ -377,7 +522,6 @@ const styles = StyleSheet.create({
   timestampRight: {
     alignSelf: "flex-end",
   },
-
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -403,6 +547,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sendBtnDisabled: { opacity: 0.5 },
+  attachBtn: {
+    minHeight: 42,
+    maxHeight: 100,
+    width: 42,
+    borderRadius: 21,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   dateSep: {
     flexDirection: "row",
     alignItems: "center",
@@ -419,5 +571,16 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     opacity: 0.6,
     textTransform: "uppercase",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  empty: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 40,
   },
 });

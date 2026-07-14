@@ -74,6 +74,7 @@ const InputField = ({
         color={theme.textSecondary}
         style={{ marginRight: 10 }}
       />
+
       <TextInput
         style={[styles.input, { color: theme.text }]}
         value={value}
@@ -98,13 +99,12 @@ const LoginScreen = () => {
   const selectedRole = storage.getString("selectedRole");
   const roleMeta = ROLE_META[selectedRole];
 
-  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSubmit = emailValid && password.length >= 8;
+  const canSubmit = phoneNumber.length >= 10 && password.length >= 8;
 
   const { login, error } = useAuthStore();
 
@@ -113,10 +113,10 @@ const LoginScreen = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(phoneNumber, password);
       router.replace({
         pathname: "/OTPVerification",
-        params: { selectedRole },
+        params: { selectedRole, phoneNumber },
       });
     } catch (error: any) {
       Alert.alert(
@@ -124,6 +124,8 @@ const LoginScreen = () => {
         error.message || "An error occurred during login.",
       );
       console.error("Login failed:", error);
+      console.log("Phone:", phoneNumber);
+      console.log("Password:", password);
     } finally {
       setLoading(false);
     }
@@ -179,11 +181,11 @@ const LoginScreen = () => {
         {/* Form */}
         <View style={styles.form}>
           <InputField
-            label="Email address"
-            icon="mail-outline"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            label="Phone number"
+            icon="call-outline"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            keyboardType="phone-pad"
             theme={theme}
             secureTextEntry={undefined}
             autoCapitalize={"none"}

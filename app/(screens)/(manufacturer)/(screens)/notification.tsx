@@ -1,6 +1,7 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -21,61 +22,36 @@ import Animated, { LinearTransition } from "react-native-reanimated";
 
 const { width } = Dimensions.get("window");
 
-interface Notification {
+// ─── Types ──────────────────────────────────────────────────────────────────
+interface ApiNotification {
   id: string;
   title: string;
   message: string;
-  timestamp: string;
+  createdAt: string; // ISO date
   read: boolean;
-  type: "order" | "bid" | "payment" | "system";
+  type?: "order" | "bid" | "payment" | "system"; // if not provided, default to "system"
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "1",
-    title: "Order Update",
-    message:
-      "AfroDrinks Ltd has marked 'Aluminium Cans' as Quality Check completed.",
-    timestamp: "10m ago",
-    read: false,
-    type: "order",
-  },
-  {
-    id: "2",
-    title: "New Bid",
-    message: "Your bid for 'Plastic Containers' has been accepted!",
-    timestamp: "1h ago",
-    read: false,
-    type: "bid",
-  },
-  {
-    id: "3",
-    title: "Payment Received",
-    message: "GH₵ 32,200 has been released from escrow for 'Steel Frames'.",
-    timestamp: "3h ago",
-    read: false,
-    type: "payment",
-  },
-  {
-    id: "4",
-    title: "System Update",
-    message:
-      "New features available: milestone tracking and chat enhancements.",
-    timestamp: "Yesterday",
-    read: false,
-    type: "system",
-  },
-  {
-    id: "5",
-    title: "Urgent: Delivery Reminder",
-    message: "Order 'Aluminium Cans' is due in 3 days. Please update status.",
-    timestamp: "Yesterday",
-    read: false,
-    type: "order",
-  },
-];
+// Internal shape (with formatted timestamp)
+interface Notification extends ApiNotification {
+  timestamp: string; // formatted relative time
+}
 
-const getIconName = (type: string) => {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const getTimeAgo = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+};
+
+const getIconName = (type?: string) => {
   switch (type) {
     case "order":
       return "cube-outline";
@@ -90,84 +66,117 @@ const getIconName = (type: string) => {
   }
 };
 
+// ─── Main Screen ────────────────────────────────────────────────────────────
 export default function NotificationsScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
   const isDark = colorScheme === "dark";
 
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
+  const [loading, setLoading] = useState(true);
 
   const swipeableRefs = useRef(new Map<string, Swipeable>());
 
-  useEffect(() => {
-    return () => {
-      swipeableRefs.current.clear();
-    };
-  }, []);
-
-  const activeUnreadNotifications = notifications.filter((n) => !n.read);
-
-  const filteredNotifications =
-    activeTab === "all"
-      ? activeUnreadNotifications
-      : activeUnreadNotifications.filter((n) => n.type === "order");
-
-  const unreadCount = activeUnreadNotifications.length;
-
-  const markAsRead = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif)),
-    );
-  }, []);
-
-  const deleteNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await api.get("/api/v1/notifications", {
+        params: { page: 0, size: 100 },
+      });
+      const items: ApiNotification[] = response.data.content || [];
+      const formatted: Notification[] = items.map((n) => ({
+        ...n,
+        timestamp: getTimeAgo(n.createdAt),
+      }));
+      setNotifications(formatted);
     } catch (error) {
-      console.error("Refresh failed", error);
+      console.error("Failed to fetch notifications:", error);
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  const markAllAsRead = () => {
-    if (unreadCount === 0) return;
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  // Mark as read
+  const markAsRead = useCallback(async (id: string) => {
+    try {
+      await api.patch(`/api/v1/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+    } catch (error) {
+      console.error("Failed to mark as read:", error);
+    }
+  }, []);
+
+  // Delete
+  const deleteNotification = useCallback(async (id: string) => {
+    try {
+      await api.delete(`/api/v1/notifications/${id}`);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (error) {
+      console.error("Failed to delete notification:", error);
+    }
+  }, []);
+
+  // Mark all as read
+  const markAllAsRead = useCallback(async () => {
+    const unread = notifications.filter((n) => !n.read);
+    if (unread.length === 0) return;
     Alert.alert(
       "Clear all notifications",
-      `Clear all ${unreadCount} active updates?`,
+      `Clear all ${unread.length} active updates?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Clear All",
-          onPress: () => {
-            setNotifications((prev) =>
-              prev.map((notif) => ({ ...notif, read: true })),
-            );
+          onPress: async () => {
+            try {
+              await api.patch("/api/v1/notifications/read-all");
+              setNotifications((prev) =>
+                prev.map((n) => ({ ...n, read: true })),
+              );
+            } catch (error) {
+              console.error("Failed to mark all as read:", error);
+            }
           },
         },
       ],
     );
-  };
+  }, [notifications]);
+
+  // Pull-to-refresh
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  // Derived data
+  const activeUnread = notifications.filter((n) => !n.read);
+  const unreadCount = activeUnread.length;
+
+  const filteredNotifications =
+    activeTab === "all"
+      ? activeUnread
+      : activeUnread.filter((n) => n.type === "order");
 
   const renderRightActions = useCallback(
     (id: string) => {
       return (
         <RectButton
-          style={[
-            styles.deleteButton,
-            { backgroundColor: isDark ? "#2A2A2A" : "#1A1A1A" },
-          ]}
+          style={[styles.deleteButton, { backgroundColor: theme.error }]}
           onPress={() => deleteNotification(id)}
         >
-          <Ionicons name="trash-outline" size={20} color="#fff" />
-          <Text style={styles.deleteText}>Delete</Text>
+          <Ionicons name="trash-outline" size={20} color={theme.onPrimary} />
+          <Text style={[styles.deleteText, { color: theme.onPrimary }]}>
+            Delete
+          </Text>
         </RectButton>
       );
     },
@@ -284,7 +293,7 @@ export default function NotificationsScreen() {
             )}
           </View>
 
-          {/* Monochromatic Bordered Tab Bar */}
+          {/* Tab Bar */}
           <View
             style={[styles.tabContainerPill, { borderColor: theme.border }]}
           >
@@ -356,29 +365,40 @@ export default function NotificationsScreen() {
               />
             }
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <View
-                  style={[
-                    styles.emptyIconCircle,
-                    { borderColor: theme.border },
-                  ]}
-                >
-                  <Ionicons
-                    name="checkmark-outline"
-                    size={24}
-                    color={theme.text}
-                  />
+              loading ? (
+                <View style={styles.emptyState}>
+                  <Text style={{ color: theme.textSecondary }}>
+                    Loading notifications...
+                  </Text>
                 </View>
-                <Text style={[styles.emptyText, { color: theme.text }]}>
-                  Inbox is empty
-                </Text>
-                <Text
-                  style={[styles.emptySubtext, { color: theme.textSecondary }]}
-                >
-                  Tapping modifications updates them out of your immediate
-                  workflow grid.
-                </Text>
-              </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <View
+                    style={[
+                      styles.emptyIconCircle,
+                      { borderColor: theme.border },
+                    ]}
+                  >
+                    <Ionicons
+                      name="checkmark-outline"
+                      size={24}
+                      color={theme.text}
+                    />
+                  </View>
+                  <Text style={[styles.emptyText, { color: theme.text }]}>
+                    Inbox is empty
+                  </Text>
+                  <Text
+                    style={[
+                      styles.emptySubtext,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Tapping modifications updates them out of your immediate
+                    workflow grid.
+                  </Text>
+                </View>
+              )
             }
           />
         </View>
@@ -483,7 +503,6 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   deleteText: {
-    color: "#fff",
     fontSize: 11,
     fontWeight: "600",
     marginTop: 2,
