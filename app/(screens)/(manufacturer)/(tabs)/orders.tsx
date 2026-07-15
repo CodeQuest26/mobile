@@ -44,8 +44,7 @@ interface ApiOrder {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
-  // We need job title – assume it's included in the response (not in spec but we'll map if present)
-  jobTitle?: string; // optional, we'll derive from something else if missing
+  jobTitle?: string;
 }
 
 // The shape expected by OrderCard
@@ -77,9 +76,7 @@ export default function ManufacturerOrders() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      // Assuming the endpoint is GET /api/v1/orders (not in spec, but we need it)
-      // If not available, we might need to use a different endpoint or ask for it.
-      const response = await api.get("/api/v1/orders", {
+      const response = await api.get("orders", {
         params: {
           page: 0,
           size: 1000,
@@ -210,8 +207,9 @@ export default function ManufacturerOrders() {
     backgroundColor: activeTab === tab ? theme.primary : "transparent",
     borderColor: activeTab === tab ? theme.primary : theme.border,
   });
+
   const getTabTextStyle = (tab: TabType) => ({
-    color: activeTab === tab ? "#fff" : theme.textSecondary,
+    color: activeTab === tab ? theme.onPrimary : theme.textSecondary,
   });
 
   const handleFilterBtn = () => {

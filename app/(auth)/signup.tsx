@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -157,7 +158,6 @@ const SignupScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const canSubmit = phoneNumber.length >= 10 && password.length >= 8;
 
   const handleSignup = async () => {
@@ -170,7 +170,7 @@ const SignupScreen = () => {
         phoneNumber: phoneNumber.trim(),
         password,
         fullName: fullName.trim(),
-        role: selectedRole as "sme" | "manufacturer",
+        role: selectedRole as "SME_OWNER" | "FACTORY_OWNER",
         region: "Greater Accra",
         town: "East Legon",
       });
@@ -302,7 +302,11 @@ const SignupScreen = () => {
                 { color: canSubmit ? theme.onPrimary : theme.textSecondary },
               ]}
             >
-              {loading ? "Creating account…" : "Create Account"}
+              {loading ? (
+                <ActivityIndicator size={"small"} color={theme.onPrimary} />
+              ) : (
+                "Create Account"
+              )}
             </Text>
           </TouchableOpacity>
 

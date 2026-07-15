@@ -1,10 +1,13 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { api } from "@/services/api";
+import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -19,9 +22,49 @@ import {
   View,
 } from "react-native";
 
-import { getJobById } from "@/constants/manufacturerData";
-
 const { width, height } = Dimensions.get("window");
+
+// Matches JobDetailResponse from the OpenAPI spec
+interface JobDetail {
+  id: string;
+  smeId: string;
+  smeName: string;
+  title: string;
+  productType: string;
+  sectorTag: string;
+  quantity: number;
+  specifications?: string;
+  budgetMinGhs: number;
+  budgetMaxGhs: number;
+  deadline: string;
+  attachmentUrls?: string[];
+  deliveryAddress?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const formatBudget = (min: number, max: number) => {
+  if (!min && !max) return "GHS 0";
+  const minStr = min ? `GHS ${min.toLocaleString()}` : "";
+  const maxStr = max ? `GHS ${max.toLocaleString()}` : "";
+  if (minStr && maxStr) return `${minStr} - ${maxStr}`;
+  return minStr || maxStr;
+};
+
+const timeAgo = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days < 1) return "today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+};
+
+const defaultImages = [
+  "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=600",
+  "https://images.unsplash.com/photo-1563784462386-044fd95e9852?auto=format&fit=crop&q=80&w=400",
+  "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&q=80&w=400",
+];
 
 export default function BidDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,19 +72,59 @@ export default function BidDetailsScreen() {
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
   const isDark = colorScheme === "dark";
 
-  const [job] = useState(() => getJobById(id));
+  const { hasHydrated, token } = useAuthStore();
+
+  const [job, setJob] = useState<JobDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [bidAmount, setBidAmount] = useState("");
+  const [productionDays, setProductionDays] = useState("");
   const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [bidSubmitted, setBidSubmitted] = useState(false);
 
-  // Lightbox Image State
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  if (!job) {
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!token || !id) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchJob = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const { data } = await api.get(`jobs/${id}`);
+        setJob(data);
+      } catch (err) {
+        console.error("Error fetching job details:", err);
+        setError("Couldn't load this job. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJob();
+  }, [hasHydrated, token, id]);
+
+  if (!hasHydrated || loading) {
     return (
       <MainContainer safe>
         <View style={styles.notFound}>
-          <Text style={{ color: theme.text }}>Job not found.</Text>
+          <ActivityIndicator color={theme.primary} />
+        </View>
+      </MainContainer>
+    );
+  }
+
+  if (error || !job) {
+    return (
+      <MainContainer safe>
+        <View style={styles.notFound}>
+          <Text style={{ color: theme.text }}>{error || "Job not found."}</Text>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={{ color: theme.primary }}>Go Back</Text>
           </TouchableOpacity>
@@ -50,23 +133,64 @@ export default function BidDetailsScreen() {
     );
   }
 
-  const jobImages = job.images || [
-    "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=600",
-    "https://images.unsplash.com/photo-1563784462386-044fd95e9852?auto=format&fit=crop&q=80&w=400",
-    "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&q=80&w=400",
-  ];
+  // API only gives us attachmentUrls, not a dedicated "images" field —
+  // fall back to placeholder images when none were attached to the job.
+  const jobImages =
+    job.attachmentUrls && job.attachmentUrls.length > 0
+      ? job.attachmentUrls
+      : defaultImages;
 
-  const handleSubmitBid = () => {
+  const handleSubmitBid = async () => {
     if (!bidAmount.trim()) {
       Alert.alert("Missing amount", "Please enter your bid amount.");
       return;
     }
-    const parsed = parseFloat(bidAmount.replace(/,/g, ""));
-    if (isNaN(parsed) || parsed <= 0) {
+    const totalPrice = parseFloat(bidAmount.replace(/,/g, ""));
+    if (isNaN(totalPrice) || totalPrice <= 0) {
       Alert.alert("Invalid amount", "Please enter a valid bid amount.");
       return;
     }
-    setBidSubmitted(true);
+
+    const days = parseInt(productionDays, 10);
+    if (isNaN(days) || days <= 0) {
+      Alert.alert(
+        "Missing production time",
+        "Please enter how many days production will take.",
+      );
+      return;
+    }
+
+    // pricePerUnitGhs is required by the API — derive it from the total
+    // bid and quantity rather than asking the user to compute it by hand.
+    const pricePerUnit =
+      job.quantity > 0 ? totalPrice / job.quantity : totalPrice;
+
+    const deliveryDateEstimate = new Date(
+      Date.now() + days * 24 * 60 * 60 * 1000,
+    )
+      .toISOString()
+      .split("T")[0]; // date-only, per the API's "date" format
+
+    try {
+      setSubmitting(true);
+      await api.post(`jobs/${job.id}/bids`, {
+        jobId: job.id,
+        pricePerUnitGhs: Number(pricePerUnit.toFixed(2)),
+        totalPriceGhs: totalPrice,
+        productionDays: days,
+        deliveryDateEstimate,
+        message: note.trim() || undefined,
+      });
+      setBidSubmitted(true);
+    } catch (err) {
+      console.error("Error submitting bid:", err);
+      Alert.alert(
+        "Couldn't submit bid",
+        "Something went wrong submitting your bid. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -77,7 +201,6 @@ export default function BidDetailsScreen() {
         backgroundColor="transparent"
       />
 
-      {/* Clean Minimal Inline Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={theme.text} />
@@ -93,7 +216,6 @@ export default function BidDetailsScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Job overview card */}
         <FadeIn delay={0}>
           <View
             style={[
@@ -109,18 +231,18 @@ export default function BidDetailsScreen() {
               style={[styles.catTag, { backgroundColor: theme.primary + "15" }]}
             >
               <Text style={[styles.catText, { color: theme.primary }]}>
-                {job.category}
+                {job.sectorTag}
               </Text>
             </View>
 
             <Text style={[styles.productTitle, { color: theme.text }]}>
-              {job.product}
+              {job.title || job.productType}
             </Text>
 
             <Text style={[styles.smeLabel, { color: theme.textSecondary }]}>
               Posted by{" "}
               <Text style={{ color: theme.text, fontWeight: "700" }}>
-                {job.sme}
+                {job.smeName}
               </Text>
             </Text>
 
@@ -134,7 +256,7 @@ export default function BidDetailsScreen() {
                   Quantity
                 </Text>
                 <Text style={[styles.infoValue, { color: theme.text }]}>
-                  {job.quantity}
+                  {job.quantity.toLocaleString()}
                 </Text>
               </View>
 
@@ -145,7 +267,7 @@ export default function BidDetailsScreen() {
                   Budget
                 </Text>
                 <Text style={[styles.infoValue, { color: theme.primary }]}>
-                  {job.budget}
+                  {formatBudget(job.budgetMinGhs, job.budgetMaxGhs)}
                 </Text>
               </View>
             </View>
@@ -157,16 +279,15 @@ export default function BidDetailsScreen() {
                 color={theme.textSecondary}
               />
               <Text style={[styles.locText, { color: theme.textSecondary }]}>
-                {job.location}
+                {job.deliveryAddress || "Location not specified"}
               </Text>
               <Text style={[styles.postedAt, { color: theme.textSecondary }]}>
-                · Posted {job.postedAt}
+                · Posted {timeAgo(job.createdAt)}
               </Text>
             </View>
           </View>
         </FadeIn>
 
-        {/* Reference Gallery Row */}
         <FadeIn delay={60}>
           <View style={[styles.card, { padding: 0 }]}>
             <Text
@@ -196,57 +317,27 @@ export default function BidDetailsScreen() {
           </View>
         </FadeIn>
 
-        {/* Description */}
-        <FadeIn delay={100}>
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.cardBackground,
-                marginHorizontal: 16,
-              },
-            ]}
-          >
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Description
-            </Text>
-            <Text style={[styles.bodyText, { color: theme.textSecondary }]}>
-              {job.description}
-            </Text>
-          </View>
-        </FadeIn>
+        {job.specifications && (
+          <FadeIn delay={100}>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.cardBackground,
+                  marginHorizontal: 16,
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Specifications
+              </Text>
+              <Text style={[styles.bodyText, { color: theme.textSecondary }]}>
+                {job.specifications}
+              </Text>
+            </View>
+          </FadeIn>
+        )}
 
-        {/* Requirements */}
-        <FadeIn delay={140}>
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.cardBackground,
-                marginHorizontal: 16,
-              },
-            ]}
-          >
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Requirements
-            </Text>
-            {job.requirements.map((req, idx) => (
-              <View key={idx} style={styles.reqRow}>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={16}
-                  color={theme.primary}
-                  style={{ marginTop: 1 }}
-                />
-                <Text style={[styles.reqText, { color: theme.textSecondary }]}>
-                  {req}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </FadeIn>
-
-        {/* Bid form */}
         <FadeIn delay={180}>
           <View
             style={[
@@ -279,7 +370,7 @@ export default function BidDetailsScreen() {
                     GH₵{" "}
                     {parseFloat(bidAmount.replace(/,/g, "")).toLocaleString()}
                   </Text>
-                  . {job.sme} will be notified and may contact you shortly.
+                  . {job.smeName} will be notified and may contact you shortly.
                 </Text>
               </View>
             ) : (
@@ -317,6 +408,33 @@ export default function BidDetailsScreen() {
                     { color: theme.textSecondary, marginTop: 12 },
                   ]}
                 >
+                  Production time (days)
+                </Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      borderColor: theme.border,
+                      backgroundColor: theme.cardBackground,
+                    },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.input, { color: theme.text }]}
+                    placeholder="e.g. 14"
+                    placeholderTextColor={theme.textSecondary}
+                    keyboardType="number-pad"
+                    value={productionDays}
+                    onChangeText={setProductionDays}
+                  />
+                </View>
+
+                <Text
+                  style={[
+                    styles.inputLabel,
+                    { color: theme.textSecondary, marginTop: 12 },
+                  ]}
+                >
                   Note to SME{" "}
                   <Text style={{ fontStyle: "italic" }}>(optional)</Text>
                 </Text>
@@ -339,15 +457,26 @@ export default function BidDetailsScreen() {
                 />
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: theme.primary }]}
+                  style={[
+                    styles.submitBtn,
+                    {
+                      backgroundColor: theme.primary,
+                      opacity: submitting ? 0.6 : 1,
+                    },
+                  ]}
                   onPress={handleSubmitBid}
                   activeOpacity={0.85}
+                  disabled={submitting}
                 >
-                  <Text
-                    style={[styles.submitBtnText, { color: theme.onPrimary }]}
-                  >
-                    Submit Bid
-                  </Text>
+                  {submitting ? (
+                    <ActivityIndicator color={theme.onPrimary} />
+                  ) : (
+                    <Text
+                      style={[styles.submitBtnText, { color: theme.onPrimary }]}
+                    >
+                      Submit Bid
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </>
             )}
@@ -357,7 +486,6 @@ export default function BidDetailsScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Image Lightbox Portal */}
       <Modal
         visible={selectedImage !== null}
         transparent={true}
@@ -374,7 +502,7 @@ export default function BidDetailsScreen() {
             style={styles.closeLightboxBtn}
             onPress={() => setSelectedImage(null)}
           >
-            <Ionicons name="close" size={28} color="#fff" />
+            <Ionicons name="close" size={28} color={theme.onPrimary} />
           </TouchableOpacity>
           {selectedImage && (
             <Image
@@ -398,10 +526,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 16,
   },
-  scrollContent: {
-    paddingTop: 8,
-    paddingBottom: 20,
-  },
+  scrollContent: { paddingTop: 8, paddingBottom: 20 },
   notFound: {
     flex: 1,
     justifyContent: "center",
@@ -410,12 +535,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 8 },
   headerTitle: { fontSize: 20, fontWeight: "700" },
-  card: {
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    gap: 6,
-  },
+  card: { borderRadius: 20, padding: 16, marginBottom: 16, gap: 6 },
   catTag: {
     alignSelf: "flex-start",
     paddingHorizontal: 8,
@@ -434,20 +554,11 @@ const styles = StyleSheet.create({
   infoItem: { flex: 1, gap: 2 },
   infoLabel: { fontSize: 11, fontWeight: "600" },
   infoValue: { fontSize: 13, fontWeight: "700" },
-  locRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
+  locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   locText: { fontSize: 12 },
   postedAt: { fontSize: 12 },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
-  galleryContainer: {
-    gap: 10,
-    marginLeft: 16,
-    paddingRight: 16,
-  },
+  galleryContainer: { gap: 10, marginLeft: 16, paddingRight: 16 },
   galleryImage: {
     width: width * 0.4,
     height: 95,
@@ -488,16 +599,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   submitBtnText: { fontSize: 15, fontWeight: "700" },
-
-  successBox: {
-    alignItems: "center",
-    paddingVertical: 16,
-    gap: 10,
-  },
+  successBox: { alignItems: "center", paddingVertical: 16, gap: 10 },
   successTitle: { fontSize: 16, fontWeight: "700" },
   successSub: { fontSize: 14, textAlign: "center", lineHeight: 21 },
-
-  // Lightbox Specific Layout Styles
   lightboxOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.92)",
@@ -511,8 +615,5 @@ const styles = StyleSheet.create({
     zIndex: 20,
     padding: 8,
   },
-  lightboxImage: {
-    width: width,
-    height: height * 0.75,
-  },
+  lightboxImage: { width: width, height: height * 0.75 },
 });

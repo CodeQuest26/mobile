@@ -1,16 +1,13 @@
 import MainContainer from "@/components/MainContainer";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
-import {
-  getBidsForJob,
-  JobStatus,
-  SME_JOBS,
-  SMEJob,
-} from "@/constants/Jobstore";
+import { api, handleApiError } from "@/services/api";
+import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -24,7 +21,79 @@ import {
 
 const { width } = Dimensions.get("window");
 
-//  FadeIn
+// ---------- Types ----------
+interface JobApiResponse {
+  id: string;
+  smeId: string;
+  smeName: string;
+  title: string;
+  productType: string;
+  sectorTag: string;
+  quantity: number;
+  specifications?: string;
+  budgetMinGhs: number;
+  budgetMaxGhs: number;
+  deadline: string;
+  attachmentUrls?: string[];
+  deliveryAddress?: string;
+  status: string; // OPEN, DRAFT, etc.
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PagedJobs {
+  content: JobApiResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+interface BidApiResponse {
+  id: string;
+  jobId: string;
+  factoryId: string;
+  factoryName: string;
+  factorySectorTags: string[];
+  pricePerUnitGhs: number;
+  totalPriceGhs: number;
+  productionDays: number;
+  deliveryDateEstimate: string;
+  message?: string;
+  status: string;
+  createdAt: string;
+}
+
+type JobStatus = "active" | "completed" | "draft";
+
+// ---------- Helpers ----------
+function mapApiStatusToTab(status: string): JobStatus {
+  if (status === "DRAFT") return "draft";
+  if (status === "COMPLETED") return "completed";
+  // OPEN, BIDDING, AWARDED, IN_PRODUCTION → "active"
+  return "active";
+}
+
+function transformJob(job: JobApiResponse, bids: BidApiResponse[]) {
+  const budget =
+    job.budgetMinGhs && job.budgetMaxGhs
+      ? `GHS ${job.budgetMinGhs} – ${job.budgetMaxGhs}`
+      : "Budget not set";
+
+  return {
+    id: job.id,
+    product: job.title,
+    quantity: `${job.quantity} pcs`,
+    budget,
+    image: job.attachmentUrls?.[0] ?? null,
+    bidsCount: bids.length,
+    bids,
+    status: mapApiStatusToTab(job.status),
+    rawStatus: job.status,
+  };
+}
+
+// ---------- FadeIn wrapper ----------
 const FadeIn = ({
   children,
   delay = 0,
@@ -35,7 +104,7 @@ const FadeIn = ({
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
 
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
@@ -59,7 +128,7 @@ const FadeIn = ({
   );
 };
 
-//  Stat pill
+// ---------- StatPill ----------
 const StatPill = ({
   icon,
   label,
@@ -81,21 +150,18 @@ const StatPill = ({
   </View>
 );
 
-//  Job card
+// ---------- JobCard ----------
 const JobCard = ({
   job,
   theme,
   delay,
-  isDark,
 }: {
-  job: SMEJob;
+  job: ReturnType<typeof transformJob>;
   theme: any;
   delay: number;
   isDark: boolean;
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const bids = getBidsForJob(job.id);
 
   const handlePress = () => {
     router.push({
@@ -126,18 +192,12 @@ const JobCard = ({
           activeOpacity={1}
         >
           <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.cardBackground,
-              },
-            ]}
+            style={[styles.card, { backgroundColor: theme.cardBackground }]}
           >
             <View style={styles.cardInner}>
-              {/* Top row */}
               <View style={styles.cardTopRow}>
                 <View style={styles.cardLeft}>
-                  <View style={[styles.statusBadge]}></View>
+                  <View style={styles.statusBadge} />
                   <Text
                     style={[styles.cardTitle, { color: theme.text }]}
                     numberOfLines={2}
@@ -149,7 +209,6 @@ const JobCard = ({
                   >
                     {job.quantity}
                   </Text>
-
                   <StatPill
                     icon="cash-outline"
                     label={job.budget}
@@ -174,9 +233,7 @@ const JobCard = ({
                   <View
                     style={[
                       styles.cardImagePlaceholder,
-                      {
-                        backgroundColor: theme.background,
-                      },
+                      { backgroundColor: theme.background },
                     ]}
                   >
                     <Ionicons
@@ -192,24 +249,7 @@ const JobCard = ({
                 style={[styles.divider, { backgroundColor: theme.border }]}
               />
 
-              {/* Stats */}
-              {/* <View style={styles.statsRow}>
-                <StatPill
-                  icon="cash-outline"
-                  label={job.budget}
-                  color={theme.primary}
-                  theme={theme}
-                />
-                <StatPill
-                  icon="location-outline"
-                  label={job.location}
-                  theme={theme}
-                />
-              </View> */}
-
-              {/* Footer */}
               <View style={styles.cardFooter}>
-                {/* Bids count — show manufacturer avatars if any */}
                 <View style={styles.bidsRow}>
                   <View
                     style={[
@@ -227,9 +267,7 @@ const JobCard = ({
                   >
                     {job.bidsCount === 1 ? "bid" : "bids"}
                   </Text>
-
-                  {/* Manufacturer name previews (up to 2) */}
-                  {bids.length > 0 && (
+                  {job.bids.length > 0 && (
                     <Text
                       style={[
                         styles.bidPreview,
@@ -238,11 +276,11 @@ const JobCard = ({
                       numberOfLines={1}
                     >
                       ·{" "}
-                      {bids
+                      {job.bids
                         .slice(0, 2)
-                        .map((b) => b.manufacturer.name)
+                        .map((b) => b.factoryName)
                         .join(", ")}
-                      {bids.length > 2 ? ` +${bids.length - 2}` : ""}
+                      {job.bids.length > 2 ? ` +${job.bids.length - 2}` : ""}
                     </Text>
                   )}
                 </View>
@@ -255,6 +293,7 @@ const JobCard = ({
   );
 };
 
+// ---------- EmptyState ----------
 const EmptyState = ({
   activeTab,
   theme,
@@ -307,7 +346,7 @@ const EmptyState = ({
             onPress={() => router.push("/(screens)/(sme)/(screens)/postJob")}
             style={[styles.emptyBtn, { backgroundColor: theme.primary }]}
           >
-            <Ionicons name="add" size={18} color="#fff" />
+            <Ionicons name="add" size={18} color={theme.onPrimary} />
             <Text style={styles.emptyBtnText}>{cfg.cta}</Text>
           </TouchableOpacity>
         )}
@@ -316,15 +355,64 @@ const EmptyState = ({
   );
 };
 
+// ---------- Main Screen ----------
 const MyJobs = () => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
   const [activeTab, setActiveTab] = useState<JobStatus>("active");
+  const [jobs, setJobs] = useState<ReturnType<typeof transformJob>[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredJobs = SME_JOBS.filter((j) => j.status === activeTab);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+
+  const user = useAuthStore((s) => s.user);
+  console.log("Current role:", user?.role);
+
+  const fetchAllJobs = useCallback(async () => {
+    if (!hasHydrated || !isAuthenticated) return;
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 1. Get all jobs (paginate large; size=1000 should be enough for now)
+      const jobsResp = await api.get<PagedJobs>("jobs?page=0&size=1000");
+      const jobsArray = jobsResp.data.content;
+
+      // 2. For each job, fetch its bids (parallel)
+      const jobsWithBids = await Promise.all(
+        jobsArray.map(async (jobApi) => {
+          try {
+            const bidsResp = await api.get<BidApiResponse[]>(
+              `jobs/${jobApi.id}/bids`,
+            );
+            return transformJob(jobApi, bidsResp.data);
+          } catch {
+            // If bids fail, still show the job without bids
+            return transformJob(jobApi, []);
+          }
+        }),
+      );
+
+      setJobs(jobsWithBids);
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message || "Failed to load jobs.");
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, hasHydrated]);
+
+  useEffect(() => {
+    fetchAllJobs();
+  }, [fetchAllJobs]);
+
+  const filteredJobs = jobs.filter((j) => j.status === activeTab);
   const tabCount = (key: JobStatus) =>
-    SME_JOBS.filter((j) => j.status === key).length;
+    jobs.filter((j) => j.status === key).length;
 
   const tabs: { key: JobStatus; label: string }[] = [
     { key: "active", label: "Active" },
@@ -354,7 +442,6 @@ const MyJobs = () => {
                 style={[styles.postBtn, { backgroundColor: theme.primary }]}
               >
                 <Ionicons name="add" size={18} color="#fff" />
-
                 <Text style={styles.postBtnText}>Post Job</Text>
               </TouchableOpacity>
             </View>
@@ -430,9 +517,44 @@ const MyJobs = () => {
           </FadeIn>
         </View>
 
-        {/* List */}
+        {/* Job list */}
         <View style={styles.listContainer}>
-          {filteredJobs.length > 0 ? (
+          {!hasHydrated ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={theme.primary} />
+              <Text
+                style={[styles.loadingText, { color: theme.textSecondary }]}
+              >
+                Loading...
+              </Text>
+            </View>
+          ) : loading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={theme.primary} />
+              <Text
+                style={[styles.loadingText, { color: theme.textSecondary }]}
+              >
+                Fetching your jobs...
+              </Text>
+            </View>
+          ) : error ? (
+            <View style={styles.centered}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={40}
+                color={theme.error}
+              />
+              <Text style={[styles.errorText, { color: theme.error }]}>
+                {error}
+              </Text>
+              <TouchableOpacity
+                onPress={fetchAllJobs}
+                style={[styles.emptyBtn, { backgroundColor: theme.primary }]}
+              >
+                <Text style={styles.emptyBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filteredJobs.length > 0 ? (
             filteredJobs.map((job, i) => (
               <JobCard
                 key={job.id}
@@ -455,7 +577,7 @@ const MyJobs = () => {
 
 export default MyJobs;
 
-//  Styles
+// (styles remain the same as before – omitted here for brevity)
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
@@ -465,23 +587,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
   },
-  headerEyebrow: {
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
   headerTitle: { fontSize: 28, fontWeight: "800", letterSpacing: -0.8 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  headerIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   postBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -491,7 +598,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   postBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-
   tabsWrapper: { borderBottomWidth: 1, paddingHorizontal: 20 },
   tabsRow: { flexDirection: "row" },
   tab: {
@@ -515,14 +621,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tabCountText: { fontSize: 11, fontWeight: "700" },
-
   listContainer: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 48,
     gap: 14,
   },
-
+  centered: { alignItems: "center", paddingVertical: 48 },
+  loadingText: { fontSize: 15, marginTop: 12 },
+  errorText: { fontSize: 15, marginTop: 8, marginBottom: 20 },
   card: {
     borderRadius: 18,
     borderWidth: 0,
@@ -534,7 +641,6 @@ const styles = StyleSheet.create({
     elevation: 4,
     marginBottom: 14,
   },
-  categoryAccent: { height: 3 },
   cardInner: { padding: 16 },
   cardTopRow: {
     flexDirection: "row",
@@ -543,19 +649,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   cardLeft: { flex: 1, marginRight: 12 },
-  categoryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    alignSelf: "flex-start",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  categoryDot: { width: 6, height: 6, borderRadius: 3 },
-  categoryChipText: { fontSize: 11, fontWeight: "700", letterSpacing: 0.2 },
   cardTitle: {
     fontSize: 17,
     fontWeight: "700",
@@ -573,12 +666,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   divider: { height: 1, marginBottom: 12, opacity: 0.5 },
-  statsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 14,
-    flexWrap: "wrap",
-  },
   statPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -604,7 +691,6 @@ const styles = StyleSheet.create({
   bidsCount: { fontSize: 14, fontWeight: "800" },
   bidsLabel: { fontSize: 13 },
   bidPreview: { fontSize: 12, flex: 1 },
-  footerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -613,18 +699,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-  statusText: { fontSize: 12, fontWeight: "700" },
-  deadlinePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  deadlineText: { fontSize: 12 },
-
   emptyState: {
     alignItems: "center",
     paddingVertical: 64,

@@ -1,5 +1,6 @@
 import Colors from "@/constants/colors";
 import { api } from "@/services/api";
+import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -27,23 +28,16 @@ const COVER_HEIGHT = 200;
 
 type Theme = (typeof Colors)["light"];
 
-// ── API Types ──────────────────────────────────────────────────────────────
-interface ApiUser {
-  id: string;
-  phoneNumber: string;
-  fullName: string;
-  role: string;
-  isVerified: boolean;
-  region?: string;
-  town?: string;
-  profileImageUrl?: string;
-}
-
 interface ApiOrder {
   id: string;
   agreedAmountGhs: number;
   status: string;
-  // ... other fields
+}
+
+interface Stats {
+  totalOrders: number;
+  completedOrders: number;
+  totalEarned: number;
 }
 
 // ── Star rating ──────────────────────────────────────────────────────────────
@@ -137,55 +131,67 @@ export default function ManufacturerProfile() {
   const theme = Colors[colorScheme ?? "light"];
   const isDark = colorScheme === "dark";
 
+  // Pull auth state from the store instead of re-fetching independently.
+  // This guarantees we only read `user` once the store has hydrated
+  // and the api client has its Authorization header attached.
+  const { user, token, hasHydrated, getMe, logout } = useAuthStore();
+
   const [notifications, setNotifications] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // State for real data
-  const [user, setUser] = useState<ApiUser | null>(null);
   const [orders, setOrders] = useState<ApiOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Stats derived from orders
-  const stats = {
+  const [stats, setStats] = useState<Stats>({
     totalOrders: 0,
     completedOrders: 0,
     totalEarned: 0,
-  };
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for the persisted auth store to rehydrate (and thus for the
+    // api instance's Authorization header to be set) before hitting the API.
+    if (!hasHydrated) return;
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setLoading(true);
-        // 1. Fetch user
-        const userRes = await api.get("users/me");
-        setUser(userRes.data);
 
-        // 2. Fetch orders
+        // Refresh user in case profile changed since last login
+        await getMe();
+
         const ordersRes = await api.get("orders", {
           params: { page: 0, size: 1000 },
         });
         const allOrders: ApiOrder[] = ordersRes.data.content || [];
         setOrders(allOrders);
 
-        // Compute stats
         const completed = allOrders.filter((o) => o.status === "COMPLETED");
         const totalEarned = completed.reduce(
           (sum, o) => sum + (o.agreedAmountGhs || 0),
           0,
         );
-        stats.totalOrders = allOrders.length;
-        stats.completedOrders = completed.length;
-        stats.totalEarned = totalEarned;
+
+        setStats({
+          totalOrders: allOrders.length,
+          completedOrders: completed.length,
+          totalEarned,
+        });
       } catch (error) {
         console.error("Error fetching profile data:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
-  }, []);
 
-  // Build profile object from API data
+    fetchData();
+  }, [hasHydrated, token]);
+
+  // Build profile object from store's user data
   const profile = {
     companyName: user?.fullName || "Manufacturer",
     initials: user?.fullName
@@ -197,14 +203,14 @@ export default function ManufacturerProfile() {
           .slice(0, 2)
       : "MF",
     verified: user?.isVerified || false,
-    bio: "Short bio about the manufacturer.", //
-    city: user?.town || "City",
+    bio: "Short bio about the manufacturer.",
+    city: (user as any)?.town || "City",
     region: user?.region || "Region",
     country: "Ghana",
-    registrationNumber: "N/A", // Not available from user endpoint
-    since: new Date().getFullYear().toString(), // Placeholder
-    category: "Manufacturing", // Placeholder – could be from sectorTags if we had factory profile
-    email: "N/A", // Not available from user endpoint
+    registrationNumber: "N/A",
+    since: new Date().getFullYear().toString(),
+    category: "Manufacturing",
+    email: "N/A",
     phone: user?.phoneNumber || "N/A",
     website: "N/A",
     bankName: "N/A",
@@ -212,7 +218,7 @@ export default function ManufacturerProfile() {
     accountName: "N/A",
     avatarUri: user?.profileImageUrl || null,
     coverUri: null,
-    averageRating: 0, // Could be computed from reviews if we had them
+    averageRating: 0,
     ratingCount: 0,
     stats: {
       totalOrders: stats.totalOrders,
@@ -230,8 +236,8 @@ export default function ManufacturerProfile() {
         {
           text: "Log out",
           style: "destructive",
-          onPress: () => {
-            // Clear tokens and navigate to login
+          onPress: async () => {
+            await logout();
             router.replace("/(auth)/login");
           },
         },
@@ -239,7 +245,6 @@ export default function ManufacturerProfile() {
     );
   };
 
-  // Nav dynamic blur configs
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 60, 100],
     outputRange: [0, 0.4, 1],
@@ -258,7 +263,7 @@ export default function ManufacturerProfile() {
     extrapolate: "clamp",
   });
 
-  if (loading) {
+  if (!hasHydrated || loading) {
     return (
       <View
         style={[
@@ -285,7 +290,6 @@ export default function ManufacturerProfile() {
         backgroundColor="transparent"
       />
 
-      {/* ── Dynamic Top Bar Floating Navigation ── */}
       <Animated.View
         style={[
           styles.headerBlur,
@@ -304,7 +308,6 @@ export default function ManufacturerProfile() {
         </View>
       </Animated.View>
 
-      {/* Floating Buttons */}
       <View
         style={[
           styles.navActionWrapper,
@@ -334,7 +337,6 @@ export default function ManufacturerProfile() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Background Canvas Parallax Cover ── */}
       <Animated.View
         style={[
           styles.coverContainer,
@@ -353,7 +355,6 @@ export default function ManufacturerProfile() {
         )}
       </Animated.View>
 
-      {/* ── Scrollable Body Context ── */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -364,7 +365,6 @@ export default function ManufacturerProfile() {
         scrollEventThrottle={16}
       >
         <View style={styles.mainCardPositioner}>
-          {/* Main Integrated Profile Master Card */}
           <View
             style={[
               styles.profileMasterCard,
@@ -374,7 +374,6 @@ export default function ManufacturerProfile() {
               },
             ]}
           >
-            {/* Avatar Section Frame */}
             <View
               style={[
                 styles.avatarBoundary,
@@ -395,7 +394,6 @@ export default function ManufacturerProfile() {
               )}
             </View>
 
-            {/* Profile Info Details */}
             <View style={styles.metaInformation}>
               <View style={styles.titleLine}>
                 <Text style={[styles.companyName, { color: theme.text }]}>
@@ -481,7 +479,6 @@ export default function ManufacturerProfile() {
             </View>
           </View>
 
-          {/* Stats Card */}
           <View
             style={[
               styles.groupedCard,
@@ -531,7 +528,6 @@ export default function ManufacturerProfile() {
             </View>
           </View>
 
-          {/* Contact Details Module */}
           <Section title="Contact Channels" theme={theme}>
             <View
               style={[
@@ -564,7 +560,6 @@ export default function ManufacturerProfile() {
             </View>
           </Section>
 
-          {/* Functional System Application Configuration Preferences */}
           <Section title="Preferences" theme={theme}>
             <View
               style={[
@@ -606,7 +601,6 @@ export default function ManufacturerProfile() {
             </View>
           </Section>
 
-          {/* Secure System Termination Button */}
           <TouchableOpacity
             onPress={handleLogout}
             activeOpacity={0.8}
@@ -624,9 +618,7 @@ export default function ManufacturerProfile() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
   headerBlur: {
     position: "absolute",
     top: 0,
@@ -643,10 +635,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 70,
   },
-  headerTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
+  headerTitle: { fontSize: 15, fontWeight: "600" },
   navActionWrapper: {
     position: "absolute",
     left: 16,
@@ -675,17 +664,9 @@ const styles = StyleSheet.create({
     height: COVER_HEIGHT,
     zIndex: 0,
   },
-  coverImage: {
-    width: "100%",
-    height: "100%",
-  },
-  scrollContent: {
-    paddingTop: COVER_HEIGHT - 40,
-    paddingBottom: 40,
-  },
-  mainCardPositioner: {
-    paddingHorizontal: 16,
-  },
+  coverImage: { width: "100%", height: "100%" },
+  scrollContent: { paddingTop: COVER_HEIGHT - 40, paddingBottom: 40 },
+  mainCardPositioner: { paddingHorizontal: 16 },
   profileMasterCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -723,11 +704,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     letterSpacing: -0.5,
   },
-  metaInformation: {
-    alignItems: "center",
-    width: "100%",
-    marginTop: 12,
-  },
+  metaInformation: { alignItems: "center", width: "100%", marginTop: 12 },
   titleLine: {
     flexDirection: "row",
     alignItems: "center",
@@ -753,11 +730,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 6,
   },
-  subDetailText: {
-    fontSize: 13,
-    marginLeft: 3,
-    fontWeight: "500",
-  },
+  subDetailText: { fontSize: 13, marginLeft: 3, fontWeight: "500" },
   dotSeparator: {
     width: 4,
     height: 4,
@@ -765,11 +738,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     opacity: 0.6,
   },
-  starContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
+  starContainer: { flexDirection: "row", alignItems: "center", gap: 2 },
   starText: {
     fontSize: 12.5,
     fontWeight: "600",
@@ -788,24 +757,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
   },
-  chipText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  divider: {
-    height: 1,
-    width: "100%",
-    marginVertical: 16,
-  },
+  chipText: { fontSize: 11, fontWeight: "600" },
+  divider: { height: 1, width: "100%", marginVertical: 16 },
   bioText: {
     fontSize: 13,
     lineHeight: 19,
     textAlign: "center",
     paddingHorizontal: 8,
   },
-  section: {
-    marginBottom: 20,
-  },
+  section: { marginBottom: 20 },
   sectionTitle: {
     fontSize: 11,
     fontWeight: "700",
@@ -813,11 +773,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
-  groupedCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
+  groupedCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -825,12 +781,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  infoLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
+  infoLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   infoIconWrap: {
     width: 28,
     height: 28,
@@ -838,10 +789,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  infoLabel: {
-    fontSize: 13.5,
-    fontWeight: "500",
-  },
+  infoLabel: { fontSize: 13.5, fontWeight: "500" },
   infoRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -849,11 +797,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     flex: 1,
   },
-  infoValue: {
-    fontSize: 13.5,
-    fontWeight: "500",
-    maxWidth: "80%",
-  },
+  infoValue: { fontSize: 13.5, fontWeight: "500", maxWidth: "80%" },
   toggleConfigRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -861,11 +805,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  toggleLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  toggleLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   configIconWrap: {
     width: 28,
     height: 28,
@@ -873,10 +813,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  configLabel: {
-    fontSize: 13.5,
-    fontWeight: "500",
-  },
+  configLabel: { fontSize: 13.5, fontWeight: "500" },
   signOutAction: {
     marginTop: 12,
     borderWidth: 1,
@@ -887,16 +824,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  signOutLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 4,
-  },
+  signOutLabel: { fontSize: 14, fontWeight: "600" },
+  statValue: { fontSize: 20, fontWeight: "700" },
+  statLabel: { fontSize: 12, marginTop: 4 },
 });

@@ -89,7 +89,7 @@ const OrderCard = ({
         <View style={{ flex: 1 }}>
           {order.urgent && (
             <View style={[styles.urgentPill, { backgroundColor: "#EF444415" }]}>
-              <Ionicons name="flash" size={10} color="#EF4444" />
+              <Ionicons name="flash" size={10} color={theme.error} />
               <Text style={styles.urgentPillText}>Due soon</Text>
             </View>
           )}
@@ -100,6 +100,7 @@ const OrderCard = ({
             {order.sme}
           </Text>
         </View>
+
         <Text style={[styles.orderAmount, { color: theme.primary }]}>
           {order.amount}
         </Text>
@@ -127,7 +128,7 @@ const OrderCard = ({
             styles.progressFill,
             {
               width: `${order.progress * 100}%`,
-              backgroundColor: order.urgent ? "#EF4444" : theme.primary,
+              backgroundColor: order.urgent ? theme.error : theme.primary,
             },
           ]}
         />

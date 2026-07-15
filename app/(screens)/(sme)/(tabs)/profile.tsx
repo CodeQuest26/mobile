@@ -1,523 +1,11 @@
-// import MainContainer from "@/components/MainContainer";
-// import Colors from "@/constants/colors";
-// import { Ionicons } from "@expo/vector-icons";
-// import React, { useState } from "react";
-// import {
-//   ActivityIndicator,
-//   Alert,
-//   ScrollView,
-//   StyleSheet,
-//   Switch,
-//   Text,
-//   TouchableOpacity,
-//   useColorScheme,
-//   View,
-// } from "react-native";
-
-// const Profile = () => {
-//   const colorScheme = useColorScheme();
-//   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
-
-//   const [isDarkMode, setIsDarkMode] = useState(colorScheme === "dark");
-//   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-//   const [isLoading, setIsLoading] = useState(false);
-
-//   const handleResetPassword = () => {
-//     Alert.alert(
-//       "Reset Password",
-//       "A password reset link will be sent to your email",
-//       [
-//         { text: "Cancel", style: "cancel" },
-//         {
-//           text: "Send",
-//           onPress: () => {
-//             setIsLoading(true);
-//             setTimeout(() => {
-//               setIsLoading(false);
-//               Alert.alert("Success", "Password reset link sent to your email");
-//             }, 1000);
-//           },
-//         },
-//       ],
-//     );
-//   };
-
-//   const handleLogout = () => {
-//     Alert.alert("Log Out", "Are you sure you want to log out?", [
-//       { text: "Cancel", style: "cancel" },
-//       {
-//         text: "Log Out",
-//         style: "destructive",
-//         onPress: () => {
-//           setIsLoading(true);
-//           setTimeout(() => {
-//             setIsLoading(false);
-//           }, 1000);
-//         },
-//       },
-//     ]);
-//   };
-
-//   const handleDeleteAccount = () => {
-//     Alert.alert(
-//       "Delete Account",
-//       "This action cannot be undone. All your data will be permanently deleted.",
-//       [
-//         { text: "Cancel", style: "cancel" },
-//         {
-//           text: "Delete",
-//           style: "destructive",
-//           onPress: () => {
-//             setIsLoading(true);
-//             setTimeout(() => {
-//               setIsLoading(false);
-//             }, 1000);
-//           },
-//         },
-//       ],
-//     );
-//   };
-
-//   return (
-//     <MainContainer safe>
-//       <ScrollView
-//         style={styles.container}
-//         showsVerticalScrollIndicator={false}
-//         contentContainerStyle={styles.scrollContent}
-//       >
-//         {/* Identity Band */}
-//         <View
-//           style={[styles.identityBand, { borderBottomColor: theme.border }]}
-//         >
-//           {/* Monogram Avatar */}
-//           <View
-//             style={[styles.monogram, { backgroundColor: theme.iconBackground }]}
-//           >
-//             <Text style={[styles.monogramText, { color: theme.primary }]}>
-//               CN
-//             </Text>
-//           </View>
-
-//           {/* Company Info */}
-//           <View style={styles.identityText}>
-//             <Text style={[styles.companyName, { color: theme.text }]}>
-//               Company Name
-//             </Text>
-//             <View style={styles.locationRow}>
-//               <Ionicons
-//                 name="location-outline"
-//                 size={12}
-//                 color={theme.textSecondary}
-//               />
-//               <Text
-//                 style={[styles.locationText, { color: theme.textSecondary }]}
-//               >
-//                 Location
-//               </Text>
-//             </View>
-//           </View>
-
-//           {/* Edit Button */}
-//           <TouchableOpacity
-//             style={[styles.editBtn, { borderColor: theme.border }]}
-//           >
-//             <Ionicons
-//               name="pencil-outline"
-//               size={13}
-//               color={theme.textSecondary}
-//             />
-//             <Text style={[styles.editBtnText, { color: theme.textSecondary }]}>
-//               Edit
-//             </Text>
-//           </TouchableOpacity>
-//         </View>
-
-//         {/* Account Section */}
-//         <View style={styles.section}>
-//           <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-//             Account
-//           </Text>
-
-//           <View
-//             style={[
-//               styles.sectionCard,
-//               { backgroundColor: theme.cardBackground },
-//             ]}
-//           >
-//             {/* Email */}
-//             <View style={styles.row}>
-//               <View
-//                 style={[
-//                   styles.rowIcon,
-//                   { backgroundColor: theme.iconBackground },
-//                 ]}
-//               >
-//                 <Ionicons name="mail" size={16} color={theme.icon} />
-//               </View>
-//               <View style={styles.rowBody}>
-//                 <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
-//                   Email
-//                 </Text>
-//                 <Text style={[styles.rowValue, { color: theme.text }]}>
-//                   user@example.com
-//                 </Text>
-//               </View>
-//             </View>
-
-//             <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-//             {/* Phone */}
-//             <View style={styles.row}>
-//               <View
-//                 style={[
-//                   styles.rowIcon,
-//                   { backgroundColor: theme.iconBackground },
-//                 ]}
-//               >
-//                 <Ionicons name="call" size={16} color={theme.icon} />
-//               </View>
-//               <View style={styles.rowBody}>
-//                 <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
-//                   Phone
-//                 </Text>
-//                 <Text style={[styles.rowValue, { color: theme.text }]}>
-//                   +233 55 123 4567
-//                 </Text>
-//               </View>
-//             </View>
-//           </View>
-//         </View>
-
-//         {/* Preferences Section */}
-//         <View style={styles.section}>
-//           <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-//             Preferences
-//           </Text>
-
-//           <View
-//             style={[
-//               styles.sectionCard,
-//               { backgroundColor: theme.cardBackground },
-//             ]}
-//           >
-//             {/* Dark Mode */}
-//             {/* <View style={styles.row}>
-//               <View
-//                 style={[
-//                   styles.rowIcon,
-//                   { backgroundColor: theme.iconBackground },
-//                 ]}
-//               >
-//                 <Ionicons
-//                   name={isDarkMode ? "moon" : "sunny"}
-//                   size={16}
-//                   color={theme.icon}
-//                 />
-//               </View>
-
-//               <View style={styles.rowBody}>
-//                 <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
-//                   Appearance
-//                 </Text>
-//                 <Text style={[styles.rowValue, { color: theme.text }]}>
-//                   Dark mode
-//                 </Text>
-//               </View>
-
-//               <Switch
-//                 value={isDarkMode}
-//                 onValueChange={setIsDarkMode}
-//                 trackColor={{ false: "#E0E0E0", true: theme.primary }}
-//                 thumbColor={isDarkMode ? theme.onPrimary : "#F0F0F0"}
-//               />
-//             </View> */}
-
-//             <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-//             {/* Notifications */}
-//             <View style={styles.row}>
-//               <View
-//                 style={[
-//                   styles.rowIcon,
-//                   { backgroundColor: theme.iconBackground },
-//                 ]}
-//               >
-//                 <Ionicons
-//                   name={
-//                     notificationsEnabled ? "notifications" : "notifications-off"
-//                   }
-//                   size={16}
-//                   color={theme.icon}
-//                 />
-//               </View>
-//               <View style={styles.rowBody}>
-//                 <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
-//                   Notifications
-//                 </Text>
-//                 <Text style={[styles.rowValue, { color: theme.text }]}>
-//                   {notificationsEnabled ? "Push & email" : "Disabled"}
-//                 </Text>
-//               </View>
-//               <Switch
-//                 value={notificationsEnabled}
-//                 onValueChange={setNotificationsEnabled}
-//                 trackColor={{ false: "#E0E0E0", true: theme.primary }}
-//                 thumbColor={notificationsEnabled ? theme.onPrimary : "#F0F0F0"}
-//               />
-//             </View>
-
-//             <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-//             {/* Reset Password */}
-//             <TouchableOpacity
-//               disabled={isLoading}
-//               onPress={handleResetPassword}
-//               style={styles.row}
-//             >
-//               <View
-//                 style={[
-//                   styles.rowIcon,
-//                   { backgroundColor: theme.iconBackground },
-//                 ]}
-//               >
-//                 <Ionicons name="key" size={16} color={theme.icon} />
-//               </View>
-//               <View style={styles.rowBody}>
-//                 <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>
-//                   Security
-//                 </Text>
-//                 <Text style={[styles.rowValue, { color: theme.text }]}>
-//                   Reset password
-//                 </Text>
-//               </View>
-//               <Ionicons
-//                 name="chevron-forward"
-//                 size={16}
-//                 color={theme.textSecondary}
-//               />
-//             </TouchableOpacity>
-//           </View>
-//         </View>
-
-//         {/* Account Actions Section */}
-//         <View style={styles.section}>
-//           <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-//             Account actions
-//           </Text>
-
-//           <View
-//             style={[
-//               styles.sectionCard,
-//               { backgroundColor: theme.cardBackground },
-//             ]}
-//           >
-//             {/* Log Out */}
-//             <TouchableOpacity
-//               disabled={isLoading}
-//               onPress={handleLogout}
-//               style={[styles.row, { opacity: isLoading ? 0.6 : 1 }]}
-//             >
-//               {isLoading ? (
-//                 <ActivityIndicator
-//                   color={theme.primary}
-//                   style={styles.actionLoader}
-//                 />
-//               ) : (
-//                 <>
-//                   <View
-//                     style={[
-//                       styles.rowIcon,
-//                       { backgroundColor: theme.iconBackground },
-//                     ]}
-//                   >
-//                     <Ionicons name="log-out" size={16} color={theme.primary} />
-//                   </View>
-//                   <View style={styles.rowBody}>
-//                     <Text style={[styles.rowValue, { color: theme.primary }]}>
-//                       Log out
-//                     </Text>
-//                   </View>
-//                   <Ionicons
-//                     name="chevron-forward"
-//                     size={16}
-//                     color={theme.textSecondary}
-//                   />
-//                 </>
-//               )}
-//             </TouchableOpacity>
-
-//             <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-//             {/* Delete Account */}
-//             <TouchableOpacity
-//               disabled={isLoading}
-//               onPress={handleDeleteAccount}
-//               style={[styles.row, { opacity: isLoading ? 0.6 : 1 }]}
-//             >
-//               {isLoading ? (
-//                 <ActivityIndicator
-//                   color={theme.error}
-//                   style={styles.actionLoader}
-//                 />
-//               ) : (
-//                 <>
-//                   <View
-//                     style={[
-//                       styles.rowIcon,
-//                       { backgroundColor: theme.iconBackground },
-//                     ]}
-//                   >
-//                     <Ionicons name="trash" size={16} color={theme.error} />
-//                   </View>
-//                   <View style={styles.rowBody}>
-//                     <Text style={[styles.rowValue, { color: theme.error }]}>
-//                       Delete account
-//                     </Text>
-//                   </View>
-//                   <Ionicons
-//                     name="chevron-forward"
-//                     size={16}
-//                     color={theme.textSecondary}
-//                   />
-//                 </>
-//               )}
-//             </TouchableOpacity>
-//           </View>
-//         </View>
-
-//         <View style={{ height: 60 }} />
-//       </ScrollView>
-//     </MainContainer>
-//   );
-// };
-
-// export default Profile;
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//   },
-//   scrollContent: {
-//     paddingBottom: 32,
-//   },
-
-//   /* Identity band */
-//   identityBand: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 14,
-//     paddingHorizontal: 20,
-//     paddingVertical: 20,
-//     borderBottomWidth: StyleSheet.hairlineWidth,
-//   },
-//   monogram: {
-//     width: 54,
-//     height: 54,
-//     borderRadius: 14,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     flexShrink: 0,
-//   },
-//   monogramText: {
-//     fontSize: 20,
-//     fontWeight: "600",
-//   },
-//   identityText: {
-//     flex: 1,
-//     minWidth: 0,
-//   },
-//   companyName: {
-//     fontSize: 16,
-//     fontWeight: "600",
-//     marginBottom: 3,
-//   },
-//   locationRow: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 3,
-//   },
-//   locationText: {
-//     fontSize: 12,
-//     fontWeight: "500",
-//   },
-//   editBtn: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 5,
-//     borderWidth: StyleSheet.hairlineWidth,
-//     borderRadius: 8,
-//     paddingHorizontal: 12,
-//     paddingVertical: 7,
-//     flexShrink: 0,
-//   },
-//   editBtnText: {
-//     fontSize: 13,
-//     fontWeight: "500",
-//   },
-
-//   /* Sections */
-//   section: {
-//     paddingHorizontal: 20,
-//     paddingTop: 24,
-//   },
-//   sectionLabel: {
-//     fontSize: 11,
-//     fontWeight: "600",
-//     letterSpacing: 0.7,
-//     textTransform: "uppercase",
-//     marginBottom: 10,
-//   },
-//   sectionCard: {
-//     borderRadius: 12,
-//     overflow: "hidden",
-//   },
-
-//   /* Rows */
-//   row: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 12,
-//     paddingHorizontal: 14,
-//     paddingVertical: 12,
-//   },
-//   rowIcon: {
-//     width: 32,
-//     height: 32,
-//     borderRadius: 8,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     flexShrink: 0,
-//   },
-//   rowBody: {
-//     flex: 1,
-//     minWidth: 0,
-//   },
-//   rowLabel: {
-//     fontSize: 11,
-//     fontWeight: "500",
-//     marginBottom: 1,
-//   },
-//   rowValue: {
-//     fontSize: 14,
-//     fontWeight: "500",
-//   },
-//   divider: {
-//     height: StyleSheet.hairlineWidth,
-//     marginLeft: 58,
-//   },
-//   actionLoader: {
-//     flex: 1,
-//     paddingVertical: 4,
-//   },
-// });
-
 import Colors from "@/constants/colors";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -539,19 +27,6 @@ const { width } = Dimensions.get("window");
 const COVER_HEIGHT = 200;
 
 type Theme = (typeof Colors)["light"];
-
-const SME_PROFILE = {
-  companyName: "Company Name",
-  initials: "CN",
-  verified: false,
-  bio: "",
-  city: "Location",
-  region: "",
-  email: "user@example.com",
-  phone: "+233 55 123 4567",
-  avatarUri: null as string | null,
-  coverUri: null as string | null,
-};
 
 // ── Info Row ──────────────────────────────────────────────────
 const InfoRow = ({
@@ -605,14 +80,16 @@ const InfoRow = ({
         >
           <Ionicons name={icon as any} size={20} color={theme.icon} />
         </View>
-        <Text
-          style={[
-            styles.infoLabel,
-            { color: destructive ? tint : theme.textSecondary },
-          ]}
-        >
-          {label}
-        </Text>
+        {!!label && (
+          <Text
+            style={[
+              styles.infoLabel,
+              { color: destructive ? tint : theme.textSecondary },
+            ]}
+          >
+            {label}
+          </Text>
+        )}
       </View>
       <View style={styles.infoRight}>
         <Text
@@ -686,30 +163,48 @@ const Section = ({
 export default function SMEProfile() {
   const { theme, colorScheme, setColorScheme } = useTheme();
   const isDark = colorScheme === "dark";
+
+  const { user, token, hasHydrated, getMe, logout } = useAuthStore();
+
   const [notifications, setNotifications] = useState(true);
   const [isLoading, setIsLoading] = useState<
     "logout" | "delete" | "reset" | null
   >(null);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const p = SME_PROFILE;
 
+  useEffect(() => {
+    if (!hasHydrated || !token) return;
+    // Refresh user in case profile changed since last login
+    getMe();
+  }, [hasHydrated, token]);
+
+  const initials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "??";
+
+  const p = {
+    companyName: user?.fullName || "Company Name",
+    initials,
+    verified: user?.isVerified || false,
+    city: (user as any)?.town || "Location",
+    region: user?.region || "",
+    email: "N/A", // not returned by /users/me — see note below
+    phone: user?.phoneNumber || "N/A",
+    avatarUri: user?.profileImageUrl || null,
+    coverUri: null as string | null,
+  };
+
+  // No reset-password endpoint exists in the API spec yet — this is a
+  // placeholder until the backend adds one. Don't fake success.
   const handleResetPassword = () => {
     Alert.alert(
-      "Reset Password",
-      "A password reset link will be sent to your email",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Send",
-          onPress: () => {
-            setIsLoading("reset");
-            setTimeout(() => {
-              setIsLoading(null);
-              Alert.alert("Success", "Password reset link sent to your email");
-            }, 1000);
-          },
-        },
-      ],
+      "Not available yet",
+      "Password reset isn't supported by the app yet. Please contact support if you need to change your password.",
     );
   };
 
@@ -719,38 +214,19 @@ export default function SMEProfile() {
       {
         text: "Log out",
         style: "destructive",
-        onPress: () => {
+        onPress: async () => {
           setIsLoading("logout");
-          setTimeout(() => {
-            setIsLoading(null);
+          try {
+            await logout();
             router.replace("/(auth)/login");
-          }, 1000);
+          } finally {
+            setIsLoading(null);
+          }
         },
       },
     ]);
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "This action cannot be undone. All your data will be permanently deleted.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setIsLoading("delete");
-            setTimeout(() => {
-              setIsLoading(null);
-            }, 1000);
-          },
-        },
-      ],
-    );
-  };
-
-  // Nav dynamic blur configs
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 60, 100],
     outputRange: [0, 0.4, 1],
@@ -769,6 +245,23 @@ export default function SMEProfile() {
     extrapolate: "clamp",
   });
 
+  if (!hasHydrated) {
+    return (
+      <View
+        style={[
+          styles.screen,
+          {
+            backgroundColor: theme.background,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <ActivityIndicator color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <StatusBar
@@ -777,7 +270,6 @@ export default function SMEProfile() {
         backgroundColor="transparent"
       />
 
-      {/* ── Dynamic Top Bar Floating Navigation ── */}
       <Animated.View
         style={[
           styles.headerBlur,
@@ -796,7 +288,6 @@ export default function SMEProfile() {
         </View>
       </Animated.View>
 
-      {/* Floating Buttons */}
       <View
         style={[
           styles.navActionWrapper,
@@ -823,7 +314,6 @@ export default function SMEProfile() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Background Canvas Parallax Cover ── */}
       <Animated.View
         style={[
           styles.coverContainer,
@@ -842,7 +332,6 @@ export default function SMEProfile() {
         )}
       </Animated.View>
 
-      {/* ── Scrollable Body Context ── */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -853,9 +342,7 @@ export default function SMEProfile() {
         scrollEventThrottle={16}
       >
         <View style={styles.mainCardPositioner}>
-          {/* Main Integrated Profile Master Card */}
           <View style={styles.profileMasterCard}>
-            {/* Avatar Section Frame */}
             <View
               style={[
                 styles.avatarBoundary,
@@ -880,7 +367,6 @@ export default function SMEProfile() {
               )}
             </View>
 
-            {/* Profile Info Details */}
             <View style={styles.metaInformation}>
               <View style={styles.titleLine}>
                 <Text style={[styles.companyName, { color: theme.text }]}>
@@ -917,7 +403,6 @@ export default function SMEProfile() {
             </View>
           </View>
 
-          {/* Account Details Module */}
           <Section title="Account" theme={theme}>
             <View
               style={[
@@ -944,7 +429,6 @@ export default function SMEProfile() {
             </View>
           </Section>
 
-          {/* Preferences Module */}
           <Section title="Preferences" theme={theme}>
             <View
               style={[
@@ -1006,7 +490,6 @@ export default function SMEProfile() {
             </View>
           </Section>
 
-          {/* Account Actions Module */}
           <Section title="Account actions" theme={theme}>
             <View
               style={[
@@ -1024,14 +507,6 @@ export default function SMEProfile() {
                 theme={theme}
                 onPress={handleLogout}
                 loading={isLoading === "logout"}
-              />
-              <InfoRow
-                icon="trash-outline"
-                label=""
-                value="Delete account"
-                theme={theme}
-                onPress={handleDeleteAccount}
-                loading={isLoading === "delete"}
                 destructive
                 last
               />
@@ -1044,9 +519,7 @@ export default function SMEProfile() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
   headerBlur: {
     position: "absolute",
     top: 0,
@@ -1063,10 +536,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 70,
   },
-  headerTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
+  headerTitle: { fontSize: 15, fontWeight: "600" },
   navActionWrapper: {
     position: "absolute",
     left: 16,
@@ -1096,17 +566,9 @@ const styles = StyleSheet.create({
     height: COVER_HEIGHT,
     zIndex: 0,
   },
-  coverImage: {
-    width: "100%",
-    height: "100%",
-  },
-  scrollContent: {
-    paddingTop: COVER_HEIGHT - 40,
-    paddingBottom: 40,
-  },
-  mainCardPositioner: {
-    paddingHorizontal: 16,
-  },
+  coverImage: { width: "100%", height: "100%" },
+  scrollContent: { paddingTop: COVER_HEIGHT - 40, paddingBottom: 40 },
+  mainCardPositioner: { paddingHorizontal: 16 },
   profileMasterCard: {
     borderRadius: 20,
     padding: 20,
@@ -1137,16 +599,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarInitials: {
-    fontSize: 26,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  metaInformation: {
-    alignItems: "center",
-    width: "100%",
-    marginTop: 12,
-  },
+  avatarInitials: { fontSize: 26, fontWeight: "700", letterSpacing: -0.5 },
+  metaInformation: { alignItems: "center", width: "100%", marginTop: 12 },
   titleLine: {
     flexDirection: "row",
     alignItems: "center",
@@ -1172,14 +626,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 6,
   },
-  subDetailText: {
-    fontSize: 13,
-    marginLeft: 3,
-    fontWeight: "500",
-  },
-  section: {
-    marginBottom: 20,
-  },
+  subDetailText: { fontSize: 13, marginLeft: 3, fontWeight: "500" },
+  section: { marginBottom: 20 },
   sectionTitle: {
     fontSize: 11,
     fontWeight: "700",
@@ -1187,10 +635,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
-  groupedCard: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
+  groupedCard: { borderRadius: 16, overflow: "hidden" },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1198,12 +643,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  infoLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
+  infoLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   infoIconWrap: {
     width: 30,
     height: 30,
@@ -1211,10 +651,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  infoLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  infoLabel: { fontSize: 14, fontWeight: "500" },
   infoRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -1222,11 +659,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     flex: 1,
   },
-  infoValue: {
-    fontSize: 15,
-    fontWeight: "500",
-    maxWidth: "80%",
-  },
+  infoValue: { fontSize: 15, fontWeight: "500", maxWidth: "80%" },
   toggleConfigRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1234,11 +667,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  toggleLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  toggleLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   configIconWrap: {
     width: 28,
     height: 28,
@@ -1246,8 +675,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  configLabel: {
-    fontSize: 13.5,
-    fontWeight: "500",
-  },
+  configLabel: { fontSize: 13.5, fontWeight: "500" },
 });

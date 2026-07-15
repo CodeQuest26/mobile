@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -114,9 +115,22 @@ const LoginScreen = () => {
 
     try {
       await login(phoneNumber, password);
+
+      const user = useAuthStore.getState().user;
+
+      if (!user) {
+        throw new Error("Failed to load user profile.");
+      }
+
+      // Replace the previously selected role with the real one
+      storage.set("selectedRole", user.role);
+
       router.replace({
         pathname: "/OTPVerification",
-        params: { selectedRole, phoneNumber },
+        params: {
+          phoneNumber,
+          role: user.role,
+        },
       });
     } catch (error: any) {
       Alert.alert(
@@ -245,14 +259,7 @@ const LoginScreen = () => {
             onPress={handleLogin}
           >
             {loading ? (
-              <Text
-                style={[
-                  styles.buttonText,
-                  { color: canSubmit ? theme.onPrimary : theme.textSecondary },
-                ]}
-              >
-                Signing in…
-              </Text>
+              <ActivityIndicator size={"small"} color={theme.onPrimary} />
             ) : (
               <Text
                 style={[

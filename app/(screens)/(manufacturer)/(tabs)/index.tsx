@@ -2,6 +2,7 @@ import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   ImageBackground,
   LayoutChangeEvent,
@@ -20,21 +21,10 @@ import MainContainer from "@/components/MainContainer";
 import OrderCard from "@/components/OrderCard";
 import Spacer from "@/components/Spacer";
 import { api } from "@/services/api";
+import { useAuthStore } from "@/store/auth";
 import { router } from "expo-router";
 
 const CardImg = require("../../../../assets/images/Production.jpeg");
-
-// --- Types from API ---
-interface ApiUser {
-  id: string;
-  phoneNumber: string;
-  fullName: string;
-  role: string;
-  isVerified: boolean;
-  region?: string;
-  town?: string;
-  profileImageUrl?: string;
-}
 
 interface ApiJob {
   id: string;
@@ -81,6 +71,12 @@ interface ApiOrder {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface HeroStats {
+  escrowHeld: number;
+  released: number;
+  rating: number;
 }
 
 // --- Helper functions ---
@@ -159,8 +155,13 @@ interface HeroCardProps {
   isDark: boolean;
   scrollY: Animated.Value;
   onCompanyLayout: (event: LayoutChangeEvent) => void;
-  user: ApiUser | null;
-  stats: { escrowHeld: number; released: number; rating: number };
+  user: {
+    fullName?: string;
+    town?: string;
+    region?: string;
+    isVerified?: boolean;
+  } | null;
+  stats: HeroStats;
 }
 
 const HeroCard = ({
@@ -235,14 +236,6 @@ const HeroCard = ({
           />
 
           <View style={styles.heroTopBar}>
-            {/* <Text style={[styles.heroDate, { color: theme.onPrimary }]}>
-              {new Date().toLocaleDateString("en-GB", {
-                weekday: "short",
-                day: "numeric",
-                month: "short",
-              })}
-            </Text> */}
-
             <TouchableOpacity
               onPress={() =>
                 router.push("/(screens)/(manufacturer)/(screens)/notification")
@@ -377,36 +370,49 @@ export default function ManufacturerHome() {
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
   const isDark = colorScheme === "dark";
 
+  // Pull user from the auth store so we don't race the store's rehydration
+  // (and the api client's Authorization header being attached).
+  const { user, token, hasHydrated, getMe } = useAuthStore();
+
   const scrollY = useRef(new Animated.Value(0)).current;
   const blurOpacity = useRef(new Animated.Value(0)).current;
   const [companyNameTop, setCompanyNameTop] = useState<number | null>(null);
 
-  const [user, setUser] = useState<ApiUser | null>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [newJobs, setNewJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const stats = {
+  const [stats, setStats] = useState<HeroStats>({
     escrowHeld: 0,
     released: 0,
     rating: 0,
-  };
+  });
 
   useEffect(() => {
+    if (!hasHydrated) return;
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setLoading(true);
-        const userRes = await api.get("/api/v1/users/me");
-        setUser(userRes.data);
 
-        const ordersRes = await api.get("/api/v1/orders", {
+        // Refresh user info (keeps store + this screen consistent)
+        await getMe();
+
+        const ordersRes = await api.get("orders", {
           params: { page: 0, size: 100 },
         });
+
         const orders: ApiOrder[] = ordersRes.data.content || [];
 
         const active = orders.filter(
           (o) => !["COMPLETED", "REFUNDED", "CANCELLED"].includes(o.status),
         );
+
         const transformedOrders = active.map((order) => {
           const { milestone, label } = mapStatusToMilestone(order.status);
           const progress = getProgress(order.status);
@@ -438,10 +444,14 @@ export default function ManufacturerHome() {
             released += o.agreedAmountGhs || 0;
           }
         });
-        stats.escrowHeld = held;
-        stats.released = released;
 
-        const jobsRes = await api.get("/api/v1/jobs", {
+        setStats({
+          escrowHeld: held,
+          released,
+          rating: 0, // placeholder until ratings are wired in
+        });
+
+        const jobsRes = await api.get("jobs", {
           params: { page: 0, size: 10 },
         });
         const jobs: ApiJob[] = jobsRes.data.content || [];
@@ -449,6 +459,7 @@ export default function ManufacturerHome() {
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
+
         const transformedJobs = sorted.slice(0, 10).map((job) => ({
           id: job.id,
           product: job.productType || "Unnamed",
@@ -461,8 +472,6 @@ export default function ManufacturerHome() {
           bids: 0,
         }));
         setNewJobs(transformedJobs);
-
-        stats.rating = 0; // placeholder
       } catch (error) {
         console.error("Error fetching home data:", error);
       } finally {
@@ -471,7 +480,7 @@ export default function ManufacturerHome() {
     };
 
     fetchData();
-  }, []);
+  }, [hasHydrated, token]);
 
   useEffect(() => {
     if (companyNameTop === null) return;
@@ -520,9 +529,9 @@ export default function ManufacturerHome() {
             { useNativeDriver: true },
           )}
         >
-          {loading ? (
+          {!hasHydrated || loading ? (
             <View style={styles.loadingContainer}>
-              <Text style={{ color: theme.textSecondary }}>Loading...</Text>
+              <ActivityIndicator size="large" color={theme.primary} />
             </View>
           ) : (
             <>

@@ -135,7 +135,9 @@ const ContactRow = ({
           </Text>
           {unreadCount > 0 && (
             <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
+              <Text style={[styles.badgeText, { color: theme.onPrimary }]}>
+                {unreadCount}
+              </Text>
             </View>
           )}
         </View>
@@ -439,7 +441,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 6,
   },
-  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  badgeText: { fontSize: 11, fontWeight: "700" },
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 80 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 15 },

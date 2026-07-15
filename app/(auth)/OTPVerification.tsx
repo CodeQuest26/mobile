@@ -14,11 +14,12 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { useAuthStore } from "@/store/auth"; // adjust path to your actual store location
 import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
 
-const OTP_LENGTH = 4;
+const OTP_LENGTH = 6;
 const RESEND_COUNTDOWN = 30;
 
 // --- Single OTP Box ---
@@ -101,14 +102,21 @@ export default function OtpVerifyScreen() {
   const theme = Colors[colorScheme] || Colors.light;
   const isDark = colorScheme === "dark";
 
-  const { phoneNumber, role } = useLocalSearchParams<{
+  const { phoneNumber, role, password } = useLocalSearchParams<{
     phoneNumber?: string;
     role?: string;
+    password?: string; // passed from register screen so we can auto-login after verify
   }>();
+
+  const verifyOtp = useAuthStore((s) => s.verifyOtp);
+  const login = useAuthStore((s) => s.login);
+  const authError = useAuthStore((s) => s.error);
+  const clearError = useAuthStore((s) => s.clearError);
 
   const [otp, setOtp] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_COUNTDOWN);
@@ -258,25 +266,42 @@ export default function OtpVerifyScreen() {
     }, 1800);
   };
 
-  const verify = (code: string) => {
+  const verify = async (code: string) => {
+    if (!phoneNumber || code.length < OTP_LENGTH || loading || verified) return;
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const MOCK_OTP = "1234";
-      if (code === MOCK_OTP) {
-        setVerified(true);
-        triggerSuccess();
-      } else {
-        setHasError(true);
-        triggerShake();
+    setErrorMessage(null);
+    clearError();
+
+    try {
+      // Step 1: verify the OTP with the backend
+      await verifyOtp(phoneNumber, code);
+
+      // Step 2: the verify endpoint doesn't return tokens, so log the user
+      // in immediately after if we have their password from the register step.
+      if (password) {
+        await login(phoneNumber, password);
       }
-    }, 850);
+
+      setVerified(true);
+      triggerSuccess();
+    } catch (err: any) {
+      setErrorMessage(err?.message ?? "Incorrect code. Please try again.");
+      setHasError(true);
+      triggerShake();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResend = () => {
     if (!canResend) return;
+    // NOTE: there's no dedicated resend-OTP endpoint in the API today.
+    // Wire this to whatever endpoint your backend uses to reissue a code
+    // (e.g. re-calling register, or a future POST /auth/resend-otp).
     setOtp("");
     setHasError(false);
+    setErrorMessage(null);
     setFocusedIndex(0);
     startCountdown();
     inputRef.current?.focus();
@@ -366,6 +391,7 @@ export default function OtpVerifyScreen() {
             maxLength={OTP_LENGTH}
             style={styles.hiddenInput}
             caretHidden
+            editable={!loading && !verified}
             onFocus={() =>
               setFocusedIndex(Math.min(otp.length, OTP_LENGTH - 1))
             }
@@ -377,7 +403,7 @@ export default function OtpVerifyScreen() {
           {/* Verification Indicators */}
           {hasError && (
             <Text style={styles.errorText}>
-              Incorrect code. Please try again.
+              {errorMessage ?? "Incorrect code. Please try again."}
             </Text>
           )}
           {loading && (
@@ -524,7 +550,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 32,
     alignItems: "center",
-    justifyContent: "flex-start", // Changed to top-down for smoother keyboard experience
+    justifyContent: "flex-start",
   },
   iconCircle: {
     width: 68,
@@ -615,8 +641,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-
-  /* NEW REDESIGNED SUCCESS STYLES */
   successOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",

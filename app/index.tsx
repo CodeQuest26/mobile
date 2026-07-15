@@ -40,17 +40,16 @@ export default function Index() {
 
     // 4. ROLE ROUTING
     switch (user?.role || savedRole) {
-      case "manufacturer":
+      case "FACTORY_OWNER":
         router.replace("/(screens)/(manufacturer)/(tabs)");
         break;
 
-      case "sme":
+      case "SME_OWNER":
         router.replace("/(screens)/(sme)/(tabs)");
         break;
 
       default:
-        // router.replace("/(auth)/login");
-        router.replace("/(screens)/(manufacturer)/(tabs)");
+        router.replace("/(auth)/login");
     }
   }, [hasHydrated, isAuthenticated, user]);
 

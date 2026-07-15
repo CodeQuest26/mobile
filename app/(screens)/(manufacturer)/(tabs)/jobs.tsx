@@ -3,6 +3,7 @@ import MainContainer from "@/components/MainContainer";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import { api } from "@/services/api";
+import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -17,7 +18,6 @@ import {
 
 const ALL = "All";
 
-// Helper: relative time from ISO date string
 const getTimeAgo = (dateStr: string) => {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
@@ -31,7 +31,6 @@ const getTimeAgo = (dateStr: string) => {
   return `${Math.floor(days / 7)}w ago`;
 };
 
-// Interface for the API's job response (subset of JobDetailResponse)
 interface ApiJob {
   id: string;
   title: string;
@@ -41,32 +40,30 @@ interface ApiJob {
   specifications?: string;
   budgetMinGhs: number;
   budgetMaxGhs: number;
-  deadline: string; // date string
+  deadline: string;
   deliveryAddress?: string;
   attachmentUrls?: string[];
   status: string;
-  createdAt: string; // ISO date
+  createdAt: string;
   updatedAt: string;
   smeName: string;
   smeId: string;
 }
 
-// Internal job type used for filtering/sorting/display
 interface Job {
   id: string;
-  product: string; // from productType
+  product: string;
   quantity: number;
-  budget: string; // formatted budget range
-  location: string; // from deliveryAddress or fallback
-  category: string; // from sectorTag
-  postedAt: string; // from createdAt
-  deadline: string; // from deadline
-  sme: string; // from smeName
-  rating?: number; // not provided by API, default 0
-  bids?: number; // not provided by API, default 0
+  budget: string;
+  location: string;
+  category: string;
+  postedAt: string;
+  deadline: string;
+  sme: string;
+  rating?: number;
+  bids?: number;
 }
 
-// The shape expected by JobPeekCard
 interface EnhancedJobPeek {
   id: string;
   product: string;
@@ -83,6 +80,9 @@ export default function JobsScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
 
+  // Needed so we don't fetch before the api client has its auth header set
+  const { hasHydrated, token } = useAuthStore();
+
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState(ALL);
   const [sortBy, setSortBy] = useState<"newest" | "budget" | "deadline">(
@@ -91,26 +91,25 @@ export default function JobsScreen() {
   const [showSort, setShowSort] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
-  // State for real jobs from API
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch jobs from API
+  const formatBudget = (min: number, max: number) => {
+    if (!min && !max) return "GHS 0";
+    const minStr = min ? `GHS ${min.toLocaleString()}` : "";
+    const maxStr = max ? `GHS ${max.toLocaleString()}` : "";
+    if (minStr && maxStr) return `${minStr} - ${maxStr}`;
+    return minStr || maxStr;
+  };
+
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      // Request first page with a large page size to get all jobs at once
-      const response = await api.get("/api/v1/jobs", {
-        params: {
-          page: 0,
-          size: 1000,
-          // optionally add sectorTag filter? could be added later
-        },
+      const response = await api.get("jobs", {
+        params: { page: 0, size: 1000 },
       });
-      // response.data should be PagedResponseJobDetailResponse
       const apiJobs: ApiJob[] = response.data.content || [];
 
-      // Transform API jobs to internal Job format
       const transformed: Job[] = apiJobs.map((job) => ({
         id: job.id,
         product: job.productType || "Unnamed Product",
@@ -121,8 +120,8 @@ export default function JobsScreen() {
         postedAt: job.createdAt || new Date().toISOString(),
         deadline: job.deadline || new Date().toISOString(),
         sme: job.smeName || "Unknown Client",
-        rating: 0, // API does not provide rating on job list
-        bids: 0, // API does not provide bid count on job list
+        rating: 0,
+        bids: 0,
       }));
       setJobs(transformed);
     } catch (error) {
@@ -132,29 +131,24 @@ export default function JobsScreen() {
     }
   };
 
-  // Helper to format budget range
-  const formatBudget = (min: number, max: number) => {
-    if (!min && !max) return "GHS 0";
-    const minStr = min ? `GHS ${min.toLocaleString()}` : "";
-    const maxStr = max ? `GHS ${max.toLocaleString()}` : "";
-    if (minStr && maxStr) return `${minStr} - ${maxStr}`;
-    return minStr || maxStr;
-  };
-
   useEffect(() => {
+    // Wait for the auth store to rehydrate; only fetch once we actually
+    // have a token attached to the api client.
+    if (!hasHydrated) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetchJobs();
-  }, []);
+  }, [hasHydrated, token]);
 
-  // Filter, search, and sort the real jobs
   const filteredJobs = useMemo(() => {
     let list = [...jobs];
 
-    // Category filter (if not ALL)
     if (activeCategory !== ALL) {
       list = list.filter((j) => j.category === activeCategory);
     }
 
-    // Search filter
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -166,19 +160,16 @@ export default function JobsScreen() {
       );
     }
 
-    // Sorting
     if (sortBy === "newest") {
       list.sort(
         (a, b) =>
           new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
       );
     } else if (sortBy === "budget") {
-      // Sort by budgetMinGhs (extract from budget string? Better to store numeric)
-      // We'll parse the budget string to get min numeric value
       list.sort((a, b) => {
         const aMin = extractBudgetMin(a.budget);
         const bMin = extractBudgetMin(b.budget);
-        return bMin - aMin; // descending
+        return bMin - aMin;
       });
     } else if (sortBy === "deadline") {
       list.sort(
@@ -190,7 +181,6 @@ export default function JobsScreen() {
     return list;
   }, [search, activeCategory, sortBy, jobs]);
 
-  // Helper to extract numeric min from budget string like "GHS 1,500 - GHS 2,000"
   const extractBudgetMin = (budgetStr: string) => {
     const match = budgetStr.match(/GHS\s*([\d,]+)/);
     if (match) {
@@ -199,7 +189,6 @@ export default function JobsScreen() {
     return 0;
   };
 
-  // Transform to EnhancedJobPeek for rendering
   const jobsToRender = useMemo<EnhancedJobPeek[]>(
     () =>
       filteredJobs.map((job) => ({
@@ -233,7 +222,6 @@ export default function JobsScreen() {
 
   return (
     <MainContainer safe>
-      {/* Header */}
       <View style={styles.headerRow}>
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: theme.text }]}>Job Board</Text>
@@ -256,7 +244,6 @@ export default function JobsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Expandable Search Bar */}
       {isSearchVisible && (
         <View
           style={[
@@ -293,7 +280,6 @@ export default function JobsScreen() {
         </View>
       )}
 
-      {/* Sort Button Row */}
       <View style={styles.sortRow}>
         <TouchableOpacity
           onPress={() => setShowSort((v) => !v)}
@@ -317,14 +303,11 @@ export default function JobsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Sort Dropdown */}
       {showSort && (
         <View
           style={[
             styles.sortDropdown,
-            {
-              backgroundColor: theme.cardBackground,
-            },
+            { backgroundColor: theme.cardBackground },
           ]}
         >
           {(["newest", "budget", "deadline"] as const).map((opt) => (
@@ -360,7 +343,6 @@ export default function JobsScreen() {
 
       <Spacer style={{ height: 10 }} />
 
-      {/* Job Grid with JobPeekCard */}
       <FlatList
         data={jobsToRender}
         keyExtractor={(item) => item.id}
@@ -409,23 +391,10 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  titleContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 12,
-    fontWeight: "500",
-    marginTop: 2,
-  },
-  searchButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
+  titleContainer: { flex: 1 },
+  title: { fontSize: 22, fontWeight: "800", letterSpacing: -0.5 },
+  subtitle: { fontSize: 12, fontWeight: "500", marginTop: 2 },
+  searchButton: { padding: 8, marginLeft: 8 },
   searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -438,15 +407,8 @@ const styles = StyleSheet.create({
     height: 46,
     gap: 8,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-  },
-  sortRow: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 4,
-  },
+  searchInput: { flex: 1, fontSize: 14 },
+  sortRow: { paddingHorizontal: 20, marginTop: 8, marginBottom: 4 },
   sortBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -457,10 +419,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignSelf: "flex-start",
   },
-  sortBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
+  sortBtnText: { fontSize: 13, fontWeight: "600" },
   sortDropdown: {
     marginHorizontal: 20,
     marginTop: 4,
@@ -476,28 +435,10 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   sortOptionText: { fontSize: 14 },
-  gridContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  columnWrapper: {
-    justifyContent: "space-between",
-    gap: 16,
-  },
-  empty: {
-    alignItems: "center",
-    paddingTop: 60,
-    gap: 10,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  emptySub: {
-    fontSize: 13,
-  },
-  loadingContainer: {
-    paddingVertical: 40,
-    alignItems: "center",
-  },
+  gridContainer: { paddingHorizontal: 16, paddingBottom: 100 },
+  columnWrapper: { justifyContent: "space-between", gap: 16 },
+  empty: { alignItems: "center", paddingTop: 60, gap: 10 },
+  emptyTitle: { fontSize: 16, fontWeight: "700" },
+  emptySub: { fontSize: 13 },
+  loadingContainer: { paddingVertical: 40, alignItems: "center" },
 });
