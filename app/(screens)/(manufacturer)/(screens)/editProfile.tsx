@@ -1,9 +1,9 @@
 import Colors from "@/constants/colors";
 import { useTheme } from "@/contexts/ThemeContext";
-import { api } from "@/services/api";
+import { api, handleApiError } from "@/services/api";
+import { mmkvStorage } from "@/store/mmkv";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router } from "expo-router";
@@ -13,7 +13,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -30,71 +29,50 @@ const COVER_HEIGHT = 220;
 
 type Theme = (typeof Colors)["light"];
 
-// ─── API helpers ──────────────────────────────────────────────────────────────
+const DRAFT_KEY = "factoryProfileDraft";
+const SAVE_DEBOUNCE_MS = 500;
 
-// Fetch user profile and (if available) factory profile
-const fetchManufacturerProfile = async () => {
-  // 1. Get user data
-  const userRes = await api.get("users/me");
-  const user = userRes.data;
+// Matches CreateFactoryProfileRequest from the OpenAPI spec exactly.
+// This is the ONLY endpoint that exists for factory profile data —
+// there is no GET or PATCH for it, only POST.
+interface FactoryProfilePayload {
+  companyName: string;
+  description?: string;
+  sectorTags: string[];
+  machineryList?: string;
+  minOrderQuantity?: number;
+  maxOrderQuantity?: number;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+}
 
-  // 2. Optionally fetch factory profile (if endpoint exists)
-  let factoryData = {};
-  try {
-    const factoryRes = await api.get("users/factory-profile");
-    factoryData = factoryRes.data || {};
-  } catch (e) {
-    // Factory profile might not exist yet – that’s fine
-  }
+// Local draft shape — everything the form needs to fully restore itself,
+// including raw string inputs (like sectorTagsInput) rather than the
+// parsed payload, so partially-typed values aren't lost either.
+interface FactoryProfileDraft {
+  companyName: string;
+  description: string;
+  sectorTagsInput: string;
+  machineryList: string;
+  minOrderQuantity: string;
+  maxOrderQuantity: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+}
 
-  // Combine and map to form fields
-  return {
-    companyName: user.fullName || "Manufacturer",
-    location:
-      user.town && user.region
-        ? `${user.town}, ${user.region}`
-        : user.region || "",
-    email: factoryData.email || "",
-    phone: user.phoneNumber || "",
-    website: factoryData.website || "",
-    bio: factoryData.description || "",
-    avatarUri: user.profileImageUrl || null,
-    coverUri: factoryData.coverImageUrl || null,
-  };
+const emptyDraft: FactoryProfileDraft = {
+  companyName: "",
+  description: "",
+  sectorTagsInput: "",
+  machineryList: "",
+  minOrderQuantity: "",
+  maxOrderQuantity: "",
+  address: "",
+  latitude: null,
+  longitude: null,
 };
-
-// Update profile (PATCH to user or factory profile endpoint)
-const updateManufacturerProfile = async (data: any) => {
-  // We'll send a PATCH to /api/v1/users/me with the fields we want to update.
-  // For fields like companyName, phone, location, we can update user.
-  // For email, website, bio, cover, we may need a separate factory endpoint.
-  // We'll try to update user for basic fields and factory for extra fields.
-  const userPayload = {
-    fullName: data.companyName,
-    phoneNumber: data.phone,
-    region: data.location.split(",").pop()?.trim() || "",
-    town: data.location.split(",")[0]?.trim() || "",
-    // avatarUri: data.avatarUri, // if endpoint supports
-  };
-  await api.patch("users/me", userPayload);
-
-  // Update factory fields if possible
-  const factoryPayload = {
-    description: data.bio,
-    website: data.website,
-    email: data.email,
-    coverImageUrl: data.coverUri,
-  };
-  try {
-    await api.patch("users/factory-profile", factoryPayload);
-  } catch (e) {
-    // If factory profile doesn't exist, maybe we need to create it
-    // For simplicity, we just log and ignore
-  }
-  return { success: true };
-};
-
-// ─── Component ──────────────────────────────────────────────────────────────
 
 export default function EditManufacturerProfile() {
   const { theme, colorScheme } = useTheme();
@@ -103,33 +81,85 @@ export default function EditManufacturerProfile() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    companyName: "",
-    location: "",
-    email: "",
-    phone: "",
-    website: "",
-    bio: "",
-    avatarUri: null as string | null,
-    coverUri: null as string | null,
-  });
+
+  // Read-only, pulled from the real user object (GET /users/me).
+  const [displayName, setDisplayName] = useState("");
+  const [displayPhone, setDisplayPhone] = useState("");
+
+  // Editable — persisted locally as a draft since there's no GET to
+  // restore this from the backend.
+  const [draft, setDraft] = useState<FactoryProfileDraft>(emptyDraft);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  // Tracks whether the initial load has finished, so the debounce-save
+  // effect below doesn't immediately overwrite the saved draft with the
+  // empty default state on first render.
+  const hasLoadedRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     loadProfile();
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, []);
 
   const loadProfile = async () => {
     try {
-      const data = await fetchManufacturerProfile();
-      setFormData(data);
+      const { data: user } = await api.get("users/me");
+
+      setDisplayName(user.fullName || "");
+      setDisplayPhone(user.phoneNumber || "");
+
+      // Check for existing draft
+      const raw = await mmkvStorage.getItem(DRAFT_KEY);
+
+      if (raw) {
+        const restored: FactoryProfileDraft = JSON.parse(raw);
+
+        // Always use the latest full name as the default company name
+        restored.companyName = user.fullName || "";
+
+        setDraft(restored);
+      } else {
+        setDraft({
+          ...emptyDraft,
+          companyName: user.fullName || "", // Default company name
+        });
+      }
     } catch (error) {
+      console.error(error);
       Alert.alert("Error", "Failed to load profile data");
     } finally {
       setInitialLoading(false);
+      hasLoadedRef.current = true;
     }
   };
+
+  // Debounced auto-save of the draft to MMKV on every change, so the
+  // user never has to refill the form just from navigating away.
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await mmkvStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch (e) {
+        // Non-critical — worst case the user retypes a field. Don't
+        // interrupt them with an alert for a background save failing.
+        console.warn("Failed to save profile draft:", e);
+      }
+    }, SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [draft]);
+
+  const updateDraft = (patch: Partial<FactoryProfileDraft>) =>
+    setDraft((prev) => ({ ...prev, ...patch }));
 
   const fetchCurrentLocation = async () => {
     setLocationLoading(true);
@@ -138,7 +168,7 @@ export default function EditManufacturerProfile() {
       if (status !== "granted") {
         Alert.alert(
           "Permission Denied",
-          "We need location access to auto‑fill your address.",
+          "We need location access to auto-fill your address.",
         );
         return;
       }
@@ -162,9 +192,12 @@ export default function EditManufacturerProfile() {
           addr.region,
           addr.country,
         ].filter(Boolean);
-        const locationString = parts.join(", ");
-        setFormData((prev) => ({ ...prev, location: locationString }));
-        setErrors((prev) => ({ ...prev, location: "" }));
+        updateDraft({
+          address: parts.join(", "),
+          latitude,
+          longitude,
+        });
+        setErrors((prev) => ({ ...prev, address: "" }));
       } else {
         Alert.alert(
           "Error",
@@ -183,78 +216,91 @@ export default function EditManufacturerProfile() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.companyName.trim())
+
+    if (!draft.companyName.trim())
       newErrors.companyName = "Company name is required";
-    if (!formData.location.trim()) newErrors.location = "Location is required";
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email))
-      newErrors.email = "Invalid email format";
-    if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
+
+    const tags = draft.sectorTagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (tags.length === 0) {
+      newErrors.sectorTags = "Add at least one sector tag";
+    }
+
+    if (
+      draft.minOrderQuantity &&
+      draft.maxOrderQuantity &&
+      Number(draft.minOrderQuantity) > Number(draft.maxOrderQuantity)
+    ) {
+      newErrors.maxOrderQuantity = "Max must be greater than min";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSave = async () => {
     if (!validateForm()) return;
+
+    const sectorTags = draft.sectorTagsInput
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    const payload: FactoryProfilePayload = {
+      companyName: draft.companyName.trim(),
+
+      sectorTags,
+
+      description: draft.description.trim() || undefined,
+
+      machineryList: draft.machineryList.trim() || undefined,
+
+      minOrderQuantity: draft.minOrderQuantity
+        ? parseInt(draft.minOrderQuantity, 10)
+        : undefined,
+
+      maxOrderQuantity: draft.maxOrderQuantity
+        ? parseInt(draft.maxOrderQuantity, 10)
+        : undefined,
+
+      address: draft.address.trim() || undefined,
+
+      latitude: draft.latitude !== null ? draft.latitude : undefined,
+
+      longitude: draft.longitude !== null ? draft.longitude : undefined,
+    };
+
     setLoading(true);
+
     try {
-      await updateManufacturerProfile(formData);
-      Alert.alert("Success", "Workspace changes saved cleanly", [
-        { text: "Done", onPress: () => router.back() },
+      await api.post("users/factory-profile", payload);
+
+      // Save the latest values locally
+      await mmkvStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          ...draft,
+          companyName: payload.companyName,
+        }),
+      );
+
+      Alert.alert("Success", "Factory profile saved successfully.", [
+        {
+          text: "OK",
+          onPress: () => router.back(),
+        },
       ]);
     } catch (error) {
-      Alert.alert("Error", "Failed to update profile");
+      console.error("Failed to save factory profile:", error);
+
+      Alert.alert("Couldn't save profile", handleApiError(error));
     } finally {
       setLoading(false);
     }
   };
 
-  const pickImage = async (type: "avatar" | "cover") => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Please grant photo library access");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: type === "avatar" ? [1, 1] : [16, 6],
-      quality: 0.8,
-    });
-    if (!result.canceled) {
-      setFormData({ ...formData, [`${type}Uri`]: result.assets[0].uri });
-    }
-  };
-
-  const takePhoto = async (type: "avatar" | "cover") => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Please grant camera access");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: type === "avatar" ? [1, 1] : [16, 6],
-      quality: 0.8,
-    });
-    if (!result.canceled) {
-      setFormData({ ...formData, [`${type}Uri`]: result.assets[0].uri });
-    }
-  };
-
-  const showImageOptions = (type: "avatar" | "cover") => {
-    Alert.alert(
-      `Modify ${type === "avatar" ? "Display Image" : "Backdrop Canvas"}`,
-      "Choose a valid source",
-      [
-        { text: "Camera Shot", onPress: () => takePhoto(type) },
-        { text: "Media Library", onPress: () => pickImage(type) },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
-  };
-
-  // Header Parallax Interpolations
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 60, 100],
     outputRange: [0, 0.4, 1],
@@ -270,12 +316,6 @@ export default function EditManufacturerProfile() {
   const coverTranslateY = scrollY.interpolate({
     inputRange: [-200, 0, COVER_HEIGHT],
     outputRange: [-100, 0, COVER_HEIGHT * 0.5],
-    extrapolate: "clamp",
-  });
-
-  const coverButtonOpacity = scrollY.interpolate({
-    inputRange: [0, 80],
-    outputRange: [1, 0],
     extrapolate: "clamp",
   });
 
@@ -297,7 +337,6 @@ export default function EditManufacturerProfile() {
         backgroundColor="transparent"
       />
 
-      {/* ── Dynamic Top Bar Floating Navigation ── */}
       <Animated.View
         style={[
           styles.headerBlur,
@@ -311,12 +350,11 @@ export default function EditManufacturerProfile() {
         />
         <View style={styles.headerContent}>
           <Text style={[styles.headerTitle, { color: theme.text }]}>
-            Edit Profile
+            Factory Profile
           </Text>
         </View>
       </Animated.View>
 
-      {/* Back Floating Navigation Button */}
       <View
         style={[
           styles.navActionWrapper,
@@ -334,32 +372,6 @@ export default function EditManufacturerProfile() {
         </TouchableOpacity>
       </View>
 
-      {/* ── HIGH Z-INDEX INTERACTIVE COVER BUTTON ── */}
-      <Animated.View
-        style={[
-          styles.foregroundCoverTriggerContainer,
-          { opacity: coverButtonOpacity },
-        ]}
-      >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => showImageOptions("cover")}
-          style={[
-            styles.coverActionIndicator,
-            {
-              backgroundColor: theme.text,
-              borderColor: theme.background + "20",
-            },
-          ]}
-        >
-          <Ionicons name="camera-outline" size={13} color={theme.background} />
-          <Text style={[styles.coverActionText, { color: theme.background }]}>
-            Update Cover Asset
-          </Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* ── Background Canvas Parallax Backdrop Frame ── */}
       <Animated.View
         style={[
           styles.coverContainer,
@@ -368,35 +380,25 @@ export default function EditManufacturerProfile() {
           },
         ]}
       >
-        <View style={StyleSheet.absoluteFill}>
-          {formData.coverUri ? (
-            <Image
-              source={{ uri: formData.coverUri }}
-              style={styles.coverImage}
-            />
-          ) : (
-            <View
-              style={[
-                styles.coverPlaceholderContainer,
-                { backgroundColor: theme.cardBackground },
-              ]}
-            >
-              <LinearGradient
-                colors={[theme.primary + "12", theme.primary + "02"]}
-                style={StyleSheet.absoluteFill}
-              />
-              <View
-                style={[
-                  styles.fallbackFrameDecoration,
-                  { borderColor: theme.border },
-                ]}
-              />
-            </View>
-          )}
+        <View
+          style={[
+            styles.coverPlaceholderContainer,
+            { backgroundColor: theme.cardBackground },
+          ]}
+        >
+          <LinearGradient
+            colors={[theme.primary + "12", theme.primary + "02"]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            style={[
+              styles.fallbackFrameDecoration,
+              { borderColor: theme.border },
+            ]}
+          />
         </View>
       </Animated.View>
 
-      {/* ── Scrollable Body Context ── */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -411,58 +413,40 @@ export default function EditManufacturerProfile() {
           scrollEventThrottle={16}
         >
           <View style={styles.mainCardPositioner}>
-            {/* Integrated Avatar Header Anchor Card */}
-            <View style={[styles.profileMasterCard]}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => showImageOptions("avatar")}
+            <View style={styles.profileMasterCard}>
+              <View
                 style={[
                   styles.avatarBoundary,
                   {
                     borderColor: theme.cardBackground,
-                    backgroundColor: theme.cardBackground,
+                    backgroundColor: theme.primary,
                   },
                 ]}
               >
-                {formData.avatarUri ? (
-                  <Image
-                    source={{ uri: formData.avatarUri }}
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View
-                    style={[styles.avatar, { backgroundColor: theme.primary }]}
-                  >
-                    <Text style={styles.avatarInitials}>
-                      {formData.companyName
-                        ? formData.companyName.slice(0, 2).toUpperCase()
-                        : "MF"}
-                    </Text>
-                  </View>
-                )}
-                <View
-                  style={[
-                    styles.avatarBadgeOverlay,
-                    { backgroundColor: theme.primary },
-                  ]}
-                >
-                  <Ionicons name="camera" size={10} color="#FFF" />
-                </View>
-              </TouchableOpacity>
-
+                <Text style={styles.avatarInitials}>
+                  {draft.companyName
+                    ? draft.companyName.slice(0, 2).toUpperCase()
+                    : "MF"}
+                </Text>
+              </View>
               <Text
                 style={[styles.anchorLabelText, { color: theme.textSecondary }]}
               >
-                TAP TO UPDATE DISPLAY LOGO
+                {displayName} · {displayPhone}
+              </Text>
+              <Text
+                style={[styles.readOnlyNote, { color: theme.textSecondary }]}
+              >
+                Name and phone number are set at registration and can't be
+                edited here yet.
               </Text>
             </View>
 
-            {/* Inputs: Corporate details */}
             <View style={styles.section}>
               <Text
                 style={[styles.sectionTitle, { color: theme.textSecondary }]}
               >
-                CORPORATE DETAILS
+                FACTORY DETAILS
               </Text>
               <View
                 style={[
@@ -475,47 +459,50 @@ export default function EditManufacturerProfile() {
               >
                 <InputField
                   label="Company Name"
-                  value={formData.companyName}
-                  onChangeText={(t: string) =>
-                    setFormData({ ...formData, companyName: t })
-                  }
-                  error={errors.companyName}
+                  value={displayName}
+                  onChangeText={() => {}}
+                  editable={false}
                   theme={theme}
                   icon="business-outline"
                 />
                 <InputField
-                  label="Hub Operations Location"
-                  value={formData.location}
+                  label="Sector Tags (comma separated)"
+                  value={draft.sectorTagsInput}
                   onChangeText={(t: string) =>
-                    setFormData({ ...formData, location: t })
+                    updateDraft({ sectorTagsInput: t })
                   }
-                  error={errors.location}
+                  error={errors.sectorTags}
                   theme={theme}
-                  icon="location-outline"
-                  rightIconName="locate-outline"
-                  onRightIconPress={fetchCurrentLocation}
-                  rightIconLoading={locationLoading}
+                  icon="pricetags-outline"
+                  placeholder="e.g. Textiles, Furniture, Packaging"
                 />
                 <TextAreaField
                   label="Description"
-                  value={formData.bio}
-                  onChangeText={(t: string) =>
-                    setFormData({ ...formData, bio: t })
-                  }
+                  value={draft.description}
+                  onChangeText={(t: string) => updateDraft({ description: t })}
                   theme={theme}
                   icon="document-text-outline"
-                  placeholder="Tell us about your company, your expertise, and what sets you apart…"
+                  placeholder="Tell buyers about your factory, your expertise, and what sets you apart…"
+                />
+                <InputField
+                  label="Machinery / Equipment"
+                  value={draft.machineryList}
+                  onChangeText={(t: string) =>
+                    updateDraft({ machineryList: t })
+                  }
+                  theme={theme}
+                  icon="construct-outline"
+                  placeholder="e.g. 3 injection molders, 2 CNC lathes"
                   last
                 />
               </View>
             </View>
 
-            {/* Inputs: Channels */}
             <View style={styles.section}>
               <Text
                 style={[styles.sectionTitle, { color: theme.textSecondary }]}
               >
-                CHANNELS AND LINKS
+                CAPACITY
               </Text>
               <View
                 style={[
@@ -527,46 +514,61 @@ export default function EditManufacturerProfile() {
                 ]}
               >
                 <InputField
-                  label="Corporate Email"
-                  value={formData.email}
+                  label="Minimum Order Quantity"
+                  value={draft.minOrderQuantity}
                   onChangeText={(t: string) =>
-                    setFormData({ ...formData, email: t })
+                    updateDraft({ minOrderQuantity: t })
                   }
-                  error={errors.email}
                   theme={theme}
-                  icon="mail-outline"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
+                  icon="cube-outline"
+                  keyboardType="number-pad"
                 />
                 <InputField
-                  label="Contact Line"
-                  value={formData.phone}
+                  label="Maximum Order Quantity"
+                  value={draft.maxOrderQuantity}
                   onChangeText={(t: string) =>
-                    setFormData({ ...formData, phone: t })
+                    updateDraft({ maxOrderQuantity: t })
                   }
-                  error={errors.phone}
+                  error={errors.maxOrderQuantity}
                   theme={theme}
-                  icon="call-outline"
-                  keyboardType="phone-pad"
-                />
-                <InputField
-                  label="Web Address"
-                  value={formData.website}
-                  onChangeText={(t: string) =>
-                    setFormData({ ...formData, website: t })
-                  }
-                  theme={theme}
-                  icon="globe-outline"
-                  autoCapitalize="none"
+                  icon="cube-outline"
+                  keyboardType="number-pad"
                   last
                 />
               </View>
             </View>
 
-            {/* Layout Spacer View */}
+            <View style={styles.section}>
+              <Text
+                style={[styles.sectionTitle, { color: theme.textSecondary }]}
+              >
+                LOCATION
+              </Text>
+              <View
+                style={[
+                  styles.groupedCard,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <InputField
+                  label="Factory Address"
+                  value={draft.address}
+                  onChangeText={(t: string) => updateDraft({ address: t })}
+                  theme={theme}
+                  icon="location-outline"
+                  rightIconName="locate-outline"
+                  onRightIconPress={fetchCurrentLocation}
+                  rightIconLoading={locationLoading}
+                  last
+                />
+              </View>
+            </View>
+
             <View style={{ height: 16 }} />
 
-            {/* Form Save Button */}
             <TouchableOpacity
               onPress={handleSave}
               disabled={loading}
@@ -585,7 +587,7 @@ export default function EditManufacturerProfile() {
                   <Text
                     style={[styles.primaryActionLabel, { color: theme.text }]}
                   >
-                    Save Structural Updates
+                    Save Factory Profile
                   </Text>
                 </>
               )}
@@ -597,7 +599,6 @@ export default function EditManufacturerProfile() {
   );
 }
 
-// ── Shared Single‑line Input ──────────────────────────────────────
 const InputField = ({
   label,
   value,
@@ -607,6 +608,7 @@ const InputField = ({
   icon,
   keyboardType = "default",
   autoCapitalize = "sentences",
+  placeholder,
   last,
   rightIconName,
   onRightIconPress,
@@ -642,7 +644,7 @@ const InputField = ({
           style={[styles.nativeInput, { color: theme.text }]}
           value={value}
           onChangeText={onChangeText}
-          placeholder={`Specify ${label.toLowerCase()}`}
+          placeholder={placeholder || `Specify ${label.toLowerCase()}`}
           placeholderTextColor={theme.textSecondary + "50"}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
@@ -670,7 +672,6 @@ const InputField = ({
   </View>
 );
 
-// ── Multi‑line TextArea ──────────────────────────────────────────────
 const TextAreaField = ({
   label,
   value,
@@ -766,7 +767,6 @@ const styles = StyleSheet.create({
     height: COVER_HEIGHT,
     zIndex: 0,
   },
-  coverImage: { width: "100%", height: "100%" },
   coverPlaceholderContainer: {
     width: "100%",
     height: "100%",
@@ -783,22 +783,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: "15%",
   },
-  foregroundCoverTriggerContainer: {
-    position: "absolute",
-    top: COVER_HEIGHT - 82,
-    right: 16,
-    zIndex: 45,
-  },
-  coverActionIndicator: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    gap: 6,
-  },
-  coverActionText: { fontSize: 11, fontWeight: "600", letterSpacing: -0.1 },
   scrollContent: { paddingTop: COVER_HEIGHT - 32, paddingBottom: 40 },
   mainCardPositioner: { paddingHorizontal: 16 },
   profileMasterCard: {
@@ -814,38 +798,21 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     borderWidth: 4,
     marginTop: -64,
-    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
   },
-  avatar: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 44,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   avatarInitials: { fontSize: 26, fontWeight: "700", color: "#FFFFFF" },
-  avatarBadgeOverlay: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#FFF",
-  },
-  anchorLabelText: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    marginTop: 12,
+  anchorLabelText: { fontSize: 12, fontWeight: "600", marginTop: 12 },
+  readOnlyNote: {
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 4,
+    paddingHorizontal: 20,
   },
   section: { marginBottom: 20 },
   sectionTitle: {

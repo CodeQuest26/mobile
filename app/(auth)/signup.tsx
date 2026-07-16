@@ -176,7 +176,7 @@ const SignupScreen = () => {
       });
       router.replace({
         pathname: "/OTPVerification",
-        params: { role: selectedRole, phoneNumber },
+        params: { role: selectedRole, phoneNumber, password },
       });
     } catch (error: any) {
       Alert.alert(

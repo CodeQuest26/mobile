@@ -2,15 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";

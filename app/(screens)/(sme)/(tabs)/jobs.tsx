@@ -1,11 +1,12 @@
 import MainContainer from "@/components/MainContainer";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
-import { api, handleApiError } from "@/services/api";
+import { api } from "@/services/api";
 import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -371,44 +372,92 @@ const MyJobs = () => {
   const user = useAuthStore((s) => s.user);
   console.log("Current role:", user?.role);
 
-  const fetchAllJobs = useCallback(async () => {
-    if (!hasHydrated || !isAuthenticated) return;
+  // const fetchAllJobs = useCallback(async () => {
+  //   if (!hasHydrated || !isAuthenticated) return;
+  //   try {
+  //     setLoading(true);
+  //     setError(null);
+
+  //     // 1. Get all jobs (paginate large; size=1000 should be enough for now)
+  //     const jobsResp = await api.get<PagedJobs>("jobs?page=0&size=1000");
+  //     const jobsArray = jobsResp.data.content;
+
+  //     // 2. For each job, fetch its bids (parallel)
+  //     const jobsWithBids = await Promise.all(
+  //       jobsArray.map(async (jobApi) => {
+  //         try {
+  //           const bidsResp = await api.get<BidApiResponse[]>(
+  //             `jobs/${jobApi.id}/bids`,
+  //           );
+  //           return transformJob(jobApi, bidsResp.data);
+  //         } catch {
+  //           // If bids fail, still show the job without bids
+  //           return transformJob(jobApi, []);
+  //         }
+  //       }),
+  //     );
+
+  //     setJobs(jobsWithBids);
+  //   } catch (err) {
+  //     const message = handleApiError(err);
+  //     setError(message || "Failed to load jobs.");
+  //     setJobs([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, [isAuthenticated, hasHydrated]);
+
+  // useEffect(() => {
+  //   fetchAllJobs();
+  // }, [fetchAllJobs]);
+
+  const fetchJobs = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // 1. Get all jobs (paginate large; size=1000 should be enough for now)
-      const jobsResp = await api.get<PagedJobs>("jobs?page=0&size=1000");
-      const jobsArray = jobsResp.data.content;
+      const response = await api.get<PagedJobs>("jobs?page=0&size=1000");
 
-      // 2. For each job, fetch its bids (parallel)
+      console.log("Jobs response:", response.data);
+
+      const jobsArray = response.data.content ?? [];
+
       const jobsWithBids = await Promise.all(
         jobsArray.map(async (jobApi) => {
           try {
-            const bidsResp = await api.get<BidApiResponse[]>(
+            const bidsResponse = await api.get<BidApiResponse[]>(
               `jobs/${jobApi.id}/bids`,
             );
-            return transformJob(jobApi, bidsResp.data);
-          } catch {
-            // If bids fail, still show the job without bids
+
+            return transformJob(jobApi, bidsResponse.data);
+          } catch (error) {
+            // still show job if bids fail
             return transformJob(jobApi, []);
           }
         }),
       );
 
       setJobs(jobsWithBids);
-    } catch (err) {
-      const message = handleApiError(err);
-      setError(message || "Failed to load jobs.");
-      setJobs([]);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.log("STATUS:", error.response?.status);
+        console.log("DATA:", error.response?.data);
+        console.log("HEADERS:", error.response?.headers);
+      } else {
+        console.log(error);
+      }
+
+      setError("Failed to load jobs.");
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, hasHydrated]);
+  };
 
   useEffect(() => {
-    fetchAllJobs();
-  }, [fetchAllJobs]);
+    if (!hasHydrated || !isAuthenticated) return;
+
+    fetchJobs();
+  }, [hasHydrated, isAuthenticated]);
 
   const filteredJobs = jobs.filter((j) => j.status === activeTab);
   const tabCount = (key: JobStatus) =>
@@ -548,7 +597,7 @@ const MyJobs = () => {
                 {error}
               </Text>
               <TouchableOpacity
-                onPress={fetchAllJobs}
+                onPress={fetchJobs}
                 style={[styles.emptyBtn, { backgroundColor: theme.primary }]}
               >
                 <Text style={styles.emptyBtnText}>Retry</Text>

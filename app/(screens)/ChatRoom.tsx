@@ -5,15 +5,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -196,21 +196,25 @@ const ChatRoom = () => {
         const user = userRes.data;
         setCurrentUserId(user.id);
 
-        // 2. Fetch all orders for this manufacturer
+        // 2. Fetch all orders for the current user
         const ordersRes = await api.get("orders", {
           params: { page: 0, size: 100 },
         });
         const allOrders: ApiOrder[] = ordersRes.data.content || [];
 
-        // Filter orders for this SME (contactId)
-        const smeOrders = allOrders.filter((o) => o.smeId === contactId);
-        if (smeOrders.length === 0) {
+        const contactOrders = allOrders.filter((o) =>
+          userType === "manufacturer"
+            ? o.smeId === contactId
+            : o.factoryId === contactId,
+        );
+
+        if (contactOrders.length === 0) {
           setLoading(false);
           return;
         }
 
         // Sort orders by createdAt descending
-        const sortedOrders = smeOrders.sort(
+        const sortedOrders = contactOrders.sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
@@ -218,7 +222,7 @@ const ChatRoom = () => {
         const latestOrder = sortedOrders[0];
         setActiveOrderId(latestOrder.id);
 
-        // 3. Fetch messages for all orders of this SME
+        // 3. Fetch messages for all orders with this contact
         const allMessages: ApiMessage[] = [];
         for (const order of sortedOrders) {
           try {

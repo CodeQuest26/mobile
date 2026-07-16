@@ -280,8 +280,11 @@ const Chat = () => {
     c.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleContactPress = (contact: { id: string }) => {
-    // Mark messages as read (we'll handle via API later, but for now just navigate)
+  const handleContactPress = (contact: {
+    id: string;
+    name: string;
+    initials: string;
+  }) => {
     router.push({
       pathname: "../../ChatRoom",
       params: {

@@ -25,6 +25,7 @@ interface RegisterPayload {
 }
 
 interface AuthState {
+  [x: string]: any;
   user: User | null;
   token: string | null;
   refreshToken: string | null;

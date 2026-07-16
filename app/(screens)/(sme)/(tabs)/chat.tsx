@@ -1,16 +1,9 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
-import {
-    Contact,
-    CONTACTS,
-    formatListTime,
-    getAvatarColor,
-    Message,
-} from "@/constants/contacts";
-import { useChatConversations } from "@/hooks/useChatConversations";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     FlatList,
     Pressable,
@@ -21,32 +14,84 @@ import {
     View,
 } from "react-native";
 
-// ─── Contact Row Component ────────────────────────────────────────────────────
+interface Order {
+  id: string;
+  jobId: string;
+  smeId: string;
+  smeName: string;
+  factoryId: string;
+  factoryName: string;
+  agreedAmountGhs: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Message {
+  id: string;
+  orderId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  attachmentUrl?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface Contact {
+  id: string;
+  name: string;
+  initials: string;
+  online: boolean;
+}
+
+const getAvatarColor = (id: string) => {
+  const colors = [
+    { bg: "#E0F2FE", text: "#0284C7" },
+    { bg: "#FCE7F3", text: "#DB2777" },
+    { bg: "#D1FAE5", text: "#059669" },
+    { bg: "#FEF3C7", text: "#D97706" },
+    { bg: "#E0E7FF", text: "#4F46E5" },
+    { bg: "#FFE4E6", text: "#E11D48" },
+  ];
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
+const formatTime = (iso: string) => {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now.getTime() - d.getTime()) / 60000;
+  if (diff < 1) return "Now";
+  if (diff < 60) return `${Math.floor(diff)}m`;
+  if (diff < 1440) return `${Math.floor(diff / 60)}h`;
+  if (diff < 10080) return `${Math.floor(diff / 1440)}d`;
+  return d.toLocaleDateString();
+};
+
 const ContactRow = ({
   contact,
-  conversations,
-  lastRead,
+  lastMessage,
+  unreadCount,
   onPress,
   theme,
 }: {
   contact: Contact;
-  conversations: Record<string, Message[]>;
-  lastRead: Record<string, number>;
+  lastMessage?: { content: string; createdAt: string; senderName: string };
+  unreadCount: number;
   onPress: () => void;
   theme: typeof Colors.light;
 }) => {
-  const msgs = conversations[contact.id] ?? [];
-  const last = msgs[msgs.length - 1];
-  const preview = last
-    ? last.sender === "user"
-      ? `You: ${last.text}`
-      : last.text
-    : "No messages yet";
-  const time = last ? formatListTime(last.timestamp) : "";
-  const unread = msgs.filter(
-    (m) => m.sender === "other" && m.timestamp > (lastRead[contact.id] ?? 0),
-  ).length;
   const c = getAvatarColor(contact.id);
+  const preview = lastMessage
+    ? lastMessage.senderName === "You"
+      ? `You: ${lastMessage.content}`
+      : lastMessage.content
+    : "No messages yet";
+  const time = lastMessage ? formatTime(lastMessage.createdAt) : "";
 
   return (
     <Pressable
@@ -72,13 +117,7 @@ const ContactRow = ({
           <Text style={[styles.contactName, { color: theme.text }]}>
             {contact.name}
           </Text>
-          <Text
-            style={[
-              styles.contactTime,
-              unread > 0 && { fontWeight: "600" },
-              { color: theme.textSecondary },
-            ]}
-          >
+          <Text style={[styles.contactTime, { color: theme.textSecondary }]}>
             {time}
           </Text>
         </View>
@@ -87,15 +126,15 @@ const ContactRow = ({
             numberOfLines={1}
             style={[
               styles.contactPreview,
-              unread > 0 && { fontWeight: "500" },
+              unreadCount > 0 && { fontWeight: "500" },
               { color: theme.text },
             ]}
           >
             {preview}
           </Text>
-          {unread > 0 && (
+          {unreadCount > 0 && (
             <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-              <Text style={styles.badgeText}>{unread}</Text>
+              <Text style={styles.badgeText}>{unreadCount}</Text>
             </View>
           )}
         </View>
@@ -104,21 +143,134 @@ const ContactRow = ({
   );
 };
 
-// ─── Chat List Screen ─────────────────────────────────────────────────────────
 const Chat = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
 
-  const { conversations, setConversations, lastRead, setLastRead } =
-    useChatConversations("sme");
-  const [search, setSearch] = React.useState("");
+  const [search, setSearch] = useState("");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [lastMessages, setLastMessages] = useState<
+    Record<string, { content: string; createdAt: string; senderName: string }>
+  >({});
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const filteredContacts = CONTACTS.filter((c) =>
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        setLoading(true);
+        const userRes = await api.get("users/me");
+        const currentUserIdFromApi = userRes.data.id;
+        setCurrentUserId(currentUserIdFromApi);
+
+        const ordersRes = await api.get("orders", {
+          params: { page: 0, size: 100 },
+        });
+        const allOrders: Order[] = ordersRes.data.content || [];
+        setOrders(allOrders);
+
+        const factoryMap = new Map<
+          string,
+          { factoryId: string; factoryName: string; orders: Order[] }
+        >();
+
+        allOrders.forEach((order) => {
+          if (!factoryMap.has(order.factoryId)) {
+            factoryMap.set(order.factoryId, {
+              factoryId: order.factoryId,
+              factoryName: order.factoryName || "Unknown Manufacturer",
+              orders: [],
+            });
+          }
+          factoryMap.get(order.factoryId)!.orders.push(order);
+        });
+
+        const lastMsgMap: typeof lastMessages = {};
+        const unreadMap: typeof unreadCounts = {};
+
+        for (const [
+          factoryId,
+          { orders: factoryOrders },
+        ] of factoryMap.entries()) {
+          const sorted = factoryOrders.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+          const latestOrder = sorted[0];
+
+          try {
+            const msgsRes = await api.get(`messages/orders/${latestOrder.id}`, {
+              params: { page: 0, size: 1, sort: "createdAt,desc" },
+            });
+            const messages: Message[] = msgsRes.data.content || [];
+            const last = messages[0];
+            if (last) {
+              lastMsgMap[factoryId] = {
+                content: last.content,
+                createdAt: last.createdAt,
+                senderName:
+                  last.senderId === currentUserIdFromApi
+                    ? "You"
+                    : last.senderName || "",
+              };
+            }
+
+            const allMsgsRes = await api.get(
+              `messages/orders/${latestOrder.id}`,
+              {
+                params: { page: 0, size: 100 },
+              },
+            );
+            const allMsgs: Message[] = allMsgsRes.data.content || [];
+            const unread = allMsgs.filter(
+              (m) => !m.isRead && m.senderId !== currentUserIdFromApi,
+            ).length;
+            unreadMap[factoryId] = unread;
+          } catch (msgErr) {
+            console.warn(
+              `Failed to fetch messages for order ${latestOrder.id}`,
+              msgErr,
+            );
+          }
+        }
+
+        setLastMessages(lastMsgMap);
+        setUnreadCounts(unreadMap);
+      } catch (error) {
+        console.error("Error loading conversations:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchConversations();
+  }, []);
+
+  const contacts = useMemo(() => {
+    const map = new Map<string, Contact>();
+    orders.forEach((order) => {
+      if (!map.has(order.factoryId)) {
+        const name = order.factoryName || "Unknown Manufacturer";
+        const parts = name.split(" ");
+        const initials =
+          parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2);
+        map.set(order.factoryId, {
+          id: order.factoryId,
+          name,
+          initials: initials.toUpperCase(),
+          online: false,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [orders]);
+
+  const filteredContacts = contacts.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleContactPress = (contact: Contact) => {
-    setLastRead((prev) => ({ ...prev, [contact.id]: Date.now() }));
     router.push({
       pathname: "../../ChatRoom",
       params: {
@@ -135,7 +287,6 @@ const Chat = () => {
     <MainContainer safe>
       <Text style={[styles.header, { color: theme.text }]}>Messages</Text>
 
-      {/* Search */}
       <View
         style={[
           styles.searchBar,
@@ -161,36 +312,44 @@ const Chat = () => {
         )}
       </View>
 
-      <FlatList
-        data={filteredContacts}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <ContactRow
-            contact={item}
-            conversations={conversations}
-            lastRead={lastRead}
-            onPress={() => handleContactPress(item)}
-            theme={theme}
-          />
-        )}
-        ItemSeparatorComponent={() => (
-          <View style={[styles.separator, { backgroundColor: theme.border }]} />
-        )}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons
-              name="chatbubbles-outline"
-              size={52}
-              color={theme.border}
+      {loading ? (
+        <View style={styles.loading}>
+          <Text style={{ color: theme.textSecondary }}>Loading chats...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredContacts}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <ContactRow
+              contact={item}
+              lastMessage={lastMessages[item.id]}
+              unreadCount={unreadCounts[item.id] || 0}
+              onPress={() => handleContactPress(item)}
+              theme={theme}
             />
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              No conversations found
-            </Text>
-          </View>
-        }
-        contentContainerStyle={{ paddingBottom: 20 }}
-      />
+          )}
+          ItemSeparatorComponent={() => (
+            <View
+              style={[styles.separator, { backgroundColor: theme.border }]}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons
+                name="chatbubbles-outline"
+                size={52}
+                color={theme.border}
+              />
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No conversations found
+              </Text>
+            </View>
+          }
+          contentContainerStyle={{ paddingBottom: 20 }}
+        />
+      )}
     </MainContainer>
   );
 };

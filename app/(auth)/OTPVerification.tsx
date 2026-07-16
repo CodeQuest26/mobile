@@ -14,7 +14,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { useAuthStore } from "@/store/auth"; // adjust path to your actual store location
+import { useAuthStore } from "@/store/auth";
 import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
@@ -110,6 +110,7 @@ export default function OtpVerifyScreen() {
 
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
   const login = useAuthStore((s) => s.login);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const authError = useAuthStore((s) => s.error);
   const clearError = useAuthStore((s) => s.clearError);
 
@@ -258,11 +259,22 @@ export default function OtpVerifyScreen() {
 
     // Hand-off route swap
     setTimeout(() => {
-      const destination =
-        role === "sme"
+      const roleStr = String(role || "").toLowerCase();
+
+      const isSme = roleStr.includes("sme") || roleStr.includes("sme_owner");
+
+      // Read current auth state directly from the store to avoid stale closures
+      const { isAuthenticated: auth, user } = useAuthStore.getState();
+      const isAuth = !!auth || !!user;
+
+      if (isAuth) {
+        const destination = isSme
           ? "/(screens)/(sme)/(tabs)"
           : "/(screens)/(manufacturer)/(tabs)";
-      router.replace({ pathname: destination, params: { role } });
+        router.replace({ pathname: destination, params: { role } });
+      } else {
+        router.replace({ pathname: "/(auth)/login", params: { role } });
+      }
     }, 1800);
   };
 

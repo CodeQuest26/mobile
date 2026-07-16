@@ -137,7 +137,7 @@ export default function RoleSelection() {
             colors={[theme.primary, theme.primary + "CC"]}
             style={styles.logoGradient}
           >
-            <Ionicons name="rocket-outline" size={48} color="#fff" />
+            <Ionicons name="rocket-outline" size={48} color={theme.onPrimary} />
 
             {/* <Image
               source={require("../../assets/images/icon.png")}

@@ -107,6 +107,7 @@ const JobPeekCard = memo(
               setImageLoading(false);
             }}
           />
+
           {imageLoading && (
             <View
               style={[styles.imageLoader, { backgroundColor: theme.border }]}
@@ -129,39 +130,37 @@ const JobPeekCard = memo(
             {job.product}
           </Text>
 
-          <View style={styles.detailsRow}>
-            <View style={styles.detailItem}>
-              <Ionicons
-                name="cube-outline"
-                size={12}
-                color={theme.textSecondary}
-              />
-              <Text
-                style={[styles.detailText, { color: theme.textSecondary }]}
-                numberOfLines={1}
-              >
-                {job.quantity}
-              </Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Ionicons
-                name="location-outline"
-                size={12}
-                color={theme.textSecondary}
-              />
-              <Text
-                style={[styles.detailText, { color: theme.textSecondary }]}
-                numberOfLines={1}
-              >
-                {job.location}
-              </Text>
-            </View>
+          <View style={[styles.budgetRow, { marginBottom: 5 }]}>
+            <Ionicons name="pricetag" size={15} color={theme.primary} />
+
+            <Text
+              style={[
+                styles.jobPeekBudget,
+                { color: theme.text, marginLeft: 5 },
+              ]}
+            >
+              {job.budget.split("-")[0].trim()}
+            </Text>
           </View>
 
-          <View style={styles.budgetRow}>
-            <Text style={[styles.jobPeekBudget, { color: theme.primary }]}>
-              {job.budget}
-            </Text>
+          <View style={styles.detailsRow}>
+            <View style={styles.detailItem}>
+              <Ionicons name="albums" size={16} color={theme.primary} />
+
+              <Text
+                style={[
+                  styles.detailText,
+                  {
+                    color: theme.text,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {job.category}
+              </Text>
+            </View>
           </View>
         </View>
       </AnimatedTouchable>
@@ -253,7 +252,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   detailText: {
-    fontSize: 11,
+    fontSize: 14,
+    fontWeight: "500",
     flexShrink: 1,
   },
   budgetRow: {

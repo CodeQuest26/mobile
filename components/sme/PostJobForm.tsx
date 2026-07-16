@@ -1,4 +1,5 @@
 import Colors from "@/constants/colors";
+import { api, handleApiError } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -104,10 +105,13 @@ const PostJobForm = () => {
   };
 
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    const eventType = event.type;
+
     if (Platform.OS !== "ios") {
       setShowDatePicker(false);
     }
-    if (selectedDate) {
+
+    if (eventType === "set" && selectedDate) {
       updateFormData("deadline", selectedDate);
     }
   };
@@ -222,8 +226,27 @@ const PostJobForm = () => {
 
     setIsSubmitting(true);
 
+    const specifications = formData.requirements.length
+      ? `${formData.description}
+
+Requirements:
+- ${formData.requirements.join("\n- ")}`
+      : formData.description;
+
+    const payload = {
+      title: formData.product,
+      productType: formData.product,
+      sectorTag: formData.category,
+      quantity: Number(formData.quantity),
+      specifications,
+      budgetMinGhs: Number(formData.budget),
+      budgetMaxGhs: Number(formData.budget),
+      deliveryAddress: formData.location,
+      deadline: formData.deadline?.toISOString(),
+    };
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await api.post("jobs", payload);
 
       Alert.alert(
         "Job Posted Successfully!",
@@ -242,7 +265,8 @@ const PostJobForm = () => {
         ],
       );
     } catch (error) {
-      Alert.alert("Error", "Failed to post job. Please try again.");
+      const message = handleApiError(error);
+      Alert.alert("Error", message || "Failed to post job. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -399,13 +423,13 @@ const PostJobForm = () => {
                   <View
                     style={[
                       styles.inputContainer,
-                      { borderColor: budgetError ? "#EF4444" : theme.border },
+                      { borderColor: budgetError ? theme.error : theme.border },
                     ]}
                   >
                     <Ionicons
                       name="cash-outline"
                       size={20}
-                      color={budgetError ? "#EF4444" : theme.textSecondary}
+                      color={budgetError ? theme.error : theme.textSecondary}
                     />
                     <TextInput
                       style={[styles.input, { color: theme.text }]}
