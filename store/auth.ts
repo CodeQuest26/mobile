@@ -104,8 +104,6 @@ export const useAuthStore = create<AuthState>()(
       },
 
       /* ---------------- Register ---------------- */
-      // NOTE: register does NOT return tokens per the API schema —
-      // it just creates the (unverified) user. The next step is verifyOtp.
       register: async (payload) => {
         try {
           set({ isLoading: true, error: null });
@@ -115,6 +113,9 @@ export const useAuthStore = create<AuthState>()(
             payload,
           );
 
+          console.log("OTP CODE (register):", data.otpCode);
+
+          // DON'T set isAuthenticated yet - user needs to verify OTP
           set({
             user: {
               id: data.id,
@@ -126,9 +127,10 @@ export const useAuthStore = create<AuthState>()(
               profileImageUrl: data.profileImageUrl,
             },
             pendingVerificationPhone: payload.phoneNumber,
+            isAuthenticated: false,
+            token: null,
+            refreshToken: null,
           });
-
-          console.log(data);
         } catch (error) {
           const message = handleApiError(error);
           set({ error: message });
@@ -148,13 +150,21 @@ export const useAuthStore = create<AuthState>()(
             { phoneNumber, otp },
           );
 
+          // Update user verification status and clear the pending flag —
+          // this is the only place pendingVerificationPhone should be
+          // cleared on success. (If a user abandons verification instead
+          // of completing it, make sure your OTP screen's back handler
+          // also clears this, or they'll keep getting redirected back
+          // to OTP on every future app launch.)
           set((state) => ({
             user: state.user ? { ...state.user, isVerified: true } : state.user,
-            pendingVerificationPhone:
-              state.pendingVerificationPhone === phoneNumber
-                ? null
-                : state.pendingVerificationPhone,
+            pendingVerificationPhone: null,
           }));
+
+          const currentState = get();
+          if (currentState.token && currentState.user?.isVerified) {
+            set({ isAuthenticated: true });
+          }
 
           return data.message;
         } catch (error) {
@@ -176,24 +186,35 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
+          // Test/staging backend echoes the OTP directly in the response —
+          // remove this log before shipping a production build.
+          console.log("📱 OTP CODE (login):", data.otpCode);
+
           api.defaults.headers.common.Authorization = `Bearer ${data.accessToken}`;
 
           set({
             token: data.accessToken,
             refreshToken: data.refreshToken,
-            isAuthenticated: true,
           });
 
-          console.log(data);
-
-          // login response has no user object, so fetch it separately
+          // Fetch the profile BEFORE deciding auth state — this tells us
+          // whether the account still needs OTP verification, or whether
+          // this session can be considered fully authenticated right away.
           await get().getMe();
+
+          const { user } = get();
+          if (user?.isVerified) {
+            // Account already verified — nothing left to verify this
+            // session. Don't force OTP on every login.
+            set({ isAuthenticated: true, pendingVerificationPhone: null });
+          } else {
+            // Not yet verified — route through OTP before granting access.
+            set({
+              isAuthenticated: false,
+              pendingVerificationPhone: phoneNumber,
+            });
+          }
         } catch (error: any) {
-          console.log(error);
-          console.log("response:", error?.response?.data);
-          console.log("status:", error?.response?.status);
-          console.log("headers:", error?.response?.headers);
-          console.log("message:", error?.message);
           const message = handleApiError(error);
           set({ error: message });
           throw new Error(message);
@@ -206,17 +227,22 @@ export const useAuthStore = create<AuthState>()(
       getMe: async () => {
         try {
           if (!get().token) return;
-
           set({ isLoading: true });
 
           const { data } = await api.get("users/me");
 
-          set({
-            user: data,
-            isAuthenticated: true,
-          });
-        } catch {
-          await get().logout();
+          set({ user: data });
+        } catch (err) {
+          // Only treat this as a real session failure on 401/403 — an
+          // expired/invalid token. A network error, timeout, or 5xx
+          // shouldn't silently log the user out; that was previously
+          // wiping valid sessions on any transient failure.
+          const status = axios.isAxiosError(err)
+            ? err.response?.status
+            : undefined;
+          if (status === 401 || status === 403) {
+            await get().logout();
+          }
         } finally {
           set({ isLoading: false });
         }
@@ -243,13 +269,19 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         token: state.token,
         refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
+        // DON'T persist isAuthenticated - recalculated on hydration
         pendingVerificationPhone: state.pendingVerificationPhone,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error("Failed to rehydrate auth store:", error);
+          return;
+        }
+
         if (state?.token) {
           api.defaults.headers.common.Authorization = `Bearer ${state.token}`;
         }
+
         state?.setHasHydrated(true);
       },
     },

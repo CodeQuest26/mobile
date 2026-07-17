@@ -1,17 +1,16 @@
 import { router } from "expo-router";
 import { useEffect } from "react";
 
-import { hasCompletedOnboarding } from "@/storage/storage";
+import {
+  getSavedRole,
+  hasCompletedOnboarding,
+  hasSelectedRole,
+} from "@/storage/storage";
 import { useAuthStore } from "@/store/auth";
 
-import { getSavedRole, hasSelectedRole } from "@/storage/storage";
-
 export default function Index() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-
-  const hasHydrated = useAuthStore((s) => s.hasHydrated);
-
-  const user = useAuthStore((s) => s.user);
+  const { isAuthenticated, hasHydrated, user, pendingVerificationPhone } =
+    useAuthStore();
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -20,38 +19,55 @@ export default function Index() {
     const rolePicked = hasSelectedRole();
     const savedRole = getSavedRole();
 
-    // 1. ROLE SELECTION FIRST
+    const state = useAuthStore.getState();
+    console.log("ROOT GATE:", {
+      isAuthenticated: state.isAuthenticated,
+      pendingVerificationPhone: state.pendingVerificationPhone,
+      userVerified: state.user?.isVerified,
+    });
+
     if (!rolePicked) {
       router.replace("/(auth)");
       return;
     }
 
-    // 2. ONBOARDING
     if (!onboarded) {
       router.replace("/(onboarding)");
       return;
     }
 
-    // 3. NOT LOGGED IN
+    // 🚨 Force OTP whenever there's a pending phone number
+    if (pendingVerificationPhone) {
+      router.replace({
+        pathname: "/(auth)/OTPVerification",
+        params: {
+          phoneNumber: pendingVerificationPhone,
+          role: savedRole,
+        },
+      });
+      return;
+    }
+
     if (!isAuthenticated) {
       router.replace("/(auth)/login");
       return;
     }
 
-    // 4. ROLE ROUTING
-    switch (user?.role || savedRole) {
+    // At this point user is fully authenticated and verified
+    switch (user?.role) {
       case "FACTORY_OWNER":
         router.replace("/(screens)/(manufacturer)/(tabs)");
         break;
-
       case "SME_OWNER":
         router.replace("/(screens)/(sme)/(tabs)");
         break;
-
+      case "ADMIN":
+        router.replace("/(screens)/(admin)/(tabs)");
+        break;
       default:
         router.replace("/(auth)/login");
     }
-  }, [hasHydrated, isAuthenticated, user]);
+  }, [hasHydrated]);
 
   return null;
 }

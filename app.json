@@ -8,6 +8,7 @@
     "scheme": "makershub",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.MakersHub",
@@ -17,31 +18,26 @@
         "NSLocationAlwaysUsageDescription": "Allow MakersHub to access your location for continuous updates."
       }
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#E6F4FE"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ],
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       "package": "com.anonymous.MakersHub",
       "softwareKeyboardLayoutMode": "resize"
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/icon.png"
     },
+
     "plugins": [
       "expo-router",
+
       [
         "expo-splash-screen",
         {
@@ -55,6 +51,7 @@
           }
         }
       ],
+
       [
         "expo-location",
         {
@@ -62,21 +59,33 @@
           "locationAlwaysPermission": "Allow MakersHub to access your location even in the background."
         }
       ],
+
       "expo-font",
       "expo-image",
       "@react-native-community/datetimepicker",
-      "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "googleServicesFile": "./GoogleService-Info.plist"
+          }
+        }
+      ]
     ],
+
     "experiments": {
       "typedRoutes": true
     },
+
     "extra": {
       "router": {},
       "eas": {
         "projectId": "39c9d52c-934b-4b87-a7a6-984658243fa2"
       }
     },
+
     "owner": "0xcyril01"
   }
 }

@@ -15,6 +15,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuthStore } from "@/store/auth";
+import { storage } from "@/store/mmkv";
 import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
@@ -113,6 +114,11 @@ export default function OtpVerifyScreen() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const authError = useAuthStore((s) => s.error);
   const clearError = useAuthStore((s) => s.clearError);
+  const pendingVerificationPhone = useAuthStore(
+    (s) => s.pendingVerificationPhone,
+  );
+  const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
   const [otp, setOtp] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -135,6 +141,9 @@ export default function OtpVerifyScreen() {
   const textOpacity = useRef(new Animated.Value(0)).current;
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const displayPhoneNumber =
+    phoneNumber || pendingVerificationPhone || user?.phoneNumber || "";
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 400);
@@ -286,13 +295,18 @@ export default function OtpVerifyScreen() {
     clearError();
 
     try {
-      // Step 1: verify the OTP with the backend
+      // Step 1: verify the OTP
       await verifyOtp(phoneNumber, code);
 
-      // Step 2: the verify endpoint doesn't return tokens, so log the user
-      // in immediately after if we have their password from the register step.
+      // Step 2: If coming from registration, login with saved password
       if (password) {
         await login(phoneNumber, password);
+      }
+
+      // Step 3: Save role now that verification is complete
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser?.role) {
+        storage.set("selectedRole", currentUser.role);
       }
 
       setVerified(true);
@@ -308,9 +322,6 @@ export default function OtpVerifyScreen() {
 
   const handleResend = () => {
     if (!canResend) return;
-    // NOTE: there's no dedicated resend-OTP endpoint in the API today.
-    // Wire this to whatever endpoint your backend uses to reissue a code
-    // (e.g. re-calling register, or a future POST /auth/resend-otp).
     setOtp("");
     setHasError(false);
     setErrorMessage(null);

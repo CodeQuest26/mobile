@@ -3,6 +3,7 @@ import MainContainer from "@/components/MainContainer";
 import ProductDetailsCard from "@/components/sme/ProductDetailsCard";
 import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
+import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -26,6 +27,10 @@ const SMEHome = () => {
   const time = new Date().getHours();
   const greeting = time < 12 ? "morning" : time < 16 ? "afternoon" : "evening";
 
+  const user = useAuthStore();
+
+  console.log(user);
+
   return (
     <MainContainer>
       <View
@@ -45,7 +50,7 @@ const SMEHome = () => {
                 Good {greeting} 👋
               </ThemedText>
               <Text style={[styles.companyName, { color: theme.text }]}>
-                Company name
+                {user.fullName}
               </Text>
             </View>
             <TouchableOpacity

@@ -170,6 +170,35 @@ const CertificationBadge = ({
   );
 };
 
+// const [fetchedData, setFetchedData] = useState();
+// const [loading, setLoading] = useState(false);
+
+// const fetchFactoryProfile = useCallback(async () => {
+//   try {
+//     setLoading(true);
+
+//     const response = await api.get("/user/factory-profile");
+
+//     setFetchedData(response.data);
+
+//     console.log("Factory Profile:", response.data);
+//   } catch (error) {
+//     console.log("Error fetching factory profile:", error);
+//   } finally {
+//     setLoading(false);
+//   }
+// }, []);
+
+// useFocusEffect(
+//   useCallback(() => {
+//     fetchFactoryProfile();
+//   }, [fetchFactoryProfile]),
+// );
+
+// useEffect(() => {
+//   console.log("Updated Data:", fetchedData);
+// }, [fetchedData]);
+
 const ManufacturerProfile = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();

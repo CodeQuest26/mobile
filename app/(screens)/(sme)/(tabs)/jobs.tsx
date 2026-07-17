@@ -372,45 +372,6 @@ const MyJobs = () => {
   const user = useAuthStore((s) => s.user);
   console.log("Current role:", user?.role);
 
-  // const fetchAllJobs = useCallback(async () => {
-  //   if (!hasHydrated || !isAuthenticated) return;
-  //   try {
-  //     setLoading(true);
-  //     setError(null);
-
-  //     // 1. Get all jobs (paginate large; size=1000 should be enough for now)
-  //     const jobsResp = await api.get<PagedJobs>("jobs?page=0&size=1000");
-  //     const jobsArray = jobsResp.data.content;
-
-  //     // 2. For each job, fetch its bids (parallel)
-  //     const jobsWithBids = await Promise.all(
-  //       jobsArray.map(async (jobApi) => {
-  //         try {
-  //           const bidsResp = await api.get<BidApiResponse[]>(
-  //             `jobs/${jobApi.id}/bids`,
-  //           );
-  //           return transformJob(jobApi, bidsResp.data);
-  //         } catch {
-  //           // If bids fail, still show the job without bids
-  //           return transformJob(jobApi, []);
-  //         }
-  //       }),
-  //     );
-
-  //     setJobs(jobsWithBids);
-  //   } catch (err) {
-  //     const message = handleApiError(err);
-  //     setError(message || "Failed to load jobs.");
-  //     setJobs([]);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // }, [isAuthenticated, hasHydrated]);
-
-  // useEffect(() => {
-  //   fetchAllJobs();
-  // }, [fetchAllJobs]);
-
   const fetchJobs = async () => {
     try {
       setLoading(true);

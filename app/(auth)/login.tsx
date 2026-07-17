@@ -2,15 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -21,7 +21,6 @@ import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
 
-// --- Role meta ---
 const ROLE_META = {
   SME_OWNER: {
     label: "Business Owner",
@@ -32,6 +31,11 @@ const ROLE_META = {
     label: "Manufacturer",
     icon: "settings-outline",
     tagline: "Oversee production & supply chain.",
+  },
+  ADMIN: {
+    label: "Administrator",
+    icon: "shield-checkmark",
+    tagline: "Manager users.",
   },
 };
 
@@ -47,7 +51,6 @@ interface InputFieldProps {
   theme: any;
 }
 
-// --- Input Field ---
 const InputField = ({
   label,
   icon,
@@ -91,12 +94,10 @@ const InputField = ({
   </View>
 );
 
-// --- Screen ---
 const LoginScreen = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
 
-  // Role passed from RoleSelection via router params
   const selectedRole = storage.getString("selectedRole");
   const roleMeta = ROLE_META[selectedRole];
 
@@ -107,7 +108,19 @@ const LoginScreen = () => {
 
   const canSubmit = phoneNumber.length >= 10 && password.length >= 8;
 
-  const { login, error } = useAuthStore();
+  const { login } = useAuthStore();
+
+  const routeForRole = (role?: string) => {
+    switch (role) {
+      case "SME_OWNER":
+        return "/(screens)/(sme)/(tabs)";
+      case "ADMIN":
+        return "/(screens)/(admin)/(tabs)";
+      case "FACTORY_OWNER":
+      default:
+        return "/(screens)/(manufacturer)/(tabs)";
+    }
+  };
 
   const handleLogin = async () => {
     if (!canSubmit) return;
@@ -115,31 +128,23 @@ const LoginScreen = () => {
 
     try {
       await login(phoneNumber, password);
+      const state = useAuthStore.getState();
 
-      const user = useAuthStore.getState().user;
+      if (!state.user) throw new Error("No user after login");
 
-      if (!user) {
-        throw new Error("Failed to load user profile.");
+      if (state.isAuthenticated) {
+        // Already-verified account — go straight into the app, no OTP
+        // needed for this session.
+        router.replace(routeForRole(state.user.role));
+      } else {
+        // Not yet verified — this account still needs to complete OTP.
+        router.replace({
+          pathname: "/OTPVerification",
+          params: { phoneNumber, role: state.user.role },
+        });
       }
-
-      // Replace the previously selected role with the real one
-      storage.set("selectedRole", user.role);
-
-      router.replace({
-        pathname: "/OTPVerification",
-        params: {
-          phoneNumber,
-          role: user.role,
-        },
-      });
-    } catch (error: any) {
-      Alert.alert(
-        "Login Failed",
-        error.message || "An error occurred during login.",
-      );
-      console.error("Login failed:", error);
-      console.log("Phone:", phoneNumber);
-      console.log("Password:", password);
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
     } finally {
       setLoading(false);
     }
@@ -147,7 +152,6 @@ const LoginScreen = () => {
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
-      {/* Back */}
       <TouchableOpacity
         onPress={() => router.replace("/(onboarding)")}
         style={[
@@ -161,9 +165,7 @@ const LoginScreen = () => {
       <KeyboardAwareScrollView bottomOffset={100}>
         <Spacer style={{ height: 25 }} />
 
-        {/* Header */}
         <View style={styles.header}>
-          {/* Role badge */}
           <View
             style={[
               styles.roleBadge,
@@ -178,12 +180,7 @@ const LoginScreen = () => {
 
           <Spacer style={{ height: 10 }} />
 
-          <ThemedText
-            style={{
-              fontSize: 30,
-              fontWeight: "bold",
-            }}
-          >
+          <ThemedText style={{ fontSize: 30, fontWeight: "bold" }}>
             Welcome back 👋
           </ThemedText>
 
@@ -192,7 +189,6 @@ const LoginScreen = () => {
           </ThemedText>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
           <InputField
             label="Phone number"
@@ -233,7 +229,6 @@ const LoginScreen = () => {
 
           <Spacer style={{ height: 10 }} />
 
-          {/* Forgot */}
           <TouchableOpacity
             onPress={() => router.push("/forgotPassword")}
             style={styles.forgotRow}
@@ -246,9 +241,7 @@ const LoginScreen = () => {
 
         <Spacer style={{ height: 20 }} />
 
-        {/* Footer */}
         <View style={styles.footer}>
-          {/* Login button */}
           <TouchableOpacity
             disabled={!canSubmit || loading}
             activeOpacity={0.9}
@@ -274,7 +267,6 @@ const LoginScreen = () => {
 
           <Spacer style={{ height: 20 }} />
 
-          {/* Divider */}
           <View style={styles.dividerRow}>
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
             <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
@@ -285,7 +277,6 @@ const LoginScreen = () => {
 
           <Spacer style={{ height: 20 }} />
 
-          {/* Google */}
           <TouchableOpacity
             activeOpacity={0.85}
             style={[
@@ -304,7 +295,6 @@ const LoginScreen = () => {
 
           <Spacer style={{ height: 12 }} />
 
-          {/* Apple */}
           <TouchableOpacity
             activeOpacity={0.85}
             style={[
@@ -323,7 +313,6 @@ const LoginScreen = () => {
 
           <Spacer style={{ height: 28 }} />
 
-          {/* Sign up */}
           <View style={styles.signupRow}>
             <Text style={[styles.signupPrompt, { color: theme.textSecondary }]}>
               Don't have an account?{" "}
@@ -350,11 +339,7 @@ const LoginScreen = () => {
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
+  header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   backBtn: {
     width: 40,
     height: 40,
@@ -371,25 +356,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 6,
   },
-  roleBadgeText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  form: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-
-  fieldWrapper: {
-    gap: 6,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
+  roleBadgeText: { fontSize: 13, fontWeight: "600" },
+  form: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
+  fieldWrapper: { gap: 6 },
+  fieldLabel: { fontSize: 13, fontWeight: "500", marginBottom: 2 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -398,52 +368,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 50,
   },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    padding: 0,
-    height: "100%",
-    width: "100%",
-  },
-
-  forgotRow: {
-    alignSelf: "flex-end",
-  },
-  forgotText: {
-    fontSize: 13.5,
-    fontWeight: "600",
-  },
-
-  footer: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    paddingTop: 8,
-  },
-
+  input: { flex: 1, fontSize: 15, padding: 0, height: "100%", width: "100%" },
+  forgotRow: { alignSelf: "flex-end" },
+  forgotText: { fontSize: 13.5, fontWeight: "600" },
+  footer: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 8 },
   button: {
     height: 54,
     borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontSize: 13,
-  },
-
+  buttonText: { fontSize: 16, fontWeight: "600" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  divider: { flex: 1, height: 1 },
+  dividerText: { fontSize: 13 },
   socialButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -453,25 +391,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 10,
   },
-  googleG: {
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  socialText: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-
+  googleG: { fontSize: 17, fontWeight: "800" },
+  socialText: { fontSize: 15, fontWeight: "500" },
   signupRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
-  signupPrompt: {
-    fontSize: 14,
-  },
-  signupLink: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
+  signupPrompt: { fontSize: 14 },
+  signupLink: { fontSize: 14, fontWeight: "700" },
 });
