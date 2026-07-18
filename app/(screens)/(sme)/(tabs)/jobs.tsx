@@ -5,8 +5,8 @@ import { api } from "@/services/api";
 import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -105,7 +105,7 @@ const FadeIn = ({
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
 
-  useEffect(() => {
+  React.useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
@@ -205,11 +205,13 @@ const JobCard = ({
                   >
                     {job.product}
                   </Text>
+
                   <Text
                     style={[styles.cardQty, { color: theme.textSecondary }]}
                   >
                     {job.quantity}
                   </Text>
+
                   <StatPill
                     icon="cash-outline"
                     label={job.budget}
@@ -328,13 +330,8 @@ const EmptyState = ({
   return (
     <FadeIn delay={100}>
       <View style={styles.emptyState}>
-        <View
-          style={[
-            styles.emptyIconWrap,
-            { backgroundColor: theme.primary + "12" },
-          ]}
-        >
-          <Ionicons name={cfg.icon as any} size={40} color={theme.primary} />
+        <View style={[styles.emptyIconWrap]}>
+          <Ionicons name={cfg.icon as any} size={30} color={theme.icon} />
         </View>
         <Text style={[styles.emptyTitle, { color: theme.text }]}>
           {cfg.title}
@@ -348,7 +345,9 @@ const EmptyState = ({
             style={[styles.emptyBtn, { backgroundColor: theme.primary }]}
           >
             <Ionicons name="add" size={18} color={theme.onPrimary} />
-            <Text style={styles.emptyBtnText}>{cfg.cta}</Text>
+            <Text style={[styles.emptyBtnText, { color: theme.onPrimary }]}>
+              {cfg.cta}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -372,12 +371,14 @@ const MyJobs = () => {
   const user = useAuthStore((s) => s.user);
   console.log("Current role:", user?.role);
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await api.get<PagedJobs>("jobs?page=0&size=1000");
+      const response = await api.get<PagedJobs>(
+        "jobs/my-jobs?page=0&size=1000",
+      );
 
       console.log("Jobs response:", response.data);
 
@@ -412,13 +413,19 @@ const MyJobs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (!hasHydrated || !isAuthenticated) return;
+  // Refetch every time this screen regains focus (e.g. returning from
+  // postJob or jobDetails), not just on first mount — useEffect only
+  // fired once, so newly posted jobs or accepted bids wouldn't show up
+  // without a full remount.
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasHydrated || !isAuthenticated) return;
 
-    fetchJobs();
-  }, [hasHydrated, isAuthenticated]);
+      fetchJobs();
+    }, [fetchJobs, hasHydrated, isAuthenticated]),
+  );
 
   const filteredJobs = jobs.filter((j) => j.status === activeTab);
   const tabCount = (key: JobStatus) =>
@@ -451,8 +458,10 @@ const MyJobs = () => {
                 }
                 style={[styles.postBtn, { backgroundColor: theme.primary }]}
               >
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text style={styles.postBtnText}>Post Job</Text>
+                <Ionicons name="add" size={18} color={theme.onPrimary} />
+                <Text style={[styles.postBtnText, { color: theme.onPrimary }]}>
+                  Post Job
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -513,7 +522,11 @@ const MyJobs = () => {
                         <Text
                           style={[
                             styles.tabCountText,
-                            { color: isActive ? "#fff" : theme.textSecondary },
+                            {
+                              color: isActive
+                                ? theme.onPrimary
+                                : theme.textSecondary,
+                            },
                           ]}
                         >
                           {count}
@@ -531,16 +544,11 @@ const MyJobs = () => {
         <View style={styles.listContainer}>
           {!hasHydrated ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={theme.primary} />
-              <Text
-                style={[styles.loadingText, { color: theme.textSecondary }]}
-              >
-                Loading...
-              </Text>
+              <ActivityIndicator size="small" color={theme.icon} />
             </View>
           ) : loading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={theme.primary} />
+              <ActivityIndicator size="small" color={theme.icon} />
               <Text
                 style={[styles.loadingText, { color: theme.textSecondary }]}
               >
@@ -607,7 +615,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
   },
-  postBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  postBtnText: { fontSize: 14, fontWeight: "700" },
   tabsWrapper: { borderBottomWidth: 1, paddingHorizontal: 20 },
   tabsRow: { flexDirection: "row" },
   tab: {
@@ -648,7 +656,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.07,
     shadowRadius: 12,
-    elevation: 4,
     marginBottom: 14,
   },
   cardInner: { padding: 16 },
@@ -715,8 +722,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyIconWrap: {
-    width: 88,
-    height: 88,
     borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
@@ -727,7 +732,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     letterSpacing: -0.4,
-    marginBottom: 10,
+    // marginBottom: 10,
   },
   emptySubtitle: {
     fontSize: 15,
@@ -743,5 +748,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
   },
-  emptyBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  emptyBtnText: { fontSize: 16, fontWeight: "700" },
 });

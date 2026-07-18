@@ -85,6 +85,8 @@ export default function ManufacturerOrders() {
       // response.data should be PagedResponseOrderDetailResponse (not in spec, but we'll assume)
       const apiOrders: ApiOrder[] = response.data.content || [];
 
+      console.log(response?.data);
+
       // Transform to OrderCardData
       const transformed = apiOrders.map((order) => transformOrder(order));
       setOrders(transformed);

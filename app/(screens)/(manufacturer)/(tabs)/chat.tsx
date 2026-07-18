@@ -1,10 +1,12 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { api } from "@/services/api";
+import { getAvatarColor } from "@/services/avatarColor";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
@@ -13,8 +15,6 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Order {
   id: string;
@@ -27,7 +27,6 @@ interface Order {
   status: string;
   createdAt: string;
   updatedAt: string;
-  // ... other fields
 }
 
 interface Message {
@@ -41,23 +40,18 @@ interface Message {
   createdAt: string;
 }
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
+interface Contact {
+  id: string;
+  name: string;
+  initials: string;
+  online: boolean;
+}
 
-const getAvatarColor = (id: string) => {
-  const colors = [
-    { bg: "#E0F2FE", text: "#0284C7" },
-    { bg: "#FCE7F3", text: "#DB2777" },
-    { bg: "#D1FAE5", text: "#059669" },
-    { bg: "#FEF3C7", text: "#D97706" },
-    { bg: "#E0E7FF", text: "#4F46E5" },
-    { bg: "#FFE4E6", text: "#E11D48" },
-  ];
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
+interface LastMessagePreview {
+  content: string;
+  createdAt: string;
+  senderName: string;
+}
 
 const formatTime = (iso: string) => {
   const d = new Date(iso);
@@ -70,8 +64,6 @@ const formatTime = (iso: string) => {
   return d.toLocaleDateString();
 };
 
-// ─── Components ─────────────────────────────────────────────────────────────
-
 const ContactRow = ({
   contact,
   lastMessage,
@@ -79,14 +71,13 @@ const ContactRow = ({
   onPress,
   theme,
 }: {
-  contact: { id: string; name: string; initials: string; online?: boolean };
-  lastMessage?: { content: string; createdAt: string; senderName: string };
+  contact: Contact;
+  lastMessage?: LastMessagePreview;
   unreadCount: number;
   onPress: () => void;
   theme: typeof Colors.light;
 }) => {
   const c = getAvatarColor(contact.id);
-
   const preview = lastMessage
     ? lastMessage.senderName === "You"
       ? `You: ${lastMessage.content}`
@@ -146,130 +137,130 @@ const ContactRow = ({
   );
 };
 
-// ─── Main Screen ────────────────────────────────────────────────────────────
-
 const Chat = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
 
-  const [search, setSearch] = React.useState("");
+  const [search, setSearch] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [lastMessages, setLastMessages] = useState<
-    Record<string, { content: string; createdAt: string; senderName: string }>
+    Record<string, LastMessagePreview>
   >({});
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch orders and build contact list
   useEffect(() => {
-    const fetchOrdersAndMessages = async () => {
+    const fetchConversations = async () => {
       try {
         setLoading(true);
-        // 1. Fetch all orders for this manufacturer
+        const userRes = await api.get("users/me");
+        const currentUserIdFromApi = userRes.data.id;
+        setCurrentUserId(currentUserIdFromApi);
+
         const ordersRes = await api.get("orders", {
           params: { page: 0, size: 100 },
         });
         const allOrders: Order[] = ordersRes.data.content || [];
         setOrders(allOrders);
 
-        // 2. Group by SME
-        const smeMap = new Map<
-          string,
-          { smeId: string; smeName: string; orders: Order[] }
-        >();
+        type FactoryGroup = {
+          factoryId: string;
+          factoryName: string;
+          orders: Order[];
+        };
+
+        const factoryMap = new Map<string, FactoryGroup>();
+
         allOrders.forEach((order) => {
-          if (!smeMap.has(order.smeId)) {
-            smeMap.set(order.smeId, {
-              smeId: order.smeId,
-              smeName: order.smeName || "Unknown SME",
+          if (!factoryMap.has(order.factoryId)) {
+            factoryMap.set(order.factoryId, {
+              factoryId: order.factoryId,
+              factoryName: order.factoryName || "Unknown Manufacturer",
               orders: [],
             });
           }
-          smeMap.get(order.smeId)!.orders.push(order);
+          factoryMap.get(order.factoryId)!.orders.push(order);
         });
 
-        // 3. For each SME, find the latest order and fetch its last message
-        const lastMsgMap: typeof lastMessages = {};
-        const unreadMap: typeof unreadCounts = {};
+        const lastMsgMap: Record<string, LastMessagePreview> = {};
+        const unreadMap: Record<string, number> = {};
 
-        for (const [
-          smeId,
-          { smeName, orders: smeOrders },
-        ] of smeMap.entries()) {
-          // Sort orders by createdAt descending
-          const sorted = smeOrders.sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-          );
-          const latestOrder = sorted[0];
-
-          // Fetch messages for this order
-          try {
-            const msgsRes = await api.get(`messages/orders/${latestOrder.id}`, {
-              params: { page: 0, size: 1, sort: "createdAt,desc" },
-            });
-            const messages: Message[] = msgsRes.data.content || [];
-            const last = messages[0];
-            if (last) {
-              lastMsgMap[smeId] = {
-                content: last.content,
-                createdAt: last.createdAt,
-                senderName:
-                  last.senderName || (last.senderId === "me" ? "You" : "Other"),
-              };
-            }
-
-            // Count unread messages (isRead === false)
-            // We need all unread, not just the last one, so fetch all messages or use a different approach.
-            // Here we'll fetch all messages and count unread (assuming isRead flag is used)
-            const allMsgsRes = await api.get(
-              `messages/orders/${latestOrder.id}`,
-              {
-                params: { page: 0, size: 100 },
-              },
+        // Aggregate across ALL orders per factory, not just the latest —
+        // matches ChatRoom's behavior. Previously this only looked at the
+        // single most recent order, so an unread message on an older order
+        // with the same factory would silently never show up here even
+        // though ChatRoom would surface it once opened.
+        await Promise.all(
+          Array.from(factoryMap.entries()).map(async ([factoryId, group]) => {
+            const results = await Promise.all(
+              group.orders.map(async (order) => {
+                try {
+                  const msgsRes = await api.get<{ content: Message[] }>(
+                    `messages/orders/${order.id}`,
+                    { params: { page: 0, size: 100 } },
+                  );
+                  return msgsRes.data.content || [];
+                } catch (msgErr) {
+                  console.warn(
+                    `Failed to fetch messages for order ${order.id}`,
+                    msgErr,
+                  );
+                  return [] as Message[];
+                }
+              }),
             );
-            const allMsgs: Message[] = allMsgsRes.data.content || [];
-            const unread = allMsgs.filter(
-              (m) => !m.isRead && m.senderId !== "me", // assuming 'me' is the current user
+
+            const allMsgs = results.flat();
+            if (allMsgs.length === 0) return;
+
+            const sortedMessages = [...allMsgs].sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime(),
+            );
+            const last = sortedMessages[0];
+
+            lastMsgMap[factoryId] = {
+              content: last.content,
+              createdAt: last.createdAt,
+              senderName:
+                last.senderId === currentUserIdFromApi
+                  ? "You"
+                  : last.senderName || "",
+            };
+
+            unreadMap[factoryId] = allMsgs.filter(
+              (m) => !m.isRead && m.senderId !== currentUserIdFromApi,
             ).length;
-            unreadMap[smeId] = unread;
-          } catch (msgErr) {
-            console.warn(
-              `Failed to fetch messages for order ${latestOrder.id}`,
-              msgErr,
-            );
-          }
-        }
+          }),
+        );
 
         setLastMessages(lastMsgMap);
         setUnreadCounts(unreadMap);
       } catch (error) {
-        console.error("Error fetching orders:", error);
+        console.error("Error loading conversations:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchOrdersAndMessages();
+    fetchConversations();
   }, []);
 
-  // Build contact list from orders
-  const contacts = React.useMemo(() => {
-    const map = new Map<
-      string,
-      { id: string; name: string; initials: string; online?: boolean }
-    >();
+  const contacts = useMemo(() => {
+    const map = new Map<string, Contact>();
     orders.forEach((order) => {
-      if (!map.has(order.smeId)) {
-        const name = order.smeName || "Unknown";
+      if (!map.has(order.factoryId)) {
+        const name = order.factoryName || "Unknown Manufacturer";
         const parts = name.split(" ");
         const initials =
-          parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2);
-        map.set(order.smeId, {
-          id: order.smeId,
+          parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2);
+        map.set(order.factoryId, {
+          id: order.factoryId,
           name,
           initials: initials.toUpperCase(),
-          online: false, // we don't have online status
+          online: false,
         });
       }
     });
@@ -280,28 +271,23 @@ const Chat = () => {
     c.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleContactPress = (contact: {
-    id: string;
-    name: string;
-    initials: string;
-  }) => {
+  const handleContactPress = (contact: Contact) => {
     router.push({
       pathname: "../../ChatRoom",
       params: {
-        userType: "manufacturer",
+        userType: "sme",
         contactId: contact.id,
         contactName: contact.name,
         contactInitials: contact.initials,
-        contactOnline: "0",
+        contactOnline: contact.online ? "1" : "0",
       },
     });
   };
 
   return (
     <MainContainer safe>
-      <Text style={[styles.header, { color: theme.text }]}>Chat</Text>
+      <Text style={[styles.header, { color: theme.text }]}>Messages</Text>
 
-      {/* Search */}
       <View
         style={[
           styles.searchBar,
@@ -329,7 +315,7 @@ const Chat = () => {
 
       {loading ? (
         <View style={styles.loading}>
-          <Text style={{ color: theme.textSecondary }}>Loading chats...</Text>
+          <ActivityIndicator size="small" color={theme.icon} />
         </View>
       ) : (
         <FlatList
@@ -371,6 +357,7 @@ const Chat = () => {
 
 export default Chat;
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   header: {
     fontSize: 24,
@@ -388,6 +375,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     gap: 8,
+  },
+  loading: {
+    alignItems: "center",
+    marginTop: 150,
   },
   searchInput: {
     flex: 1,
@@ -414,7 +405,6 @@ const styles = StyleSheet.create({
     width: 13,
     height: 13,
     borderRadius: 7,
-    backgroundColor: "#22C55E",
     position: "absolute",
     bottom: 0,
     right: 0,
@@ -448,9 +438,4 @@ const styles = StyleSheet.create({
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 80 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 15 },
-  loading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
 });

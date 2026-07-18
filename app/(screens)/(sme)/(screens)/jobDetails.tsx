@@ -4,16 +4,14 @@ import BidCard from "@/components/sme/BidCard";
 import ManufacturerModal from "@/components/sme/ManufacturerModal";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
-import {
-  BidStatus,
-  getDaysUntilDeadline,
-  getJobWithBids,
-  JobWithBids,
-} from "@/constants/Jobstore";
+import { BidStatus, getDaysUntilDeadline } from "@/constants/Jobstore";
+import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -22,6 +20,145 @@ import {
   useColorScheme,
   View,
 } from "react-native";
+
+// ---------- API response types (per OpenAPI spec) ----------
+interface JobApiResponse {
+  id: string;
+  smeId: string;
+  smeName: string;
+  title: string;
+  productType: string;
+  sectorTag: string;
+  quantity: number;
+  specifications?: string;
+  budgetMinGhs: number;
+  budgetMaxGhs: number;
+  deadline: string;
+  attachmentUrls?: string[];
+  deliveryAddress?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BidApiResponse {
+  id: string;
+  jobId: string;
+  factoryId: string;
+  factoryName: string;
+  factorySectorTags: string[];
+  pricePerUnitGhs: number;
+  totalPriceGhs: number;
+  productionDays: number;
+  deliveryDateEstimate: string;
+  message?: string;
+  status: string; // PENDING, ACCEPTED, REJECTED, WITHDRAWN, EXPIRED
+  createdAt: string;
+}
+
+// ---------- Local display types (what BidCard / ManufacturerModal expect) ----------
+interface DisplayManufacturer {
+  id: string;
+  name: string;
+  logo: string | null;
+  verified: boolean;
+  rating: number;
+  reviewCount: number;
+  location: string;
+  description: string;
+  specialties: string[];
+}
+
+interface DisplayBid {
+  id: string;
+  status: BidStatus;
+  amount: string;
+  deliveryDays: number;
+  notes: string;
+  submittedAt: string;
+  manufacturer: DisplayManufacturer;
+}
+
+interface DisplayJob {
+  id: string;
+  product: string;
+  quantity: string;
+  image: string | null;
+  description: string;
+  budget: string;
+  location: string;
+  deadline: string;
+  status: "active" | "completed" | "draft";
+  bids: DisplayBid[];
+}
+
+// ---------- Mappers ----------
+function mapApiStatusToTab(status: string): DisplayJob["status"] {
+  if (status === "DRAFT") return "draft";
+  if (status === "COMPLETED") return "completed";
+  return "active";
+}
+
+function mapBidStatus(status: string): BidStatus {
+  if (status === "ACCEPTED") return "accepted";
+  // REJECTED, WITHDRAWN, EXPIRED all read as "rejected" in this UI —
+  // there's no separate visual state for withdrawn/expired bids yet.
+  if (status === "REJECTED" || status === "WITHDRAWN" || status === "EXPIRED") {
+    return "rejected";
+  }
+  return "pending";
+}
+
+function transformBid(bid: BidApiResponse): DisplayBid {
+  return {
+    id: bid.id,
+    status: mapBidStatus(bid.status),
+    amount: `GHS ${bid.totalPriceGhs.toLocaleString()}`,
+    deliveryDays: bid.productionDays,
+    notes: bid.message ?? "No message from manufacturer.",
+    submittedAt: new Date(bid.createdAt).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    manufacturer: {
+      id: bid.factoryId,
+      name: bid.factoryName,
+      // The API's BidDetailResponse doesn't include factory profile
+      // data (logo, rating, location, description) and there's no
+      // public factory-lookup endpoint in the spec to fetch it from
+      // separately — only an admin-only one. These are placeholders
+      // until that data is exposed somewhere.
+      logo: null,
+      verified: false,
+      rating: 0,
+      reviewCount: 0,
+      location: "Location not available",
+      description: "Detailed factory profile isn't available yet.",
+      specialties: bid.factorySectorTags ?? [],
+    },
+  };
+}
+
+function transformJob(job: JobApiResponse, bids: BidApiResponse[]): DisplayJob {
+  const budget =
+    job.budgetMinGhs && job.budgetMaxGhs
+      ? `GHS ${job.budgetMinGhs} – ${job.budgetMaxGhs}`
+      : "Budget not set";
+
+  return {
+    id: job.id,
+    product: job.title,
+    quantity: `${job.quantity} pcs`,
+    image: job.attachmentUrls?.[0] ?? null,
+    description: job.specifications ?? "No specifications provided.",
+    budget,
+    location: job.deliveryAddress ?? "Not specified",
+    deadline: job.deadline,
+    status: mapApiStatusToTab(job.status),
+    bids: bids.map(transformBid),
+  };
+}
 
 // Info row component (unchanged)
 const InfoRow = ({ icon, label, value, theme, valueColor }: any) => (
@@ -48,12 +185,52 @@ const JobDetails = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
 
-  const [job, setJob] = useState<JobWithBids | undefined>(() =>
-    getJobWithBids(id),
-  );
-  const [selectedBid, setSelectedBid] = useState<any | null>(null);
+  const [job, setJob] = useState<DisplayJob | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [acceptingBidId, setAcceptingBidId] = useState<string | null>(null);
+  const [selectedBid, setSelectedBid] = useState<DisplayBid | null>(null);
 
-  if (!job) {
+  const fetchJobDetails = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [jobRes, bidsRes] = await Promise.all([
+        api.get<JobApiResponse>(`jobs/${id}`),
+        api.get<BidApiResponse[]>(`jobs/${id}/bids`),
+      ]);
+
+      setJob(transformJob(jobRes.data, bidsRes.data));
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        console.log("STATUS:", err.response?.status);
+        console.log("DATA:", err.response?.data);
+      } else {
+        console.log(err);
+      }
+      setError("Failed to load job details.");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchJobDetails();
+  }, [fetchJobDetails]);
+
+  if (loading) {
+    return (
+      <MainContainer safe>
+        <View style={styles.notFound}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </MainContainer>
+    );
+  }
+
+  if (error || !job) {
     return (
       <MainContainer safe>
         <View style={styles.notFound}>
@@ -63,14 +240,16 @@ const JobDetails = () => {
             color={theme.textSecondary}
           />
           <Text style={[styles.notFoundText, { color: theme.textSecondary }]}>
-            No Available Job Found.
+            {error ?? "No Available Job Found."}
           </Text>
 
           <TouchableOpacity
             onPress={() => router.back()}
             style={[styles.backBtn, { backgroundColor: theme.primary }]}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Go Back</Text>
+            <Text style={{ color: theme.onPrimary, fontWeight: "700" }}>
+              Go Back
+            </Text>
           </TouchableOpacity>
         </View>
       </MainContainer>
@@ -81,26 +260,48 @@ const JobDetails = () => {
   const isUrgent = daysLeft <= 7 && job.status === "active";
   const visibleBids = job.bids.filter((bid) => bid.status !== "rejected");
 
-  const handleAcceptBid = () => {
+  const handleAcceptBid = async () => {
     if (!selectedBid) return;
-    setJob((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        bids: prev.bids.map((b) =>
-          b.id === selectedBid.id
-            ? { ...b, status: "accepted" as BidStatus }
-            : b.status === "pending"
-              ? { ...b, status: "rejected" as BidStatus }
-              : b,
-        ),
-      };
-    });
-    setSelectedBid(null);
+
+    try {
+      setAcceptingBidId(selectedBid.id);
+
+      // Real endpoint: PATCH /api/v1/bids/{bidId}/accept — no request body.
+      await api.patch(`bids/${selectedBid.id}/accept`);
+
+      // Refetch so we get the server's actual resulting state for this
+      // bid and any others the backend may have auto-rejected as a
+      // side effect of accepting one (the spec doesn't document that
+      // behavior either way, so don't assume — just re-pull truth).
+      await fetchJobDetails();
+      setSelectedBid(null);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        console.log(
+          "ACCEPT BID ERROR:",
+          err.response?.status,
+          err.response?.data,
+        );
+      } else {
+        console.log(err);
+      }
+      setError("Failed to accept bid. Please try again.");
+    } finally {
+      setAcceptingBidId(null);
+    }
   };
 
   const handleRejectBid = () => {
     if (!selectedBid) return;
+
+    // NOTE: There is no reject/decline endpoint in the API spec — only
+    // POST /api/v1/bids/{bidId}/accept exists. This only updates local
+    // UI state and does NOT persist to the backend. If you need real
+    // bid rejection, that endpoint needs to be added server-side first.
+    console.warn(
+      "handleRejectBid: no backend endpoint exists for this — local UI only.",
+    );
+
     setJob((prev) => {
       if (!prev) return prev;
       return {
@@ -175,6 +376,7 @@ const JobDetails = () => {
                     {job.quantity}
                   </Text>
                 </View>
+
                 {job.image && (
                   <Image
                     source={{ uri: job.image }}
@@ -186,6 +388,7 @@ const JobDetails = () => {
                   />
                 )}
               </View>
+
               <Text
                 style={[
                   styles.heroDescription,
@@ -242,7 +445,12 @@ const JobDetails = () => {
                   { backgroundColor: theme.primary },
                 ]}
               >
-                <Text style={styles.bidsCountBubbleText}>
+                <Text
+                  style={[
+                    styles.bidsCountBubbleText,
+                    { color: theme.onPrimary },
+                  ]}
+                >
                   {job.bids.length}
                 </Text>
               </View>
@@ -393,7 +601,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  bidsCountBubbleText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  bidsCountBubbleText: { fontSize: 13, fontWeight: "700" },
   noBidsBox: {
     borderRadius: 16,
     padding: 32,

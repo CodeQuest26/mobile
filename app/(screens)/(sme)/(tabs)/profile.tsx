@@ -72,12 +72,7 @@ const InfoRow = ({
   const content = (
     <>
       <View style={styles.infoLeft}>
-        <View
-          style={[
-            styles.infoIconWrap,
-            { backgroundColor: theme.iconBackground },
-          ]}
-        >
+        <View style={[styles.infoIconWrap]}>
           <Ionicons name={icon as any} size={20} color={theme.icon} />
         </View>
         {!!label && (
@@ -191,8 +186,8 @@ export default function SMEProfile() {
     companyName: user?.fullName || "Company Name",
     initials,
     verified: user?.isVerified || false,
-    city: (user as any)?.town || "Location",
-    region: user?.region || "",
+    city: (user as any)?.town || "City",
+    region: user?.region || "Region",
     email: "N/A", // not returned by /users/me — see note below
     phone: user?.phoneNumber || "N/A",
     avatarUri: user?.profileImageUrl || null,
@@ -414,17 +409,17 @@ export default function SMEProfile() {
               ]}
             >
               <InfoRow
-                icon="mail-outline"
-                label="Email"
-                value={p.email}
-                theme={theme}
-              />
-              <InfoRow
                 icon="call-outline"
                 label="Phone"
                 value={p.phone}
                 theme={theme}
                 last
+              />
+              <InfoRow
+                icon="mail-outline"
+                label="Email"
+                value={p.email}
+                theme={theme}
               />
             </View>
           </Section>

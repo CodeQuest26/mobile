@@ -130,19 +130,11 @@ const LoginScreen = () => {
       await login(phoneNumber, password);
       const state = useAuthStore.getState();
 
-      if (!state.user) throw new Error("No user after login");
-
-      if (state.isAuthenticated) {
-        // Already-verified account — go straight into the app, no OTP
-        // needed for this session.
-        router.replace(routeForRole(state.user.role));
-      } else {
-        // Not yet verified — this account still needs to complete OTP.
-        router.replace({
-          pathname: "/OTPVerification",
-          params: { phoneNumber, role: state.user.role },
-        });
-      }
+      // Not yet verified — this account still needs to complete OTP.
+      router.replace({
+        pathname: "/OTPVerification",
+        params: { phoneNumber, role: state?.user?.role },
+      });
     } catch (e: any) {
       Alert.alert("Error", e.message);
     } finally {

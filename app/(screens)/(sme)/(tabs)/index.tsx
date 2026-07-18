@@ -50,7 +50,7 @@ const SMEHome = () => {
                 Good {greeting} 👋
               </ThemedText>
               <Text style={[styles.companyName, { color: theme.text }]}>
-                {user.fullName}
+                {user.user?.fullName}
               </Text>
             </View>
             <TouchableOpacity

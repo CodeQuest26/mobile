@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -20,10 +21,9 @@ import MainContainer from "../../components/MainContainer";
 import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
 
-const OTP_LENGTH = 6;
+const OTP_LENGTH = 4;
 const RESEND_COUNTDOWN = 30;
 
-// --- Single OTP Box ---
 const OtpBox = ({
   value,
   focused,
@@ -277,9 +277,10 @@ export default function OtpVerifyScreen() {
       const isAuth = !!auth || !!user;
 
       if (isAuth) {
-        const destination = isSme
-          ? "/(screens)/(sme)/(tabs)"
-          : "/(screens)/(manufacturer)/(tabs)";
+        const destination =
+          user?.role === "SME_OWNER"
+            ? "/(screens)/(sme)/(tabs)"
+            : "/(screens)/(manufacturer)/(tabs)";
         router.replace({ pathname: destination, params: { role } });
       } else {
         router.replace({ pathname: "/(auth)/login", params: { role } });
@@ -486,7 +487,13 @@ export default function OtpVerifyScreen() {
                 },
               ]}
             >
-              {loading ? "Verifying…" : verified ? "Verified" : "Verify"}
+              {loading ? (
+                <ActivityIndicator size={"small"} color={theme.textSecondary} />
+              ) : verified ? (
+                "Verified"
+              ) : (
+                "Verify"
+              )}
             </Text>
           </TouchableOpacity>
         </View>
@@ -528,7 +535,11 @@ export default function OtpVerifyScreen() {
                 },
               ]}
             >
-              <Ionicons name="checkmark-sharp" size={40} color="#FFFFFF" />
+              <Ionicons
+                name="checkmark-sharp"
+                size={40}
+                color={theme.onPrimary}
+              />
             </Animated.View>
 
             {/* Sliding Text Label Segment */}

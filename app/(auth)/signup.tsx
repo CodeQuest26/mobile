@@ -171,8 +171,8 @@ const SignupScreen = () => {
         password,
         fullName: fullName.trim(),
         role: selectedRole as "SME_OWNER" | "FACTORY_OWNER",
-        region: "Greater Accra",
-        town: "East Legon",
+        region: "",
+        town: "",
       });
       router.replace({
         pathname: "/OTPVerification",

@@ -145,7 +145,7 @@ const Slide = ({
         </View>
 
         {/* Floating accent chips */}
-        <View
+        {/* <View
           style={[
             styles.chip,
             styles.chipTopRight,
@@ -159,9 +159,9 @@ const Slide = ({
           <Text style={[styles.chipText, { color: theme.primary }]}>
             {item.highlight}
           </Text>
-        </View>
+        </View> */}
 
-        <View
+        {/* <View
           style={[
             styles.chip,
             styles.chipBottomLeft,
@@ -175,7 +175,7 @@ const Slide = ({
           <Text style={[styles.chipText, { color: theme.text }]}>
             {index === 0 ? "Ready" : index === 1 ? "Connected" : "Live"}
           </Text>
-        </View>
+        </View> */}
       </View>
 
       {/* Text content */}

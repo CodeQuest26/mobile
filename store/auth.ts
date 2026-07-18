@@ -24,6 +24,15 @@ interface RegisterPayload {
   town?: string;
 }
 
+interface VerifyOtpResponse {
+  accessToken: string;
+  accessTokenExpiry: string;
+  refreshToken: string;
+  user: any;
+  refreshTokenExpiry: string;
+  tokenType: string;
+}
+
 interface AuthState {
   [x: string]: any;
   user: User | null;
@@ -41,7 +50,7 @@ interface AuthState {
 
   login: (phoneNumber: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
-  verifyOtp: (phoneNumber: string, otp: string) => Promise<string>;
+  verifyOtp: (phoneNumber: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   getMe: () => Promise<void>;
 
@@ -113,7 +122,7 @@ export const useAuthStore = create<AuthState>()(
             payload,
           );
 
-          console.log("OTP CODE (register):", data.otpCode);
+          console.log(data);
 
           // DON'T set isAuthenticated yet - user needs to verify OTP
           set({
@@ -145,28 +154,28 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isVerifying: true, error: null });
 
-          const { data } = await axios.post<{ message: string }>(
+          // The backend actually returns tokens here, not a
+          // { message } payload — capture them for real.
+          const { data } = await axios.post<VerifyOtpResponse>(
             `${BASE_URL}auth/verify`,
             { phoneNumber, otp },
           );
-
-          // Update user verification status and clear the pending flag —
-          // this is the only place pendingVerificationPhone should be
-          // cleared on success. (If a user abandons verification instead
-          // of completing it, make sure your OTP screen's back handler
-          // also clears this, or they'll keep getting redirected back
-          // to OTP on every future app launch.)
-          set((state) => ({
-            user: state.user ? { ...state.user, isVerified: true } : state.user,
+          console.log(data);
+          set({
+            user: {
+              id: data.user?.id,
+              fullName: data?.user?.fullName,
+              phoneNumber: data?.user?.phoneNumber,
+              role: data.user?.role,
+              isVerified: data.user.isVerified,
+              region: data.user?.region,
+              profileImageUrl: data.user?.profileImageUrl,
+            },
             pendingVerificationPhone: null,
-          }));
-
-          const currentState = get();
-          if (currentState.token && currentState.user?.isVerified) {
-            set({ isAuthenticated: true });
-          }
-
-          return data.message;
+            isAuthenticated: true,
+            token: data.accessToken,
+            refreshToken: data.refreshToken,
+          });
         } catch (error) {
           const message = handleApiError(error);
           set({ error: message });
@@ -189,31 +198,6 @@ export const useAuthStore = create<AuthState>()(
           // Test/staging backend echoes the OTP directly in the response —
           // remove this log before shipping a production build.
           console.log("📱 OTP CODE (login):", data.otpCode);
-
-          api.defaults.headers.common.Authorization = `Bearer ${data.accessToken}`;
-
-          set({
-            token: data.accessToken,
-            refreshToken: data.refreshToken,
-          });
-
-          // Fetch the profile BEFORE deciding auth state — this tells us
-          // whether the account still needs OTP verification, or whether
-          // this session can be considered fully authenticated right away.
-          await get().getMe();
-
-          const { user } = get();
-          if (user?.isVerified) {
-            // Account already verified — nothing left to verify this
-            // session. Don't force OTP on every login.
-            set({ isAuthenticated: true, pendingVerificationPhone: null });
-          } else {
-            // Not yet verified — route through OTP before granting access.
-            set({
-              isAuthenticated: false,
-              pendingVerificationPhone: phoneNumber,
-            });
-          }
         } catch (error: any) {
           const message = handleApiError(error);
           set({ error: message });
@@ -280,6 +264,15 @@ export const useAuthStore = create<AuthState>()(
 
         if (state?.token) {
           api.defaults.headers.common.Authorization = `Bearer ${state.token}`;
+        }
+
+        // Mutate the incoming state object directly instead of calling
+        // useAuthStore.setState — that reference isn't safely available
+        // yet at this point in the store's own initialization, and
+        // referencing it here caused "Cannot read property 'setState'
+        // of undefined".
+        if (state) {
+          state.isAuthenticated = !!state.token;
         }
 
         state?.setHasHydrated(true);

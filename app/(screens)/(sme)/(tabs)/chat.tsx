@@ -1,17 +1,19 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { api } from "@/services/api";
+import { getAvatarColor } from "@/services/avatarColor";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    useColorScheme,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useColorScheme,
+  View,
 } from "react-native";
 
 interface Order {
@@ -45,21 +47,11 @@ interface Contact {
   online: boolean;
 }
 
-const getAvatarColor = (id: string) => {
-  const colors = [
-    { bg: "#E0F2FE", text: "#0284C7" },
-    { bg: "#FCE7F3", text: "#DB2777" },
-    { bg: "#D1FAE5", text: "#059669" },
-    { bg: "#FEF3C7", text: "#D97706" },
-    { bg: "#E0E7FF", text: "#4F46E5" },
-    { bg: "#FFE4E6", text: "#E11D48" },
-  ];
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-};
+interface LastMessagePreview {
+  content: string;
+  createdAt: string;
+  senderName: string;
+}
 
 const formatTime = (iso: string) => {
   const d = new Date(iso);
@@ -80,7 +72,7 @@ const ContactRow = ({
   theme,
 }: {
   contact: Contact;
-  lastMessage?: { content: string; createdAt: string; senderName: string };
+  lastMessage?: LastMessagePreview;
   unreadCount: number;
   onPress: () => void;
   theme: typeof Colors.light;
@@ -134,7 +126,9 @@ const ContactRow = ({
           </Text>
           {unreadCount > 0 && (
             <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
+              <Text style={[styles.badgeText, { color: theme.onPrimary }]}>
+                {unreadCount}
+              </Text>
             </View>
           )}
         </View>
@@ -150,7 +144,7 @@ const Chat = () => {
   const [search, setSearch] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [lastMessages, setLastMessages] = useState<
-    Record<string, { content: string; createdAt: string; senderName: string }>
+    Record<string, LastMessagePreview>
   >({});
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -170,10 +164,13 @@ const Chat = () => {
         const allOrders: Order[] = ordersRes.data.content || [];
         setOrders(allOrders);
 
-        const factoryMap = new Map<
-          string,
-          { factoryId: string; factoryName: string; orders: Order[] }
-        >();
+        type FactoryGroup = {
+          factoryId: string;
+          factoryName: string;
+          orders: Order[];
+        };
+
+        const factoryMap = new Map<string, FactoryGroup>();
 
         allOrders.forEach((order) => {
           if (!factoryMap.has(order.factoryId)) {
@@ -186,54 +183,58 @@ const Chat = () => {
           factoryMap.get(order.factoryId)!.orders.push(order);
         });
 
-        const lastMsgMap: typeof lastMessages = {};
-        const unreadMap: typeof unreadCounts = {};
+        const lastMsgMap: Record<string, LastMessagePreview> = {};
+        const unreadMap: Record<string, number> = {};
 
-        for (const [
-          factoryId,
-          { orders: factoryOrders },
-        ] of factoryMap.entries()) {
-          const sorted = factoryOrders.sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-          );
-          const latestOrder = sorted[0];
-
-          try {
-            const msgsRes = await api.get(`messages/orders/${latestOrder.id}`, {
-              params: { page: 0, size: 1, sort: "createdAt,desc" },
-            });
-            const messages: Message[] = msgsRes.data.content || [];
-            const last = messages[0];
-            if (last) {
-              lastMsgMap[factoryId] = {
-                content: last.content,
-                createdAt: last.createdAt,
-                senderName:
-                  last.senderId === currentUserIdFromApi
-                    ? "You"
-                    : last.senderName || "",
-              };
-            }
-
-            const allMsgsRes = await api.get(
-              `messages/orders/${latestOrder.id}`,
-              {
-                params: { page: 0, size: 100 },
-              },
+        // Aggregate across ALL orders per factory, not just the latest —
+        // matches ChatRoom's behavior. Previously this only looked at the
+        // single most recent order, so an unread message on an older order
+        // with the same factory would silently never show up here even
+        // though ChatRoom would surface it once opened.
+        await Promise.all(
+          Array.from(factoryMap.entries()).map(async ([factoryId, group]) => {
+            const results = await Promise.all(
+              group.orders.map(async (order) => {
+                try {
+                  const msgsRes = await api.get<{ content: Message[] }>(
+                    `messages/orders/${order.id}`,
+                    { params: { page: 0, size: 100 } },
+                  );
+                  return msgsRes.data.content || [];
+                } catch (msgErr) {
+                  console.warn(
+                    `Failed to fetch messages for order ${order.id}`,
+                    msgErr,
+                  );
+                  return [] as Message[];
+                }
+              }),
             );
-            const allMsgs: Message[] = allMsgsRes.data.content || [];
-            const unread = allMsgs.filter(
+
+            const allMsgs = results.flat();
+            if (allMsgs.length === 0) return;
+
+            const sortedMessages = [...allMsgs].sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime(),
+            );
+            const last = sortedMessages[0];
+
+            lastMsgMap[factoryId] = {
+              content: last.content,
+              createdAt: last.createdAt,
+              senderName:
+                last.senderId === currentUserIdFromApi
+                  ? "You"
+                  : last.senderName || "",
+            };
+
+            unreadMap[factoryId] = allMsgs.filter(
               (m) => !m.isRead && m.senderId !== currentUserIdFromApi,
             ).length;
-            unreadMap[factoryId] = unread;
-          } catch (msgErr) {
-            console.warn(
-              `Failed to fetch messages for order ${latestOrder.id}`,
-              msgErr,
-            );
-          }
-        }
+          }),
+        );
 
         setLastMessages(lastMsgMap);
         setUnreadCounts(unreadMap);
@@ -314,7 +315,7 @@ const Chat = () => {
 
       {loading ? (
         <View style={styles.loading}>
-          <Text style={{ color: theme.textSecondary }}>Loading chats...</Text>
+          <ActivityIndicator size="small" color={theme.icon} />
         </View>
       ) : (
         <FlatList
@@ -375,6 +376,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
   },
+  loading: {
+    alignItems: "center",
+    marginTop: 150,
+  },
   searchInput: {
     flex: 1,
     fontSize: 15,
@@ -400,7 +405,6 @@ const styles = StyleSheet.create({
     width: 13,
     height: 13,
     borderRadius: 7,
-    backgroundColor: "#22C55E",
     position: "absolute",
     bottom: 0,
     right: 0,
@@ -430,7 +434,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 6,
   },
-  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  badgeText: { fontSize: 11, fontWeight: "700" },
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 80 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 15 },

@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    height: 235,
+    height: 230,
   },
   moreCardText: {
     fontSize: 13,

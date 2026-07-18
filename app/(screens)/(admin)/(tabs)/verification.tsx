@@ -109,7 +109,17 @@ const VerificationQueue = () => {
 
   const fetchFactories = async () => {
     try {
-      const { data } = await api.get("/admin/factories/verification-queue");
+      // No leading slash — a leading "/" here combined with a baseURL
+      // ending in "/api/v1/" resolves as an absolute path from the
+      // origin (per the WHATWG URL spec axios uses), which silently
+      // strips "/api/v1" and hits the wrong route entirely.
+      //
+      // Also explicitly filtering to PENDING — the endpoint supports a
+      // status filter and without it this "queue" was returning
+      // factories in every verification status, not just pending ones.
+      const { data } = await api.get("admin/factories/verification-queue", {
+        params: { status: "PENDING", page: 0, size: 100 },
+      });
       setFactories(Array.isArray(data) ? data : data.content || []);
     } catch (err) {
       Alert.alert("Error", handleApiError(err));
@@ -181,16 +191,14 @@ const VerificationQueue = () => {
     setSubmitting(status);
 
     try {
-      // 1. Send the request
-      await api.patch(`/admin/factories/${selected.id}/verify`, {
-        status, // Ensure this matches what your backend expects
+      // Same leading-slash fix here.
+      await api.patch(`admin/factories/${selected.id}/verify`, {
+        status,
         notes: notes.trim() || undefined,
       });
 
-      // 2. Remove the item from local state immediately
       setFactories((prev) => prev.filter((f) => f.id !== selected.id));
 
-      // 3. Close the modal
       closeSheet(() => {
         Alert.alert(
           "Success",
@@ -361,21 +369,6 @@ const VerificationQueue = () => {
                     </Text>
                   ) : null}
 
-                  {/* Owner */}
-                  {/* <Text
-                    style={[
-                      styles.sectionLabel,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    OWNER
-                  </Text>
-                  <DetailRow
-                    icon="person-outline"
-                    label="Name"
-                    value={selected.ownerName}
-                    theme={theme}
-                  /> */}
                   <DetailRow
                     icon="call-outline"
                     label="Phone"

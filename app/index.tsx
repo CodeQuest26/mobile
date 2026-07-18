@@ -19,13 +19,6 @@ export default function Index() {
     const rolePicked = hasSelectedRole();
     const savedRole = getSavedRole();
 
-    const state = useAuthStore.getState();
-    console.log("ROOT GATE:", {
-      isAuthenticated: state.isAuthenticated,
-      pendingVerificationPhone: state.pendingVerificationPhone,
-      userVerified: state.user?.isVerified,
-    });
-
     if (!rolePicked) {
       router.replace("/(auth)");
       return;
@@ -36,7 +29,7 @@ export default function Index() {
       return;
     }
 
-    // 🚨 Force OTP whenever there's a pending phone number
+    //  Force OTP whenever there's a pending phone number
     if (pendingVerificationPhone) {
       router.replace({
         pathname: "/(auth)/OTPVerification",
@@ -67,7 +60,7 @@ export default function Index() {
       default:
         router.replace("/(auth)/login");
     }
-  }, [hasHydrated]);
+  }, [hasHydrated, isAuthenticated, pendingVerificationPhone, user]);
 
   return null;
 }

@@ -1,6 +1,7 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { api } from "@/services/api";
+import { getAvatarColor } from "@/services/avatarColor";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -52,24 +53,6 @@ type DateSeparator = {
 type ChatItem = ApiMessage | DateSeparator;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const AVATAR_COLORS = [
-  { bg: "#E0F2FE", text: "#0284C7" },
-  { bg: "#FCE7F3", text: "#DB2777" },
-  { bg: "#D1FAE5", text: "#059669" },
-  { bg: "#FEF3C7", text: "#D97706" },
-  { bg: "#E0E7FF", text: "#4F46E5" },
-  { bg: "#FFE4E6", text: "#E11D48" },
-];
-
-const getAvatarColor = (id: string) => {
-  const numeric = parseInt(id.replace(/\D/g, ""), 10);
-  const index = Number.isFinite(numeric)
-    ? numeric % AVATAR_COLORS.length
-    : Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0) %
-      AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
-};
 
 const formatTime = (iso: string) => {
   const d = new Date(iso);
@@ -222,21 +205,28 @@ const ChatRoom = () => {
         const latestOrder = sortedOrders[0];
         setActiveOrderId(latestOrder.id);
 
-        // 3. Fetch messages for all orders with this contact
-        const allMessages: ApiMessage[] = [];
-        for (const order of sortedOrders) {
-          try {
-            const msgsRes = await api.get(`messages/orders/${order.id}`, {
-              params: { page: 0, size: 100 },
-            });
-            const msgs: ApiMessage[] = msgsRes.data.content || [];
-            allMessages.push(...msgs);
-          } catch (err) {
-            console.warn(`Failed to fetch messages for order ${order.id}`, err);
-          }
-        }
+        // 3. Fetch messages for all orders with this contact, in parallel
+        const results = await Promise.all(
+          sortedOrders.map(async (order) => {
+            try {
+              const msgsRes = await api.get<{ content: ApiMessage[] }>(
+                `messages/orders/${order.id}`,
+                { params: { page: 0, size: 100 } },
+              );
+              return msgsRes.data.content || [];
+            } catch (err) {
+              console.warn(
+                `Failed to fetch messages for order ${order.id}`,
+                err,
+              );
+              return [] as ApiMessage[];
+            }
+          }),
+        );
 
-        // Sort messages by createdAt
+        const allMessages = results.flat();
+
+        // Sort messages by createdAt ascending
         allMessages.sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -288,7 +278,7 @@ const ChatRoom = () => {
 
     try {
       // Send to API
-      const response = await api.post("messages", {
+      const response = await api.post<ApiMessage>("messages", {
         orderId: activeOrderId,
         content: trimmed,
         // attachmentUrl optional

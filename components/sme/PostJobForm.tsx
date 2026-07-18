@@ -608,6 +608,7 @@ Requirements:
                   display={Platform.OS === "ios" ? "inline" : "default"}
                   minimumDate={new Date()}
                   onChange={onDateChange}
+                  accentColor={theme.primary}
                 />
               )}
 
@@ -615,11 +616,15 @@ Requirements:
                 <TouchableOpacity
                   style={[
                     styles.iosDoneButton,
-                    { backgroundColor: theme.primary },
+                    {
+                      backgroundColor: theme.onPrimary,
+                      borderWidth: 1,
+                      borderColor: theme.primary,
+                    },
                   ]}
                   onPress={() => setShowDatePicker(false)}
                 >
-                  <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>
+                  <Text style={{ color: theme.primary, fontWeight: "600" }}>
                     Confirm Date
                   </Text>
                 </TouchableOpacity>

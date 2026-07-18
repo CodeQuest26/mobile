@@ -167,7 +167,10 @@ const AdminHomeScreen = () => {
       value: stats?.openDisputes?.toString() ?? "0",
       color: theme.error,
       icon: "alert-circle-outline",
-      route: "../(screens)/Disputes",
+      // Was "../(screens)/Disputes" — inconsistent with the "See All"
+      // link and the dispute-list screen below. Standardized on the
+      // same route used everywhere else disputes are linked.
+      route: "/admin/disputes",
     },
     {
       id: "4",
@@ -209,13 +212,14 @@ const AdminHomeScreen = () => {
           />
         }
       >
-        {/* Error Banner */}
-        {/* {errorMessage && (
+        {/* Error Banner — re-enabled; this was silently swallowing
+            fetch failures with no user-visible feedback. */}
+        {errorMessage && (
           <View style={styles.errorContainer}>
             <Ionicons name="warning-outline" size={18} color="#FF4D4D" />
             <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
-        )} */}
+        )}
 
         {/* Loading Indicator for Initial Load */}
         {loading && !refreshing ? (
@@ -268,7 +272,13 @@ const AdminHomeScreen = () => {
                     onPress={() =>
                       router.push({
                         pathname: "/admin/disputes/[id]" as any,
-                        params: { id: dispute.id },
+                        // Pass the full object so the detail screen can
+                        // render immediately without a refetch — the
+                        // spec has no GET /admin/disputes/{id} endpoint.
+                        params: {
+                          id: dispute.id,
+                          dispute: JSON.stringify(dispute),
+                        },
                       })
                     }
                   >
@@ -285,10 +295,10 @@ const AdminHomeScreen = () => {
                       }
                       color={
                         dispute.status === "OPEN"
-                          ? "#FF4D4D"
+                          ? theme.error
                           : dispute.status === "UNDER_REVIEW"
-                            ? "#F5A623"
-                            : "#34C759"
+                            ? theme.warning
+                            : theme.primary
                       }
                     />
                   </TouchableOpacity>
