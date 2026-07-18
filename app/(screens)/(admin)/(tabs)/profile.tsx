@@ -2,15 +2,16 @@ import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React from "react";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    useColorScheme,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
 } from "react-native";
 
 const AdminProfileScreen = () => {
@@ -21,7 +22,14 @@ const AdminProfileScreen = () => {
   const handleLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to end your admin session?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Log Out", style: "destructive", onPress: () => logout() },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: () => {
+          logout();
+          router.replace("../../../(auth)/login");
+        },
+      },
     ]);
   };
 

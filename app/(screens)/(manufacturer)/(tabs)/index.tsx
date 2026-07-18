@@ -197,7 +197,7 @@ const HeroCard = ({
         .toUpperCase()
         .slice(0, 2)
     : "??";
-  const companyName = user?.fullName || "Manufacturer";
+  const companyName = user?.fullName || "-";
   const location = user?.town
     ? `${user.town}, ${user.region || ""}`
     : user?.region || "Unknown location";
@@ -283,7 +283,7 @@ const HeroCard = ({
                   <Ionicons
                     name="checkmark-circle"
                     size={16}
-                    color="#93C5FD"
+                    color={theme.primary}
                     style={{ marginLeft: 6 }}
                   />
                 )}
@@ -531,7 +531,7 @@ export default function ManufacturerHome() {
         >
           {!hasHydrated || loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.primary} />
+              <ActivityIndicator size="small" color={theme.primary} />
             </View>
           ) : (
             <>

@@ -430,7 +430,6 @@ export default function BidDetailsScreen() {
                   <TextInput
                     value={bidAmount}
                     onChangeText={(text) => {
-                      // Allow only numbers with one decimal point
                       const filtered = text.replace(/[^0-9.]/g, "");
 
                       // Prevent multiple decimals
@@ -442,6 +441,7 @@ export default function BidDetailsScreen() {
                     placeholder="Enter bid amount"
                     style={{
                       color: theme.text,
+                      height: "100%",
                     }}
                   />
                 </View>
@@ -475,6 +475,7 @@ export default function BidDetailsScreen() {
                     placeholder="Enter number of days"
                     style={{
                       color: theme.text,
+                      height: "100%",
                     }}
                   />
                 </View>

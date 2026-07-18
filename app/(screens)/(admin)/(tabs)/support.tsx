@@ -45,13 +45,13 @@ const SupportTicketsScreen = () => {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "High":
-        return "#FF4D4D";
+        return theme.error;
       case "Medium":
-        return "#F5A623";
+        return theme.warning;
       case "Low":
         return "#4A90E2";
       default:
-        return "#7ED321";
+        return theme.primary;
     }
   };
 
@@ -106,8 +106,8 @@ const SupportTicketsScreen = () => {
 
       {loading ? (
         <ActivityIndicator
-          size="large"
-          color={theme.text}
+          size="small"
+          color={theme.icon}
           style={{ marginTop: 20 }}
         />
       ) : error ? (

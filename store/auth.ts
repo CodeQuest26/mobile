@@ -124,7 +124,6 @@ export const useAuthStore = create<AuthState>()(
 
           console.log(data);
 
-          // DON'T set isAuthenticated yet - user needs to verify OTP
           set({
             user: {
               id: data.id,

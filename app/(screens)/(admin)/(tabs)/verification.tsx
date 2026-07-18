@@ -109,14 +109,6 @@ const VerificationQueue = () => {
 
   const fetchFactories = async () => {
     try {
-      // No leading slash — a leading "/" here combined with a baseURL
-      // ending in "/api/v1/" resolves as an absolute path from the
-      // origin (per the WHATWG URL spec axios uses), which silently
-      // strips "/api/v1" and hits the wrong route entirely.
-      //
-      // Also explicitly filtering to PENDING — the endpoint supports a
-      // status filter and without it this "queue" was returning
-      // factories in every verification status, not just pending ones.
       const { data } = await api.get("admin/factories/verification-queue", {
         params: { status: "PENDING", page: 0, size: 100 },
       });
@@ -220,7 +212,7 @@ const VerificationQueue = () => {
 
       {loading && !refreshing ? (
         <ActivityIndicator
-          size="large"
+          size="small"
           color={theme.text}
           style={{ marginTop: 50 }}
         />

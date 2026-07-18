@@ -3,6 +3,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { api, handleApiError } from "@/services/api";
 import { mmkvStorage } from "@/store/mmkv";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
@@ -30,11 +31,25 @@ const COVER_HEIGHT = 220;
 type Theme = (typeof Colors)["light"];
 
 const DRAFT_KEY = "factoryProfileDraft";
+
+// Tracks whether we've ever successfully created a profile for this
+// user, purely on-device. There's still no GET /users/factory-profile
+// to check server-side whether a profile exists — only POST (create)
+// and PUT (update) — so this local flag is a stand-in for that check.
+// It decides which verb to call: first successful save -> POST, every
+// save after that -> PUT. This is an approximation, not a real fix:
+// if the user reinstalls or clears storage, this flag resets and the
+// next save will incorrectly try POST again against an existing
+// profile. The real fix is a GET endpoint (or embedding factory
+// profile data in GET /users/me) so this can be driven by actual
+// server state instead of a guess.
+const PROFILE_CREATED_KEY = "factoryProfileCreated";
+
 const SAVE_DEBOUNCE_MS = 500;
 
 // Matches CreateFactoryProfileRequest from the OpenAPI spec exactly.
-// This is the ONLY endpoint that exists for factory profile data —
-// there is no GET or PATCH for it, only POST.
+// Used as the body for both createFactoryProfile (POST) and
+// updateFactoryProfile (PUT) — they share the same request schema.
 interface FactoryProfilePayload {
   companyName: string;
   description?: string;
@@ -74,6 +89,18 @@ const emptyDraft: FactoryProfileDraft = {
   longitude: null,
 };
 
+// Parses a numeric text field into a clean integer or undefined —
+// never NaN. parseInt("", 10) or parseInt("abc", 10) both produce
+// NaN, and JSON.stringify(NaN) serializes to `null`, which gets sent
+// to a non-nullable `integer` field on the backend and can trigger an
+// unhandled deserialization exception (surfaces as a 500, not a 400).
+const parseIntOrUndefined = (value: string): number | undefined => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = parseInt(trimmed, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
 export default function EditManufacturerProfile() {
   const { theme, colorScheme } = useTheme();
   const isDark = colorScheme === "dark";
@@ -86,8 +113,8 @@ export default function EditManufacturerProfile() {
   const [displayName, setDisplayName] = useState("");
   const [displayPhone, setDisplayPhone] = useState("");
 
-  // Editable — persisted locally as a draft since there's no GET to
-  // restore this from the backend.
+  // Editable — persisted locally as a draft since there's still no
+  // GET /users/factory-profile to restore this from the backend.
   const [draft, setDraft] = useState<FactoryProfileDraft>(emptyDraft);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -229,9 +256,25 @@ export default function EditManufacturerProfile() {
     }
 
     if (
+      draft.minOrderQuantity.trim() &&
+      Number.isNaN(parseInt(draft.minOrderQuantity, 10))
+    ) {
+      newErrors.minOrderQuantity = "Must be a valid number";
+    }
+    if (
+      draft.maxOrderQuantity.trim() &&
+      Number.isNaN(parseInt(draft.maxOrderQuantity, 10))
+    ) {
+      newErrors.maxOrderQuantity = "Must be a valid number";
+    }
+
+    if (
       draft.minOrderQuantity &&
       draft.maxOrderQuantity &&
-      Number(draft.minOrderQuantity) > Number(draft.maxOrderQuantity)
+      !Number.isNaN(parseInt(draft.minOrderQuantity, 10)) &&
+      !Number.isNaN(parseInt(draft.maxOrderQuantity, 10)) &&
+      parseInt(draft.minOrderQuantity, 10) >
+        parseInt(draft.maxOrderQuantity, 10)
     ) {
       newErrors.maxOrderQuantity = "Max must be greater than min";
     }
@@ -250,32 +293,36 @@ export default function EditManufacturerProfile() {
 
     const payload: FactoryProfilePayload = {
       companyName: draft.companyName.trim(),
-
       sectorTags,
-
       description: draft.description.trim() || undefined,
-
       machineryList: draft.machineryList.trim() || undefined,
-
-      minOrderQuantity: draft.minOrderQuantity
-        ? parseInt(draft.minOrderQuantity, 10)
-        : undefined,
-
-      maxOrderQuantity: draft.maxOrderQuantity
-        ? parseInt(draft.maxOrderQuantity, 10)
-        : undefined,
-
+      minOrderQuantity: parseIntOrUndefined(draft.minOrderQuantity),
+      maxOrderQuantity: parseIntOrUndefined(draft.maxOrderQuantity),
       address: draft.address.trim() || undefined,
-
       latitude: draft.latitude !== null ? draft.latitude : undefined,
-
       longitude: draft.longitude !== null ? draft.longitude : undefined,
     };
 
     setLoading(true);
 
     try {
-      await api.post("users/factory-profile", payload);
+      // No leading slash — baseURL already includes /api/v1.
+      //
+      // No GET /users/factory-profile exists yet to check server-side
+      // whether a profile already exists, so we branch on a local
+      // flag instead: first successful save ever -> POST (create),
+      // every save after that -> PUT (update). This is what fixes the
+      // original 500 — that was very likely createFactoryProfile
+      // being called a second time against a unique ownerId
+      // constraint with no upsert handling.
+      const alreadyCreated = await mmkvStorage.getItem(PROFILE_CREATED_KEY);
+
+      if (alreadyCreated === "true") {
+        await api.put("users/factory-profile", payload);
+      } else {
+        await api.post("users/factory-profile", payload);
+        await mmkvStorage.setItem(PROFILE_CREATED_KEY, "true");
+      }
 
       // Save the latest values locally
       await mmkvStorage.setItem(
@@ -293,6 +340,15 @@ export default function EditManufacturerProfile() {
         },
       ]);
     } catch (error) {
+      // Log the raw response body so the actual backend error (if any)
+      // is visible instead of just Axios's generic status-code message.
+      if (axios.isAxiosError(error)) {
+        console.log(
+          "Factory profile save failed — response body:",
+          error.response?.data,
+        );
+        console.log("Status:", error.response?.status);
+      }
       console.error("Failed to save factory profile:", error);
 
       Alert.alert("Couldn't save profile", handleApiError(error));
@@ -519,6 +575,7 @@ export default function EditManufacturerProfile() {
                   onChangeText={(t: string) =>
                     updateDraft({ minOrderQuantity: t })
                   }
+                  error={errors.minOrderQuantity}
                   theme={theme}
                   icon="cube-outline"
                   keyboardType="number-pad"

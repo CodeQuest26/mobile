@@ -1,6 +1,6 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
-import { api, handleApiError } from "@/services/api";
+import { api } from "@/services/api";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -29,11 +29,10 @@ const UserManagementScreen = () => {
   const fetchUsers = async () => {
     try {
       setError(null);
-      // Ensure this path matches your backend endpoint
       const { data } = await api.get("/admin/users");
       setUsers(data);
     } catch (err) {
-      setError(handleApiError(err));
+      console.log(err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -112,8 +111,8 @@ const UserManagementScreen = () => {
 
       {loading ? (
         <ActivityIndicator
-          size="large"
-          color={theme.text}
+          size="small"
+          color={theme.icon}
           style={{ marginTop: 50 }}
         />
       ) : error ? (

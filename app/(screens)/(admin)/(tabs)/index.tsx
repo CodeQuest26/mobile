@@ -224,7 +224,7 @@ const AdminHomeScreen = () => {
         {/* Loading Indicator for Initial Load */}
         {loading && !refreshing ? (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={theme.primary} />
+            <ActivityIndicator size="small" color={theme.icon} />
           </View>
         ) : (
           <>
@@ -272,9 +272,7 @@ const AdminHomeScreen = () => {
                     onPress={() =>
                       router.push({
                         pathname: "/admin/disputes/[id]" as any,
-                        // Pass the full object so the detail screen can
-                        // render immediately without a refetch — the
-                        // spec has no GET /admin/disputes/{id} endpoint.
+
                         params: {
                           id: dispute.id,
                           dispute: JSON.stringify(dispute),
