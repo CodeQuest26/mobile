@@ -1,16 +1,19 @@
 import Colors from "@/constants/colors";
 import { api } from "@/services/api";
 import { useAuthStore } from "@/store/auth";
+import { mmkvStorage } from "@/store/mmkv";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
   Image,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -40,6 +43,64 @@ interface Stats {
   totalEarned: number;
 }
 
+// ---------------------------------------------------------------------
+// There is still no GET /users/factory-profile (or equivalent) in the
+// API — only POST (create) and PUT (update). That means companyName,
+// description, sectorTags, machineryList, minOrderQuantity,
+// maxOrderQuantity, and address genuinely cannot be fetched from the
+// backend here. As a stopgap, this screen reads the same locally
+// cached draft that EditManufacturerProfile.tsx writes to MMKV after
+// every successful save (same DRAFT_KEY). This is NOT authoritative —
+// it's whatever was last saved *from this device*. A reinstall, a new
+// device, or an edit made elsewhere (e.g. by an admin) won't be
+// reflected until the backend adds a real read endpoint for this data.
+// User-level fields (email, region, town, profileImageUrl,
+// ghanaCardNumber, createdAt) ARE real, fetched via GET /users/me
+// through the auth store, and don't have this limitation.
+// ---------------------------------------------------------------------
+const DRAFT_KEY = "factoryProfileDraft";
+
+interface CachedFactoryDraft {
+  companyName?: string;
+  description?: string;
+  sectorTagsInput?: string;
+  machineryList?: string;
+  minOrderQuantity?: string;
+  maxOrderQuantity?: string;
+  address?: string;
+}
+
+// Machinery is stored server-side as a JSON array string (see
+// EditManufacturerProfile's handleSave), so parse it back into a
+// readable, comma-joined list here. Falls back to treating it as a
+// plain comma list if it isn't valid JSON, so older cached drafts
+// (saved before that fix) still render something sensible instead of
+// a raw JSON string.
+const parseMachineryList = (raw?: string): string[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter(Boolean);
+  } catch {
+    // Not JSON — fall through to comma-split.
+  }
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const parseSectorTags = (raw?: string): string[] =>
+  (raw || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+
+// Basic sanity check before attempting a tel:/mailto: deep link, so we
+// don't fire Linking.openURL on placeholder strings like "Not provided".
+const isUsableContactValue = (value: string) =>
+  Boolean(value) && value !== "Not provided";
+
 // ── Star rating ──────────────────────────────────────────────────────────────
 const StarRating = ({ rating, count }: { rating: number; count: number }) => {
   const full = Math.floor(rating);
@@ -67,45 +128,97 @@ const StarRating = ({ rating, count }: { rating: number; count: number }) => {
   );
 };
 
-// ── Info Row ──────────────────────────────────────────────────
+// ── Info Row v2 ─────────────────────────────────────────────
+// variant "action"   -> tinted icon + chevron, tappable to open a deep link
+// variant "readonly" -> neutral icon + copy glyph, tap still shows full value
+// variant "default"  -> neutral icon, no trailing glyph, tap shows full value
+type InfoRowVariant = "default" | "action" | "readonly";
+
 const InfoRow = ({
   icon,
   label,
   value,
   theme,
   last,
+  variant = "default",
+  onPress,
+  multiline,
 }: {
   icon: string;
   label: string;
   value: string;
   theme: Theme;
   last?: boolean;
-}) => (
-  <Pressable
-    style={[
-      styles.infoRow,
-      !last && { borderBottomWidth: 1, borderBottomColor: theme.border + "60" },
-    ]}
-    onPress={() => Alert.alert(label, value)}
-  >
-    <View style={styles.infoLeft}>
+  variant?: InfoRowVariant;
+  onPress?: () => void;
+  multiline?: boolean;
+}) => {
+  const [pressed, setPressed] = useState(false);
+
+  const handlePress = () => {
+    if (onPress) return onPress();
+    Alert.alert(label, value);
+  };
+
+  return (
+    <Pressable
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={handlePress}
+      style={[
+        styles.infoRowV2,
+        !last && {
+          borderBottomWidth: 1,
+          borderBottomColor: theme.border + "40",
+        },
+        pressed && { backgroundColor: theme.primary + "06" },
+      ]}
+    >
+      {pressed && (
+        <View style={[styles.accentBar, { backgroundColor: theme.primary }]} />
+      )}
+
       <View
-        style={[styles.infoIconWrap, { backgroundColor: theme.primary + "0A" }]}
+        style={[
+          styles.infoIconWrapV2,
+          {
+            backgroundColor:
+              variant === "action" ? theme.primary + "12" : theme.border + "50",
+          },
+        ]}
       >
-        <Ionicons name={icon as any} size={15} color={theme.primary} />
+        <Ionicons
+          name={icon as any}
+          size={15}
+          color={variant === "action" ? theme.primary : theme.textSecondary}
+        />
       </View>
-      <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
-        {label}
-      </Text>
-    </View>
-    <View style={styles.infoRight}>
-      <Text style={[styles.infoValue, { color: theme.text }]} numberOfLines={1}>
-        {value}
-      </Text>
-      <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
-    </View>
-  </Pressable>
-);
+
+      <View style={styles.infoBodyV2}>
+        <Text style={[styles.infoLabelV2, { color: theme.textSecondary }]}>
+          {label}
+        </Text>
+        <Text
+          style={[styles.infoValueV2, { color: theme.text }]}
+          numberOfLines={multiline ? 2 : 1}
+        >
+          {value}
+        </Text>
+      </View>
+
+      {variant === "action" && (
+        <Ionicons
+          name="chevron-forward"
+          size={15}
+          color={theme.textSecondary}
+        />
+      )}
+      {variant === "readonly" && (
+        <Ionicons name="copy-outline" size={14} color={theme.textSecondary} />
+      )}
+    </Pressable>
+  );
+};
 
 // ── Section ────────────────────────────────────────────────────
 const Section = ({
@@ -145,6 +258,9 @@ export default function ManufacturerProfile() {
     completedOrders: 0,
     totalEarned: 0,
   });
+  const [factoryDraft, setFactoryDraft] = useState<CachedFactoryDraft | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -189,35 +305,56 @@ export default function ManufacturerProfile() {
     };
 
     fetchData();
+
+    const loadCachedFactoryDraft = async () => {
+      try {
+        const raw = await mmkvStorage.getItem(DRAFT_KEY);
+        if (raw) setFactoryDraft(JSON.parse(raw));
+      } catch (e) {
+        console.warn("Failed to load cached factory draft:", e);
+      }
+    };
+    loadCachedFactoryDraft();
   }, [hasHydrated, token]);
 
-  // Build profile object from store's user data
+  const sectorTags = parseSectorTags(factoryDraft?.sectorTagsInput);
+  const machineryItems = parseMachineryList(factoryDraft?.machineryList);
+  const hasFactoryDetails = Boolean(
+    factoryDraft?.companyName || sectorTags.length > 0,
+  );
+
+  const registrationYear = user?.createdAt
+    ? new Date(user.createdAt).getFullYear().toString()
+    : null;
+
   const profile = {
-    companyName: user?.fullName || "Manufacturer",
-    initials: user?.fullName
-      ? user.fullName
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2)
-      : "MF",
+    companyName: factoryDraft?.companyName || user?.fullName || "Manufacturer",
+    initials: (factoryDraft?.companyName || user?.fullName || "MF")
+      .split(" ")
+      .map((n) => n[0])
+      .filter(Boolean)
+      .join("")
+      .toUpperCase()
+      .slice(0, 2),
     verified: user?.isVerified || false,
-    bio: "Short bio about the manufacturer.",
+    bio: factoryDraft?.description || "No company description added yet.",
     city: (user as any)?.town || "City",
     region: user?.region || "Region",
     country: "Ghana",
-    registrationNumber: "N/A",
-    since: new Date().getFullYear().toString(),
-    category: "Manufacturing",
-    email: "N/A",
-    phone: user?.phoneNumber || "N/A",
-    website: "N/A",
-    bankName: "N/A",
-    accountNumber: "N/A",
-    accountName: "N/A",
-    avatarUri: user?.profileImageUrl || null,
+    registrationNumber: (user as any)?.ghanaCardNumber || "Not provided",
+    since: registrationYear || new Date().getFullYear().toString(),
+    sectorTags,
+    machineryItems,
+    minOrderQuantity: factoryDraft?.minOrderQuantity || null,
+    maxOrderQuantity: factoryDraft?.maxOrderQuantity || null,
+    address: factoryDraft?.address || null,
+
+    website: "Not provided",
+    email: (user as any)?.email || "Not provided",
+    phone: user?.phoneNumber || "Not provided",
+    avatarUri: (user as any)?.profileImageUrl || null,
     coverUri: null,
+
     averageRating: 0,
     ratingCount: 0,
     stats: {
@@ -244,6 +381,9 @@ export default function ManufacturerProfile() {
       ],
     );
   };
+
+  const goToEdit = () =>
+    router.push("/(screens)/(manufacturer)/(screens)/editProfile");
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 60, 100],
@@ -275,7 +415,7 @@ export default function ManufacturerProfile() {
           },
         ]}
       >
-        <Text style={{ color: theme.textSecondary }}>Loading profile...</Text>
+        <ActivityIndicator size="small" color={theme.primary} />
       </View>
     );
   }
@@ -325,9 +465,7 @@ export default function ManufacturerProfile() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() =>
-            router.push("/(screens)/(manufacturer)/(screens)/editProfile")
-          }
+          onPress={goToEdit}
           style={[
             styles.navBtn,
             { backgroundColor: theme.cardBackground + "E0" },
@@ -415,40 +553,39 @@ export default function ManufacturerProfile() {
                 )}
               </View>
 
-              <View style={styles.subDetailRow}>
-                <Ionicons
-                  name="location-outline"
-                  size={13}
-                  color={theme.textSecondary}
-                />
-                <Text
-                  style={[styles.subDetailText, { color: theme.textSecondary }]}
-                >
-                  {p.city}, {p.region}
-                </Text>
-                <View
-                  style={[
-                    styles.dotSeparator,
-                    { backgroundColor: theme.border },
-                  ]}
-                />
-                <StarRating rating={p.averageRating} count={p.ratingCount} />
-              </View>
-
               <View style={styles.tagShelf}>
-                <View
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: theme.primary + "0A",
-                      borderColor: theme.primary + "1A",
-                    },
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: theme.primary }]}>
-                    {p.category}
-                  </Text>
-                </View>
+                {p.sectorTags.length > 0 ? (
+                  p.sectorTags.map((tag) => (
+                    <View
+                      key={tag}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: theme.primary + "0A",
+                          borderColor: theme.primary + "1A",
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: theme.primary }]}>
+                        {tag}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: theme.primary + "0A",
+                        borderColor: theme.primary + "1A",
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.chipText, { color: theme.primary }]}>
+                      Manufacturing
+                    </Text>
+                  </View>
+                )}
                 <View
                   style={[
                     styles.chip,
@@ -466,6 +603,23 @@ export default function ManufacturerProfile() {
                 </View>
               </View>
 
+              <View style={[styles.subDetailRow, { marginTop: 10 }]}>
+                <Ionicons
+                  name="location-outline"
+                  size={13}
+                  color={theme.textSecondary}
+                />
+                <Text
+                  style={[styles.subDetailText, { color: theme.textSecondary }]}
+                >
+                  {p.city}, {p.region}
+                </Text>
+              </View>
+
+              <View style={{ marginTop: 10 }}>
+                <StarRating rating={p.averageRating} count={p.ratingCount} />
+              </View>
+
               <View
                 style={[
                   styles.divider,
@@ -478,6 +632,45 @@ export default function ManufacturerProfile() {
               </Text>
             </View>
           </View>
+
+          {!hasFactoryDetails && (
+            <TouchableOpacity
+              onPress={goToEdit}
+              activeOpacity={0.85}
+              style={[
+                styles.setupBanner,
+                {
+                  backgroundColor: theme.primary + "0A",
+                  borderColor: theme.primary + "1A",
+                },
+              ]}
+            >
+              <Ionicons
+                name="construct-outline"
+                size={18}
+                color={theme.primary}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.setupBannerTitle, { color: theme.text }]}>
+                  Finish setting up your company profile
+                </Text>
+                <Text
+                  style={[
+                    styles.setupBannerSubtitle,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Add your company name, sectors, and details so buyers can find
+                  you.
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
 
           <View
             style={[
@@ -543,18 +736,103 @@ export default function ManufacturerProfile() {
                 label="Email Address"
                 value={p.email}
                 theme={theme}
+                variant={isUsableContactValue(p.email) ? "action" : "default"}
+                onPress={
+                  isUsableContactValue(p.email)
+                    ? () => Linking.openURL(`mailto:${p.email}`)
+                    : undefined
+                }
               />
               <InfoRow
                 icon="call-outline"
                 label="Business Line"
                 value={p.phone}
                 theme={theme}
+                variant={isUsableContactValue(p.phone) ? "action" : "default"}
+                onPress={
+                  isUsableContactValue(p.phone)
+                    ? () => Linking.openURL(`tel:${p.phone}`)
+                    : undefined
+                }
               />
               <InfoRow
                 icon="globe-outline"
                 label="Corporate Website"
                 value={p.website}
                 theme={theme}
+                last={!p.address}
+              />
+              {p.address && (
+                <InfoRow
+                  icon="location-outline"
+                  label="Factory Address"
+                  value={p.address}
+                  theme={theme}
+                  variant="readonly"
+                  multiline
+                  last
+                />
+              )}
+            </View>
+          </Section>
+
+          {(p.minOrderQuantity ||
+            p.maxOrderQuantity ||
+            p.machineryItems.length > 0) && (
+            <Section title="Capacity" theme={theme}>
+              <View
+                style={[
+                  styles.groupedCard,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                {(p.minOrderQuantity || p.maxOrderQuantity) && (
+                  <InfoRow
+                    icon="cube-outline"
+                    label="Order Quantity Range"
+                    value={
+                      p.minOrderQuantity && p.maxOrderQuantity
+                        ? `${p.minOrderQuantity} – ${p.maxOrderQuantity} units`
+                        : `${p.minOrderQuantity || p.maxOrderQuantity} units`
+                    }
+                    theme={theme}
+                    last={p.machineryItems.length === 0}
+                  />
+                )}
+                {p.machineryItems.length > 0 && (
+                  <InfoRow
+                    icon="construct-outline"
+                    label="Machinery"
+                    value={p.machineryItems.join(", ")}
+                    theme={theme}
+                    variant="readonly"
+                    multiline
+                    last
+                  />
+                )}
+              </View>
+            </Section>
+          )}
+
+          <Section title="Registration" theme={theme}>
+            <View
+              style={[
+                styles.groupedCard,
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <InfoRow
+                icon="card-outline"
+                label="Ghana Card Number"
+                value={p.registrationNumber}
+                theme={theme}
+                variant="readonly"
                 last
               />
             </View>
@@ -731,13 +1009,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   subDetailText: { fontSize: 13, marginLeft: 3, fontWeight: "500" },
-  dotSeparator: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginHorizontal: 8,
-    opacity: 0.6,
-  },
   starContainer: { flexDirection: "row", alignItems: "center", gap: 2 },
   starText: {
     fontSize: 12.5,
@@ -747,6 +1018,7 @@ const styles = StyleSheet.create({
   },
   tagShelf: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
     marginTop: 14,
     justifyContent: "center",
@@ -765,6 +1037,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 8,
   },
+  setupBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+  },
+  setupBannerTitle: { fontSize: 13.5, fontWeight: "600" },
+  setupBannerSubtitle: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   section: { marginBottom: 20 },
   sectionTitle: {
     fontSize: 11,
@@ -774,30 +1057,48 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   groupedCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
-  infoRow: {
+
+  infoRowV2: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
+    alignItems: "flex-start",
+    gap: 12,
+    paddingVertical: 13,
     paddingHorizontal: 16,
+    position: "relative",
   },
-  infoLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  infoIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+  accentBar: {
+    position: "absolute",
+    left: 0,
+    top: 8,
+    bottom: 8,
+    width: 3,
+    borderRadius: 2,
+  },
+  infoIconWrapV2: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 1,
   },
-  infoLabel: { fontSize: 13.5, fontWeight: "500" },
-  infoRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    justifyContent: "flex-end",
+  infoBodyV2: {
     flex: 1,
   },
-  infoValue: { fontSize: 13.5, fontWeight: "500", maxWidth: "80%" },
+  infoLabelV2: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+    marginBottom: 2,
+    textTransform: "uppercase",
+    opacity: 0.75,
+  },
+  infoValueV2: {
+    fontSize: 14.5,
+    fontWeight: "500",
+    lineHeight: 19,
+  },
+
   toggleConfigRow: {
     flexDirection: "row",
     alignItems: "center",

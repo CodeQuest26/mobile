@@ -170,41 +170,11 @@ const CertificationBadge = ({
   );
 };
 
-// const [fetchedData, setFetchedData] = useState();
-// const [loading, setLoading] = useState(false);
-
-// const fetchFactoryProfile = useCallback(async () => {
-//   try {
-//     setLoading(true);
-
-//     const response = await api.get("/user/factory-profile");
-
-//     setFetchedData(response.data);
-
-//     console.log("Factory Profile:", response.data);
-//   } catch (error) {
-//     console.log("Error fetching factory profile:", error);
-//   } finally {
-//     setLoading(false);
-//   }
-// }, []);
-
-// useFocusEffect(
-//   useCallback(() => {
-//     fetchFactoryProfile();
-//   }, [fetchFactoryProfile]),
-// );
-
-// useEffect(() => {
-//   console.log("Updated Data:", fetchedData);
-// }, [fetchedData]);
-
 const ManufacturerProfile = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
 
-  // Mock manufacturer data - in real app, fetch by ID
   const manufacturer =
     MOCK_MANUFACTURERS.find((m) => m.id === id) || MOCK_MANUFACTURERS[0];
 
@@ -253,6 +223,7 @@ const ManufacturerProfile = () => {
                     .join("")}
                 </Text>
               </View>
+
               <View style={styles.heroText}>
                 <Text style={[styles.manufacturerName, { color: theme.text }]}>
                   {manufacturer.name}
@@ -272,8 +243,9 @@ const ManufacturerProfile = () => {
                     {manufacturer.location}
                   </Text>
                 </View>
+
                 <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={16} color="#FBBF24" />
+                  <Ionicons name="star" size={16} color={theme.warning} />
                   <Text style={[styles.ratingText, { color: theme.text }]}>
                     {manufacturer.rating} ({manufacturer.completedJobs} jobs
                     completed)

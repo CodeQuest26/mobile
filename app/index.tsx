@@ -2,15 +2,20 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 
 import {
-  getSavedRole,
-  hasCompletedOnboarding,
-  hasSelectedRole,
+    getSavedRole,
+    hasCompletedOnboarding,
+    hasSelectedRole,
 } from "@/storage/storage";
 import { useAuthStore } from "@/store/auth";
 
 export default function Index() {
-  const { isAuthenticated, hasHydrated, user, pendingVerificationPhone } =
-    useAuthStore();
+  const {
+    isAuthenticated,
+    hasHydrated,
+    user,
+    pendingVerificationPhone,
+    token,
+  } = useAuthStore();
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -18,6 +23,12 @@ export default function Index() {
     const onboarded = hasCompletedOnboarding();
     const rolePicked = hasSelectedRole();
     const savedRole = getSavedRole();
+    const liveRole = user?.role ?? savedRole;
+
+    if (!token && !isAuthenticated) {
+      router.replace("/(auth)/login");
+      return;
+    }
 
     if (!rolePicked) {
       router.replace("/(auth)");
@@ -35,19 +46,18 @@ export default function Index() {
         pathname: "/(auth)/OTPVerification",
         params: {
           phoneNumber: pendingVerificationPhone,
-          role: savedRole,
+          role: liveRole,
         },
       });
       return;
     }
 
-    if (!isAuthenticated) {
-      router.replace("/(auth)/login");
+    if (!isAuthenticated || !user?.role) {
       return;
     }
 
     // At this point user is fully authenticated and verified
-    switch (user?.role) {
+    switch (liveRole) {
       case "FACTORY_OWNER":
         router.replace("/(screens)/(manufacturer)/(tabs)");
         break;
@@ -60,7 +70,7 @@ export default function Index() {
       default:
         router.replace("/(auth)/login");
     }
-  }, [hasHydrated, isAuthenticated, pendingVerificationPhone, user]);
+  }, [hasHydrated, isAuthenticated, pendingVerificationPhone, token, user]);
 
   return null;
 }

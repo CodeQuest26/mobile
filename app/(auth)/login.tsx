@@ -41,12 +41,10 @@ const ROLE_META = {
 
 interface InputFieldProps {
   label: string;
-  icon: any;
+  icon: string;
   value: string;
   onChangeText: any;
   secureTextEntry: any;
-  keyboardType: string;
-  autoCapitalize: string;
   rightSlot: any;
   theme: any;
 }
@@ -57,49 +55,55 @@ const InputField = ({
   value,
   onChangeText,
   secureTextEntry,
-  keyboardType,
-  autoCapitalize,
   rightSlot,
   theme,
-}: InputFieldProps) => (
-  <View style={styles.fieldWrapper}>
-    <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-      {label}
-    </Text>
-    <View
-      style={[
-        styles.inputRow,
-        { backgroundColor: theme.cardBackground, borderColor: theme.border },
-      ]}
-    >
-      <Ionicons
-        name={icon}
-        size={24}
-        color={theme.textSecondary}
-        style={{ marginRight: 10 }}
-      />
+}: InputFieldProps) => {
+  return (
+    <View style={styles.fieldWrapper}>
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+        {label}
+      </Text>
+      <View
+        style={[
+          styles.inputRow,
+          { backgroundColor: theme.cardBackground, borderColor: theme.border },
+        ]}
+      >
+        <Ionicons
+          name={icon as any}
+          color={theme.textSecondary}
+          style={{ marginRight: 10 }}
+        />
 
-      <TextInput
-        style={[styles.input, { color: theme.text }]}
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType || "default"}
-        autoCapitalize={autoCapitalize || "none"}
-        placeholderTextColor={theme.textSecondary + "80"}
-        placeholder={label}
-      />
-      {rightSlot}
+        <TextInput
+          style={[styles.input, { color: theme.text }]}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          placeholderTextColor={theme.textSecondary + "80"}
+          placeholder={label}
+        />
+        {rightSlot}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const LoginScreen = () => {
-  const colorScheme = useColorScheme();
-  const theme = Colors[colorScheme] || Colors.light;
+  const colorScheme = useColorScheme() ?? "light";
+  const resolvedColorScheme: "light" | "dark" =
+    colorScheme === "dark" ? "dark" : "light";
+  const theme =
+    (Colors as Record<string, any>)[resolvedColorScheme] || Colors.light;
 
   const selectedRole = storage.getString("selectedRole");
-  const roleMeta = ROLE_META[selectedRole];
+  const fallbackRoleKey = "SME_OWNER" as keyof typeof ROLE_META;
+  const roleKey =
+    typeof selectedRole === "string" && selectedRole in ROLE_META
+      ? (selectedRole as keyof typeof ROLE_META)
+      : fallbackRoleKey;
+  const roleMeta =
+    (ROLE_META as Record<string, any>)[roleKey] ?? ROLE_META[fallbackRoleKey];
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
@@ -129,11 +133,16 @@ const LoginScreen = () => {
     try {
       await login(phoneNumber, password);
       const state = useAuthStore.getState();
+      const roleForFlow = state?.user?.role || selectedRole;
+
+      if (roleForFlow) {
+        storage.set("selectedRole", roleForFlow);
+      }
 
       // Not yet verified — this account still needs to complete OTP.
       router.replace({
         pathname: "/OTPVerification",
-        params: { phoneNumber, role: state?.user?.role },
+        params: { phoneNumber, role: roleForFlow },
       });
     } catch (e: any) {
       Alert.alert("Error", e.message);
@@ -164,7 +173,11 @@ const LoginScreen = () => {
               { backgroundColor: theme.primary + "15" },
             ]}
           >
-            <Ionicons name={roleMeta.icon} size={14} color={theme.primary} />
+            <Ionicons
+              name={roleMeta.icon as any}
+              size={14}
+              color={theme.primary}
+            />
             <Text style={[styles.roleBadgeText, { color: theme.primary }]}>
               {roleMeta.label}
             </Text>
@@ -187,10 +200,8 @@ const LoginScreen = () => {
             icon="call-outline"
             value={phoneNumber}
             onChangeText={setPhoneNumber}
-            keyboardType="phone-pad"
             theme={theme}
             secureTextEntry={undefined}
-            autoCapitalize={"none"}
             rightSlot={undefined}
           />
 
@@ -215,8 +226,6 @@ const LoginScreen = () => {
                 />
               </Pressable>
             }
-            keyboardType={"default"}
-            autoCapitalize={"none"}
           />
 
           <Spacer style={{ height: 10 }} />

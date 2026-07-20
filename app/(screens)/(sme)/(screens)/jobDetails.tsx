@@ -56,6 +56,13 @@ interface BidApiResponse {
   createdAt: string;
 }
 
+// Trimmed OrderDetailResponse — just enough to resolve a bid's order
+// and hand its id to the payment endpoint.
+interface OrderApiResponse {
+  id: string;
+  bidId: string;
+}
+
 // ---------- Local display types (what BidCard / ManufacturerModal expect) ----------
 interface DisplayManufacturer {
   id: string;
@@ -101,8 +108,6 @@ function mapApiStatusToTab(status: string): DisplayJob["status"] {
 
 function mapBidStatus(status: string): BidStatus {
   if (status === "ACCEPTED") return "accepted";
-  // REJECTED, WITHDRAWN, EXPIRED all read as "rejected" in this UI —
-  // there's no separate visual state for withdrawn/expired bids yet.
   if (status === "REJECTED" || status === "WITHDRAWN" || status === "EXPIRED") {
     return "rejected";
   }
@@ -124,11 +129,6 @@ function transformBid(bid: BidApiResponse): DisplayBid {
     manufacturer: {
       id: bid.factoryId,
       name: bid.factoryName,
-      // The API's BidDetailResponse doesn't include factory profile
-      // data (logo, rating, location, description) and there's no
-      // public factory-lookup endpoint in the spec to fetch it from
-      // separately — only an admin-only one. These are placeholders
-      // until that data is exposed somewhere.
       logo: null,
       verified: false,
       rating: 0,
@@ -160,7 +160,6 @@ function transformJob(job: JobApiResponse, bids: BidApiResponse[]): DisplayJob {
   };
 }
 
-// Info row component (unchanged)
 const InfoRow = ({ icon, label, value, theme, valueColor }: any) => (
   <View style={styles.infoRow}>
     <View
@@ -190,6 +189,10 @@ const JobDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const [acceptingBidId, setAcceptingBidId] = useState<string | null>(null);
   const [selectedBid, setSelectedBid] = useState<DisplayBid | null>(null);
+  // Drives the per-card spinner on BidCard's own quick-action button —
+  // separate from ManufacturerModal's internal "resolvingPayment"
+  // state, since that button lives outside the modal.
+  const [payingBidId, setPayingBidId] = useState<string | null>(null);
 
   const fetchJobDetails = useCallback(async () => {
     if (!id) return;
@@ -220,11 +223,56 @@ const JobDetails = () => {
     fetchJobDetails();
   }, [fetchJobDetails]);
 
+  const handleAcceptBid = async () => {
+    if (!selectedBid) return;
+
+    try {
+      setAcceptingBidId(selectedBid.id);
+      await api.patch(`bids/${selectedBid.id}/accept`);
+      await fetchJobDetails();
+      setSelectedBid(null);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        console.log(
+          "ACCEPT BID ERROR:",
+          err.response?.status,
+          err.response?.data,
+        );
+      } else {
+        console.log(err);
+      }
+      setError("Failed to accept bid. Please try again.");
+    } finally {
+      setAcceptingBidId(null);
+    }
+  };
+
+  const handleRejectBid = () => {
+    if (!selectedBid) return;
+
+    console.warn(
+      "handleRejectBid: no backend endpoint exists for this — local UI only.",
+    );
+
+    setJob((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        bids: prev.bids.map((b) =>
+          b.id === selectedBid.id
+            ? { ...b, status: "rejected" as BidStatus }
+            : b,
+        ),
+      };
+    });
+    setSelectedBid(null);
+  };
+
   if (loading) {
     return (
       <MainContainer safe>
         <View style={styles.notFound}>
-          <ActivityIndicator size="large" color={theme.primary} />
+          <ActivityIndicator size="small" color={theme.primary} />
         </View>
       </MainContainer>
     );
@@ -259,62 +307,6 @@ const JobDetails = () => {
   const daysLeft = getDaysUntilDeadline(job.deadline);
   const isUrgent = daysLeft <= 7 && job.status === "active";
   const visibleBids = job.bids.filter((bid) => bid.status !== "rejected");
-
-  const handleAcceptBid = async () => {
-    if (!selectedBid) return;
-
-    try {
-      setAcceptingBidId(selectedBid.id);
-
-      // Real endpoint: PATCH /api/v1/bids/{bidId}/accept — no request body.
-      await api.patch(`bids/${selectedBid.id}/accept`);
-
-      // Refetch so we get the server's actual resulting state for this
-      // bid and any others the backend may have auto-rejected as a
-      // side effect of accepting one (the spec doesn't document that
-      // behavior either way, so don't assume — just re-pull truth).
-      await fetchJobDetails();
-      setSelectedBid(null);
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        console.log(
-          "ACCEPT BID ERROR:",
-          err.response?.status,
-          err.response?.data,
-        );
-      } else {
-        console.log(err);
-      }
-      setError("Failed to accept bid. Please try again.");
-    } finally {
-      setAcceptingBidId(null);
-    }
-  };
-
-  const handleRejectBid = () => {
-    if (!selectedBid) return;
-
-    // NOTE: There is no reject/decline endpoint in the API spec — only
-    // POST /api/v1/bids/{bidId}/accept exists. This only updates local
-    // UI state and does NOT persist to the backend. If you need real
-    // bid rejection, that endpoint needs to be added server-side first.
-    console.warn(
-      "handleRejectBid: no backend endpoint exists for this — local UI only.",
-    );
-
-    setJob((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        bids: prev.bids.map((b) =>
-          b.id === selectedBid.id
-            ? { ...b, status: "rejected" as BidStatus }
-            : b,
-        ),
-      };
-    });
-    setSelectedBid(null);
-  };
 
   return (
     <MainContainer safe>
@@ -462,7 +454,6 @@ const JobDetails = () => {
                   styles.noBidsBox,
                   {
                     backgroundColor: theme.cardBackground,
-                    borderColor: theme.border,
                   },
                 ]}
               >
@@ -496,10 +487,12 @@ const JobDetails = () => {
         visible={!!selectedBid}
         manufacturer={selectedBid?.manufacturer ?? null}
         bid={selectedBid}
+        orderId={selectedBid?.id}
         theme={theme}
         onClose={() => setSelectedBid(null)}
         onAccept={handleAcceptBid}
         onReject={handleRejectBid}
+        onPaymentComplete={fetchJobDetails}
       />
     </MainContainer>
   );
@@ -530,7 +523,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.07,
     shadowRadius: 12,
-    elevation: 4,
   },
   heroInner: { padding: 16 },
   heroTop: {
@@ -565,7 +557,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 2,
   },
   infoRow: {
     flexDirection: "row",

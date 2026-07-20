@@ -5,6 +5,7 @@ import { mmkvStorage } from "@/store/mmkv";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { BlurView } from "expo-blur";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router } from "expo-router";
@@ -14,6 +15,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -50,6 +52,10 @@ const SAVE_DEBOUNCE_MS = 500;
 // Matches CreateFactoryProfileRequest from the OpenAPI spec exactly.
 // Used as the body for both createFactoryProfile (POST) and
 // updateFactoryProfile (PUT) — they share the same request schema.
+//
+// The schema now includes email, region, town, and profileImageUrl —
+// so the uploaded Cloudinary URL from pickAndUploadLogo can be sent
+// straight through as `profileImageUrl` instead of staying local-only.
 interface FactoryProfilePayload {
   companyName: string;
   description?: string;
@@ -60,11 +66,19 @@ interface FactoryProfilePayload {
   latitude?: number;
   longitude?: number;
   address?: string;
+  email?: string;
+  region?: string;
+  town?: string;
+  profileImageUrl?: string;
 }
 
 // Local draft shape — everything the form needs to fully restore itself,
 // including raw string inputs (like sectorTagsInput) rather than the
 // parsed payload, so partially-typed values aren't lost either.
+// `logoUrl` is persisted locally AND sent to the backend now (as
+// `profileImageUrl` — see handleSave), so it's kept as its own field
+// here rather than a raw string input, since it's set by the upload
+// flow rather than typed by the user.
 interface FactoryProfileDraft {
   companyName: string;
   description: string;
@@ -75,6 +89,10 @@ interface FactoryProfileDraft {
   address: string;
   latitude: number | null;
   longitude: number | null;
+  logoUrl: string | null;
+  email: string;
+  region: string;
+  town: string;
 }
 
 const emptyDraft: FactoryProfileDraft = {
@@ -87,6 +105,10 @@ const emptyDraft: FactoryProfileDraft = {
   address: "",
   latitude: null,
   longitude: null,
+  logoUrl: null,
+  email: "",
+  region: "",
+  town: "",
 };
 
 // Parses a numeric text field into a clean integer or undefined —
@@ -101,6 +123,58 @@ const parseIntOrUndefined = (value: string): number | undefined => {
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
+// ---------------------------------------------------------------------
+// Cloudinary upload integration — POST /api/v1/files/upload
+//
+// Matches the "File Uploads" tag in the OpenAPI spec:
+//   requestBody: multipart/form-data, field name "file"
+//   200 response: { url: string, ...other string keys }
+//
+// On React Native, FormData needs the RN-specific { uri, name, type }
+// shape (not a browser File/Blob), and the Content-Type header must be
+// left for axios/RN to set with the correct multipart boundary — hand-
+// setting it to a bare "multipart/form-data" string strips the
+// boundary param and the request fails server-side with EMPTY_FILE.
+// Auth is assumed to be attached by an axios interceptor on `api`,
+// same as every other call in this file (api.get/put/post elsewhere
+// never pass an Authorization header manually).
+// ---------------------------------------------------------------------
+async function uploadFileToServer(
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<string> {
+  const formData = new FormData();
+
+  const filename =
+    asset.fileName || asset.uri.split("/").pop() || `upload-${Date.now()}.jpg`;
+  const extMatch = /\.(\w+)$/.exec(filename);
+  const inferredType = extMatch
+    ? `image/${extMatch[1].toLowerCase()}`
+    : "image/jpeg";
+
+  // RN FormData file entry — NOT a web File object.
+  formData.append("file", {
+    uri: asset.uri,
+    name: filename,
+    type: asset.mimeType || inferredType,
+  } as any);
+
+  const { data } = await api.post("files/upload", formData, {
+    headers: {
+      Accept: "application/json",
+      // Do NOT set 'Content-Type': 'multipart/form-data' here — RN's
+      // fetch/XHR layer fills in the multipart boundary automatically
+      // when it detects a FormData body. Overriding it manually is a
+      // common cause of "EMPTY_FILE" errors from this endpoint.
+    },
+  });
+
+  if (!data?.url) {
+    throw new Error("Upload succeeded but no URL was returned.");
+  }
+
+  return data.url as string;
+}
+
 export default function EditManufacturerProfile() {
   const { theme, colorScheme } = useTheme();
   const isDark = colorScheme === "dark";
@@ -108,8 +182,12 @@ export default function EditManufacturerProfile() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Read-only, pulled from the real user object (GET /users/me).
+  // displayName is updated locally after a successful save if the
+  // companyName changed — see handleSave — so this screen doesn't need
+  // a re-fetch just to reflect the sync it triggered itself.
   const [displayName, setDisplayName] = useState("");
   const [displayPhone, setDisplayPhone] = useState("");
 
@@ -118,6 +196,15 @@ export default function EditManufacturerProfile() {
   const [draft, setDraft] = useState<FactoryProfileDraft>(emptyDraft);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Whether we've ever successfully created a profile for this user
+  // (see the PROFILE_CREATED_KEY comment above). Drives which verb
+  // handleSave tries FIRST — this matters because PUTing a
+  // factory-profile row that doesn't exist yet throws a 500 on the
+  // backend (NPE on update-of-nonexistent-entity), not a clean 404,
+  // so we can't rely on catching 404 alone to decide when to fall
+  // back to POST.
+  const [profileExists, setProfileExists] = useState(false);
 
   // Tracks whether the initial load has finished, so the debounce-save
   // effect below doesn't immediately overwrite the saved draft with the
@@ -141,18 +228,25 @@ export default function EditManufacturerProfile() {
 
       // Check for existing draft
       const raw = await mmkvStorage.getItem(DRAFT_KEY);
+      const createdFlag = await mmkvStorage.getItem(PROFILE_CREATED_KEY);
+      setProfileExists(createdFlag === "true");
 
       if (raw) {
         const restored: FactoryProfileDraft = JSON.parse(raw);
 
-        // Always use the latest full name as the default company name
-        restored.companyName = user.fullName || "";
-
-        setDraft(restored);
+        // Spread over emptyDraft (not the other way round) so any
+        // fields added to the schema since this draft was cached —
+        // logoUrl, email, region, town — fall back to sane empty
+        // values instead of surfacing as undefined in controlled inputs.
+        setDraft({ ...emptyDraft, ...restored });
       } else {
         setDraft({
           ...emptyDraft,
-          companyName: user.fullName || "", // Default company name
+          // Starting point for brand-new profiles — companyName and
+          // fullName are meant to stay in sync going forward (see
+          // handleSave), so it makes sense to seed the field with the
+          // account's existing name rather than leaving it blank.
+          companyName: user.fullName || "",
         });
       }
     } catch (error) {
@@ -187,6 +281,50 @@ export default function EditManufacturerProfile() {
 
   const updateDraft = (patch: Partial<FactoryProfileDraft>) =>
     setDraft((prev) => ({ ...prev, ...patch }));
+
+  // Pick a logo/cover image from the library and upload it immediately,
+  // mirroring the "upload on select" pattern from the integration guide
+  // (ProfileAvatarUpload). Stores the resulting Cloudinary URL in the
+  // draft so it survives navigation/app restarts, same as every other
+  // field here.
+  const pickAndUploadLogo = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "We need photo library access to set your company logo.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    setUploadingLogo(true);
+    try {
+      const url = await uploadFileToServer(asset);
+      updateDraft({ logoUrl: url });
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.log(
+          "Logo upload failed — response body:",
+          error.response?.data,
+        );
+        console.log("Status:", error.response?.status);
+      }
+      console.error("Failed to upload logo:", error);
+      Alert.alert("Upload failed", handleApiError(error));
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const fetchCurrentLocation = async () => {
     setLocationLoading(true);
@@ -279,6 +417,11 @@ export default function EditManufacturerProfile() {
       newErrors.maxOrderQuantity = "Max must be greater than min";
     }
 
+    const trimmedEmail = draft.email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      newErrors.email = "Enter a valid email address";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -291,40 +434,89 @@ export default function EditManufacturerProfile() {
       .map((tag) => tag.trim())
       .filter(Boolean);
 
+    // Despite CreateFactoryProfileRequest.machineryList being typed as a
+    // plain `string` in the OpenAPI schema, the backend column is
+    // actually json/jsonb — Postgres rejects anything that isn't valid
+    // JSON syntax with a DATABASE_ERROR (confirmed via the working
+    // Swagger sample, which sent a JSON-encoded array as this string).
+    // So the free-text, comma-separated UI input has to be converted
+    // into a JSON array string, the same way sectorTagsInput already
+    // gets split into an array — just JSON-encoded rather than sent
+    // as a raw array, since the schema still says `string`.
+    const machineryItems = draft.machineryList
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
     const payload: FactoryProfilePayload = {
       companyName: draft.companyName.trim(),
       sectorTags,
       description: draft.description.trim() || undefined,
-      machineryList: draft.machineryList.trim() || undefined,
+      machineryList:
+        machineryItems.length > 0 ? JSON.stringify(machineryItems) : undefined,
       minOrderQuantity: parseIntOrUndefined(draft.minOrderQuantity),
       maxOrderQuantity: parseIntOrUndefined(draft.maxOrderQuantity),
       address: draft.address.trim() || undefined,
       latitude: draft.latitude !== null ? draft.latitude : undefined,
       longitude: draft.longitude !== null ? draft.longitude : undefined,
+      email: draft.email.trim() || undefined,
+      region: draft.region.trim() || undefined,
+      town: draft.town.trim() || undefined,
+      profileImageUrl: draft.logoUrl || undefined,
     };
 
     setLoading(true);
 
-    try {
-      // No leading slash — baseURL already includes /api/v1.
-      //
-      // No GET /users/factory-profile exists yet to check server-side
-      // whether a profile already exists, so we branch on a local
-      // flag instead: first successful save ever -> POST (create),
-      // every save after that -> PUT (update). This is what fixes the
-      // original 500 — that was very likely createFactoryProfile
-      // being called a second time against a unique ownerId
-      // constraint with no upsert handling.
-      const alreadyCreated = await mmkvStorage.getItem(PROFILE_CREATED_KEY);
+    console.log(
+      "Saving factory profile — outgoing payload:",
+      JSON.stringify(payload, null, 2),
+    );
 
-      if (alreadyCreated === "true") {
-        await api.put("users/factory-profile", payload);
+    try {
+      if (profileExists) {
+        // Known returning user — update the existing row.
+        try {
+          await api.put("users/factory-profile", payload);
+        } catch (putError) {
+          // A 404 here means our local flag was stale (e.g. storage was
+          // cleared, or a reinstall) and there's actually no row to
+          // update yet — fall back to create. Anything else is a real
+          // failure and should propagate to the outer catch.
+          const isNotFound =
+            axios.isAxiosError(putError) && putError.response?.status === 404;
+
+          if (!isNotFound) throw putError;
+
+          await api.post("users/factory-profile", payload);
+        }
       } else {
-        await api.post("users/factory-profile", payload);
-        await mmkvStorage.setItem(PROFILE_CREATED_KEY, "true");
+        // First save for this user. We lead with POST rather than PUT
+        // here: PUTing a factory-profile row that doesn't exist yet
+        // throws a 500 on the backend (looks like an NPE on
+        // update-of-nonexistent-entity) instead of a clean 404, so a
+        // "try PUT, fall back to POST on 404" strategy doesn't work as
+        // the *first* move — it only works once we already know the
+        // row exists. If the row somehow already exists server-side
+        // (flag out of sync with backend), fall back to PUT on 409/400.
+        try {
+          await api.post("users/factory-profile", payload);
+        } catch (postError) {
+          // Only 409 means "this already exists, use PUT instead."
+          // A 400 here is a genuine validation failure on THIS payload
+          // — retrying with PUT would send the same invalid body and
+          // just fail again with the same 400, masking the real error.
+          const isConflict =
+            axios.isAxiosError(postError) && postError.response?.status === 409;
+
+          if (!isConflict) throw postError;
+
+          await api.put("users/factory-profile", payload);
+        }
       }
 
-      // Save the latest values locally
+      await mmkvStorage.setItem(PROFILE_CREATED_KEY, "true");
+      setProfileExists(true);
+
       await mmkvStorage.setItem(
         DRAFT_KEY,
         JSON.stringify({
@@ -333,6 +525,35 @@ export default function EditManufacturerProfile() {
         }),
       );
 
+      // Keep the account-level fullName in sync with companyName. This
+      // is deliberately a separate, best-effort call — not folded into
+      // the try/catch above — because the factory profile save is the
+      // thing the user actually asked to do here, and its success
+      // shouldn't be undone or blocked by a failure in this secondary
+      // sync against a different endpoint (PUT /api/v1/users/profile).
+      // Only fire it when the name actually changed, to avoid a
+      // pointless network call on every save.
+      if (payload.companyName !== displayName) {
+        try {
+          await api.put("users/profile", { fullName: payload.companyName });
+          setDisplayName(payload.companyName);
+        } catch (syncError) {
+          if (axios.isAxiosError(syncError)) {
+            console.log(
+              "fullName sync failed — response body:",
+              syncError.response?.data,
+            );
+          }
+          console.warn(
+            "Factory profile saved, but syncing fullName failed:",
+            syncError,
+          );
+          // Don't surface a second alert on top of the success alert
+          // below — the user's actual save succeeded. This will just
+          // retry on the next save.
+        }
+      }
+
       Alert.alert("Success", "Factory profile saved successfully.", [
         {
           text: "OK",
@@ -340,8 +561,6 @@ export default function EditManufacturerProfile() {
         },
       ]);
     } catch (error) {
-      // Log the raw response body so the actual backend error (if any)
-      // is visible instead of just Axios's generic status-code message.
       if (axios.isAxiosError(error)) {
         console.log(
           "Factory profile save failed — response body:",
@@ -470,7 +689,10 @@ export default function EditManufacturerProfile() {
         >
           <View style={styles.mainCardPositioner}>
             <View style={styles.profileMasterCard}>
-              <View
+              <TouchableOpacity
+                onPress={pickAndUploadLogo}
+                disabled={uploadingLogo}
+                activeOpacity={0.85}
                 style={[
                   styles.avatarBoundary,
                   {
@@ -479,12 +701,37 @@ export default function EditManufacturerProfile() {
                   },
                 ]}
               >
-                <Text style={styles.avatarInitials}>
-                  {draft.companyName
-                    ? draft.companyName.slice(0, 2).toUpperCase()
-                    : "MF"}
-                </Text>
-              </View>
+                {uploadingLogo ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : draft.logoUrl ? (
+                  <Image
+                    source={{ uri: draft.logoUrl }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Text style={styles.avatarInitials}>
+                    {draft.companyName
+                      ? draft.companyName.slice(0, 2).toUpperCase()
+                      : "MF"}
+                  </Text>
+                )}
+
+                <View
+                  style={[
+                    styles.avatarEditBadge,
+                    {
+                      backgroundColor: theme.cardBackground,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="camera-outline"
+                    size={12}
+                    color={theme.icon}
+                  />
+                </View>
+              </TouchableOpacity>
               <Text
                 style={[styles.anchorLabelText, { color: theme.textSecondary }]}
               >
@@ -493,8 +740,10 @@ export default function EditManufacturerProfile() {
               <Text
                 style={[styles.readOnlyNote, { color: theme.textSecondary }]}
               >
-                Name and phone number are set at registration and can't be
-                edited here yet.
+                Your account name stays in sync with the company name below —
+                editing it here updates both. Phone number is set at
+                registration and can't be changed here. Tap the logo to upload a
+                company photo.
               </Text>
             </View>
 
@@ -515,11 +764,12 @@ export default function EditManufacturerProfile() {
               >
                 <InputField
                   label="Company Name"
-                  value={displayName}
-                  onChangeText={() => {}}
-                  editable={false}
+                  value={draft.companyName}
+                  onChangeText={(t: string) => updateDraft({ companyName: t })}
+                  error={errors.companyName}
                   theme={theme}
                   icon="business-outline"
+                  placeholder="Your company's public name"
                 />
                 <InputField
                   label="Sector Tags (comma separated)"
@@ -619,6 +869,52 @@ export default function EditManufacturerProfile() {
                   rightIconName="locate-outline"
                   onRightIconPress={fetchCurrentLocation}
                   rightIconLoading={locationLoading}
+                />
+                <InputField
+                  label="Region"
+                  value={draft.region}
+                  onChangeText={(t: string) => updateDraft({ region: t })}
+                  theme={theme}
+                  icon="map-outline"
+                  placeholder="e.g. Ashanti"
+                />
+                <InputField
+                  label="Town / City"
+                  value={draft.town}
+                  onChangeText={(t: string) => updateDraft({ town: t })}
+                  theme={theme}
+                  icon="business-outline"
+                  placeholder="e.g. Kumasi"
+                  last
+                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text
+                style={[styles.sectionTitle, { color: theme.textSecondary }]}
+              >
+                CONTACT
+              </Text>
+              <View
+                style={[
+                  styles.groupedCard,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <InputField
+                  label="Business Email"
+                  value={draft.email}
+                  onChangeText={(t: string) => updateDraft({ email: t })}
+                  error={errors.email}
+                  theme={theme}
+                  icon="mail-outline"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholder="e.g. sales@yourfactory.com"
                   last
                 />
               </View>
@@ -862,6 +1158,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
+    overflow: "visible",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 40,
+  },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   avatarInitials: { fontSize: 26, fontWeight: "700", color: "#FFFFFF" },
   anchorLabelText: { fontSize: 12, fontWeight: "600", marginTop: 12 },

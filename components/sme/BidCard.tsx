@@ -113,51 +113,43 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
                       <Ionicons
                         name="checkmark-circle"
                         size={16}
-                        color={theme.text}
+                        color={theme.primary}
                       />
                     )}
                   </View>
 
-                  <View
-                    style={[
-                      styles.bidRatingRow,
-                      { alignItems: "baseline", gap: 10 },
-                    ]}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                      }}
+                  <View style={styles.bidLocationRow}>
+                    <Ionicons
+                      name="location-outline"
+                      size={15}
+                      color={theme.textSecondary}
+                    />
+
+                    <Text
+                      style={[
+                        styles.bidLocationText,
+                        { color: theme.textSecondary },
+                      ]}
                     >
-                      <StarRating rating={manufacturer.rating} />
-                      <Text
-                        style={[
-                          styles.bidRatingText,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        {manufacturer.rating}
-                      </Text>
-                    </View>
-
-                    <View style={styles.bidLocationRow}>
-                      <Ionicons
-                        name="location-outline"
-                        size={15}
-                        color={theme.textSecondary}
-                      />
-
-                      <Text
-                        style={[
-                          styles.bidLocationText,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        {manufacturer.location}
-                      </Text>
-                    </View>
+                      {manufacturer.location}
+                    </Text>
                   </View>
                 </View>
+              </View>
+            </View>
+
+            <View style={[styles.bidRatingRow, { alignItems: "center" }]}>
+              <View
+                style={{
+                  flexDirection: "row",
+                }}
+              >
+                <StarRating rating={manufacturer.rating} />
+                <Text
+                  style={[styles.bidRatingText, { color: theme.textSecondary }]}
+                >
+                  {manufacturer.rating}
+                </Text>
               </View>
 
               {/* Bid status */}
@@ -165,13 +157,10 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
                 <Ionicons
                   name={bidStatus.icon as any}
                   size={13}
-                  color={theme.textSecondary}
+                  color={theme.warning}
                 />
                 <Text
-                  style={[
-                    styles.bidStatusPillText,
-                    { color: theme.textSecondary },
-                  ]}
+                  style={[styles.bidStatusPillText, { color: theme.warning }]}
                 >
                   {bidStatus.label}
                 </Text>
@@ -235,7 +224,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.06,
     shadowRadius: 10,
-    elevation: 3,
   },
   bidStatusAccentBar: {
     height: 3,
@@ -245,7 +233,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    padding: 14,
+    paddingLeft: 14,
+    paddingTop: 14,
+    paddingRight: 14,
   },
   bidManufacturerRow: {
     flexDirection: "row",
@@ -277,6 +267,7 @@ const styles = StyleSheet.create({
   bidRatingRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 5,
   },
   bidRatingText: { fontSize: 14, fontWeight: 500, marginLeft: 5 },

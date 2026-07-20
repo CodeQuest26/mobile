@@ -2,11 +2,12 @@ import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import OrderCard from "@/components/OrderCard";
 import Colors from "@/constants/colors";
-import { api } from "@/services/api";
+import { api, handleApiError } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -16,8 +17,6 @@ import {
   View,
 } from "react-native";
 
-// Define the shape of an order as returned by the API
-// Based on OrderDetailResponse from the OpenAPI spec
 interface ApiOrder {
   id: string;
   jobId: string;
@@ -39,12 +38,16 @@ interface ApiOrder {
     | "DISPUTED"
     | "REFUNDED"
     | "CANCELLED";
-  qualityCheckDeadline?: string; // ISO date
+  qualityCheckDeadline?: string; // ISO date-time
   deliveredAt?: string;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
-  jobTitle?: string;
+}
+
+interface JobInfo {
+  title: string;
+  deadline?: string;
 }
 
 // The shape expected by OrderCard
@@ -62,44 +65,21 @@ interface OrderCardData {
 
 type TabType = "active" | "completed";
 
+const ACTIVE_TAB_LABEL: Record<TabType, string> = {
+  active: "active",
+  completed: "completed",
+};
+
 export default function ManufacturerOrders() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] || Colors.light;
   const isDark = colorScheme === "dark";
   const [activeTab, setActiveTab] = useState<TabType>("active");
-
-  // State for real orders from API
   const [orders, setOrders] = useState<OrderCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch orders from API
-  const fetchOrders = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("orders", {
-        params: {
-          page: 0,
-          size: 1000,
-        },
-      });
-      // response.data should be PagedResponseOrderDetailResponse (not in spec, but we'll assume)
-      const apiOrders: ApiOrder[] = response.data.content || [];
-
-      console.log(response?.data);
-
-      // Transform to OrderCardData
-      const transformed = apiOrders.map((order) => transformOrder(order));
-      setOrders(transformed);
-    } catch (error) {
-      console.error("Error fetching orders:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  const [error, setError] = useState<string | null>(null);
 
   // Helper to map status to milestone number (0-4) and label
   const mapStatusToMilestone = (
@@ -138,45 +118,47 @@ export default function ManufacturerOrders() {
     return progressMap[status] || 0.0;
   };
 
-  // Helper to compute dueIn text and urgency
   const computeDueInfo = (
     order: ApiOrder,
+    jobInfo?: JobInfo,
   ): { dueIn: string; urgent: boolean } => {
-    // If completed/refunded/cancelled, show "Completed"
     if (["COMPLETED", "REFUNDED", "CANCELLED"].includes(order.status)) {
       return { dueIn: "Completed", urgent: false };
     }
-    // If DELIVERED, show "Awaiting confirmation" maybe?
     if (order.status === "DELIVERED") {
       return { dueIn: "Awaiting confirmation", urgent: false };
     }
-    // Use qualityCheckDeadline if available, else fallback to createdAt + some days? Not ideal.
-    // Actually we don't have a clear deadline field in OrderDetailResponse.
-    // We could use the job deadline, but we don't have it here.
-    // As a fallback, we'll use the qualityCheckDeadline if present, else a dummy.
-    if (order.qualityCheckDeadline) {
-      const diff = new Date(order.qualityCheckDeadline).getTime() - Date.now();
+
+    const deadlineSource = order.qualityCheckDeadline || jobInfo?.deadline;
+    if (deadlineSource) {
+      const diff = new Date(deadlineSource).getTime() - Date.now();
       const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-      if (days <= 3)
+      if (days < 0) {
+        return { dueIn: "Overdue", urgent: true };
+      }
+      if (days <= 3) {
         return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: true };
+      }
       return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: false };
     }
-    // No deadline, return generic
+
     return { dueIn: "In progress", urgent: false };
   };
 
   // Transform a single API order to OrderCardData
-  const transformOrder = (order: ApiOrder): OrderCardData => {
+  const transformOrder = (
+    order: ApiOrder,
+    jobInfoMap: Map<string, JobInfo>,
+  ): OrderCardData => {
     const { milestone, label } = mapStatusToMilestone(order.status);
     const progress = getProgress(order.status);
-    const { dueIn, urgent } = computeDueInfo(order);
+    const jobInfo = jobInfoMap.get(order.jobId);
+    const { dueIn, urgent } = computeDueInfo(order, jobInfo);
 
-    // Amount as currency string
     const amount = `GH₵ ${order.agreedAmountGhs?.toFixed(2) || "0.00"}`;
 
-    // Job title: try to use order.jobTitle if available, else use jobId as fallback
     const job =
-      order.jobTitle || `Job #${order.jobId?.slice(0, 8) || "Unknown"}`;
+      jobInfo?.title || `Job #${order.jobId?.slice(0, 8) || "Unknown"}`;
 
     return {
       id: order.id,
@@ -191,17 +173,70 @@ export default function ManufacturerOrders() {
     };
   };
 
-  // Filter orders based on activeTab
-  const filteredOrders = orders.filter((order) => {
-    // Active: statuses not completed/refunded/cancelled (we use progress < 1 as active)
-    // But we have milestone 4 for completed, so we can filter by milestone < 4
-    // However, DISPUTED might be active? We'll consider it active if progress < 1.
-    if (activeTab === "active") {
-      return order.progress < 1.0;
+  // job details
+  const fetchJobDetails = async (
+    jobIds: string[],
+  ): Promise<Map<string, JobInfo>> => {
+    const uniqueIds = [...new Set(jobIds.filter(Boolean))];
+    const map = new Map<string, JobInfo>();
+
+    if (uniqueIds.length === 0) return map;
+
+    const results = await Promise.allSettled(
+      uniqueIds.map((id) => api.get(`jobs/${id}`)),
+    );
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        const job = result.value.data;
+        map.set(uniqueIds[index], {
+          title: job?.title,
+          deadline: job?.deadline,
+        });
+      }
+    });
+
+    return map;
+  };
+
+  // Fetch orders from API.
+  const fetchOrders = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
     } else {
-      return order.progress >= 1.0;
+      setLoading(true);
     }
-  });
+    setError(null);
+
+    try {
+      const response = await api.get("orders", {
+        params: { page: 0, size: 1000 },
+      });
+      const apiOrders: ApiOrder[] = response.data.content || [];
+
+      const jobInfoMap = await fetchJobDetails(apiOrders.map((o) => o.jobId));
+
+      const transformed = apiOrders.map((order) =>
+        transformOrder(order, jobInfoMap),
+      );
+      setOrders(transformed);
+    } catch (err) {
+      console.error("Error fetching orders:", err);
+      setError(handleApiError(err));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // Filter orders based on activeTab.
+  const filteredOrders = orders.filter((order) =>
+    activeTab === "active" ? order.progress < 1.0 : order.progress >= 1.0,
+  );
 
   const hasOrders = filteredOrders.length > 0;
 
@@ -213,10 +248,6 @@ export default function ManufacturerOrders() {
   const getTabTextStyle = (tab: TabType) => ({
     color: activeTab === tab ? theme.onPrimary : theme.textSecondary,
   });
-
-  const handleFilterBtn = () => {
-    router.push("/filterScreen");
-  };
 
   return (
     <>
@@ -262,12 +293,43 @@ export default function ManufacturerOrders() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => fetchOrders(true)}
+                tintColor={theme.primary}
+                colors={[theme.primary]}
+              />
+            }
           >
             {loading ? (
               <View style={styles.loadingContainer}>
-                <Text style={{ color: theme.textSecondary }}>
-                  Loading orders...
+                <ActivityIndicator size={"small"} color={theme.primary} />
+              </View>
+            ) : error ? (
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={64}
+                  color={theme.error + "80"}
+                />
+                <Text style={[styles.emptyText, { color: theme.text }]}>
+                  Couldn't load your orders
                 </Text>
+                <Text
+                  style={[styles.errorSubtext, { color: theme.textSecondary }]}
+                >
+                  {error}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => fetchOrders()}
+                  style={[styles.retryBtn, { borderColor: theme.primary }]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.retryBtnText, { color: theme.primary }]}>
+                    Try Again
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : hasOrders ? (
               filteredOrders.map((order, index) => (
@@ -285,7 +347,7 @@ export default function ManufacturerOrders() {
                 <Text
                   style={[styles.emptyText, { color: theme.textSecondary }]}
                 >
-                  No {activeTab} orders found
+                  No {ACTIVE_TAB_LABEL[activeTab]} orders found
                 </Text>
               </View>
             )}
@@ -342,10 +404,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 80,
     gap: 12,
+    paddingHorizontal: 32,
   },
   emptyText: {
     fontSize: 16,
     fontWeight: "500",
+    textAlign: "center",
+  },
+  errorSubtext: {
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: -6,
+  },
+  retryBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  retryBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   loadingContainer: {
     paddingVertical: 40,

@@ -1,13 +1,18 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
+import { AppleMaps, GoogleMaps } from "expo-maps";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -21,24 +26,33 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const HERO_HEIGHT = 200; // Height of the parallax image header
 
 /* ================= TYPES ================= */
 
 interface Company {
   id: string;
   name: string;
+  category: string;
   coordinate: { latitude: number; longitude: number };
   rating: number;
   verified: boolean;
   address: string;
   distance: number;
+  photo: string;
+  phone: string;
+  website: string;
+  isOpen: boolean;
+  hours: {
+    weekday: string;
+    saturday: string;
+    sunday: string;
+  };
 }
 
-type Region = {
+type UserLocation = {
   latitude: number;
   longitude: number;
-  latitudeDelta: number;
-  longitudeDelta: number;
 };
 
 /* ================= MOCK DATA ================= */
@@ -62,6 +76,14 @@ const generateMockCompanies = (
     "Sunrise Robotics",
   ];
 
+  const categories = [
+    "Industrial Manufacturer",
+    "Metal Fabrication",
+    "Packaging Solutions",
+    "CNC Machining Center",
+    "Electronics Assembly",
+  ];
+
   const companies: Company[] = [];
   for (let i = 0; i < count; i++) {
     const offsetLat = (Math.random() - 0.5) * (radiusKm / 111);
@@ -73,14 +95,26 @@ const generateMockCompanies = (
     const rating = +(4 + Math.random()).toFixed(1);
     const verified = Math.random() > 0.2;
     const distance = Math.sqrt(offsetLat ** 2 + offsetLon ** 2) * 111 * 1000;
+    const seedName = names[i % names.length];
+
     companies.push({
       id: `c_${i}`,
-      name: names[i % names.length],
+      name: seedName,
+      category: categories[i % categories.length],
       coordinate: { latitude: lat, longitude: lon },
       rating,
       verified,
-      address: `${Math.floor(Math.random() * 1000)} Industrial Blvd`,
+      address: `${Math.floor(Math.random() * 1000)} Fillmore St\nKumasi, Ghana`,
       distance,
+      photo: `https://picsum.photos/seed/${i + 10}/600/400`,
+      phone: `+233 (415) ${400 + i}-${5000 + i}`,
+      website: `${seedName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
+      isOpen: Math.random() > 0.3,
+      hours: {
+        weekday: "10:00 – 00:00",
+        saturday: "10:00 – 02:00",
+        sunday: "10:00 – 00:00",
+      },
     });
   }
   return companies.filter((c) => c.rating >= 4.5 && c.verified);
@@ -89,16 +123,20 @@ const generateMockCompanies = (
 /* ================= COMPONENT ================= */
 
 const Map = () => {
-  const theme = Colors[useColorScheme() ?? "light"];
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? "light"];
   const insets = useSafeAreaInsets();
+  const blurTint = colorScheme === "dark" ? "dark" : "light";
 
   const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 49 + insets.bottom : 56;
 
   const mapRef = useRef<any>(null);
   const searchInputRef = useRef<TextInput | null>(null);
 
-  const [MapsModule, setMapsModule] = useState<any>(null);
-  const [userLocation, setUserLocation] = useState<Region | null>(null);
+  // Animation driving value tracking sheet scroll position
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [query, setQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
@@ -108,6 +146,7 @@ const Map = () => {
   const [modalVisible, setModalVisible] = useState(false);
 
   const openModal = (company: Company) => {
+    scrollY.setValue(0); // Reset animation scroll offsets
     setSelectedCompany(company);
     setModalVisible(true);
   };
@@ -130,6 +169,16 @@ const Map = () => {
     return companies.filter((c) => c.name.toLowerCase().includes(q));
   }, [companies, query]);
 
+  const markers = useMemo(
+    () =>
+      filteredCompanies.map((c) => ({
+        id: c.id,
+        coordinates: c.coordinate,
+        title: c.name,
+      })),
+    [filteredCompanies],
+  );
+
   const getLocation = async () => {
     try {
       setLoading(true);
@@ -140,11 +189,9 @@ const Map = () => {
           "Permission Denied",
           "Location access is needed to show nearby companies. Falling back to Kumasi.",
         );
-        const fallback: Region = {
+        const fallback: UserLocation = {
           latitude: 6.6885,
           longitude: -1.6244,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
         };
         setUserLocation(fallback);
         await fetchCompanies(fallback.latitude, fallback.longitude);
@@ -154,11 +201,9 @@ const Map = () => {
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.BestForNavigation,
       });
-      const region: Region = {
+      const region: UserLocation = {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
       };
       setUserLocation(region);
       await fetchCompanies(region.latitude, region.longitude);
@@ -173,22 +218,12 @@ const Map = () => {
     getLocation();
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    try {
-      const mod = require("react-native-maps");
-      if (mounted) setMapsModule(mod);
-    } catch (e) {
-      console.warn("react-native-maps not available:", e);
-    }
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   const centerUser = () => {
     if (userLocation && mapRef.current) {
-      mapRef.current.animateToRegion(userLocation, 800);
+      mapRef.current.setCameraPosition({
+        coordinates: userLocation,
+        zoom: 15,
+      });
     }
   };
 
@@ -201,13 +236,41 @@ const Map = () => {
     });
   };
 
-  /* ================= LOADING ================= */
+  const handleMarkerClick = (marker: { id?: string }) => {
+    const company = filteredCompanies.find((c) => c.id === marker.id);
+    if (company) openModal(company);
+  };
+
+  /* ================= PARALLAX & HEADER INTERPOLATIONS ================= */
+
+  // Scales up image elastically when pulled down
+  const imageScale = scrollY.interpolate({
+    inputRange: [-HERO_HEIGHT, 0],
+    outputRange: [2, 1],
+    extrapolate: "clamp",
+  });
+
+  // Moves image upwards at a slower velocity rate to create standard depth parallax
+  const imageTranslateY = scrollY.interpolate({
+    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
+    outputRange: [HERO_HEIGHT / 2, 0, -HERO_HEIGHT * 0.3],
+    extrapolate: "clamp",
+  });
+
+  // Controls the appearance of the top sticky navigation header
+  const stickyHeaderOpacity = scrollY.interpolate({
+    inputRange: [HERO_HEIGHT - 60, HERO_HEIGHT - 20],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+
+  /* ================= LOADING STACKS ================= */
 
   if (loading || !userLocation) {
     return (
       <MainContainer safe>
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={theme.primary} />
+          <ActivityIndicator size="small" color={theme.primary} />
           <Text style={[styles.loadingText, { color: theme.text }]}>
             Getting your location…
           </Text>
@@ -216,7 +279,7 @@ const Map = () => {
     );
   }
 
-  if (!MapsModule) {
+  if (Platform.OS !== "ios" && Platform.OS !== "android") {
     return (
       <MainContainer>
         <View style={[styles.loading, { padding: 16 }]}>
@@ -226,15 +289,14 @@ const Map = () => {
               { color: theme.text, textAlign: "center" },
             ]}
           >
-            Map is unavailable on this device. Install and link
-            react-native-maps to enable the map view.
+            Maps are only available on Android and iOS.
           </Text>
         </View>
       </MainContainer>
     );
   }
 
-  /* ================= UI ================= */
+  /* ================= RENDER INTERFACE ================= */
 
   return (
     <MainContainer>
@@ -277,39 +339,50 @@ const Map = () => {
           </View>
         )}
 
-        {/* ── MAP ── */}
-        <MapsModule.default
-          ref={mapRef}
-          style={styles.map}
-          provider={
-            Platform.OS === "android"
-              ? MapsModule.PROVIDER_GOOGLE
-              : MapsModule.PROVIDER_DEFAULT
-          }
-          initialRegion={userLocation}
-          showsUserLocation
-          showsMyLocationButton={false}
-          showsCompass={false}
-        >
-          {filteredCompanies.map((c) => (
-            <MapsModule.Marker
-              key={c.id}
-              coordinate={c.coordinate}
-              pinColor={c.rating > 4.7 ? theme.primary : theme.icon}
-              onPress={() => openModal(c)}
-            />
-          ))}
-        </MapsModule.default>
+        {/* ── MAP CANVAS LAYER ── */}
+        {Platform.OS === "ios" ? (
+          <AppleMaps.View
+            ref={mapRef}
+            style={styles.map}
+            cameraPosition={{ coordinates: userLocation, zoom: 14 }}
+            markers={markers.map((m) => ({
+              ...m,
+              tintColor:
+                (filteredCompanies.find((c) => c.id === m.id)?.rating ?? 0) >
+                4.7
+                  ? theme.primary
+                  : theme.icon,
+            }))}
+            properties={{ isMyLocationEnabled: true }}
+            uiSettings={{ myLocationButtonEnabled: false }}
+            onMarkerClick={handleMarkerClick}
+          />
+        ) : (
+          <GoogleMaps.View
+            ref={mapRef}
+            style={styles.map}
+            cameraPosition={{ coordinates: userLocation, zoom: 14 }}
+            markers={markers}
+            properties={{ isMyLocationEnabled: true }}
+            uiSettings={{
+              myLocationButtonEnabled: false,
+              compassEnabled: false,
+            }}
+            onMarkerClick={handleMarkerClick}
+          />
+        )}
 
-        {/* ── FETCHING PILL ── */}
+        {/* ── SYNC/FETCHING PILL ── */}
         {fetching && (
           <View style={styles.fetchingPill}>
-            <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.fetchingText}>Updating…</Text>
+            <ActivityIndicator color={theme.onPrimary} size="small" />
+            <Text style={[styles.fetchingText, { color: theme.onPrimary }]}>
+              Updating…
+            </Text>
           </View>
         )}
 
-        {/* ── RESULT COUNT PILL ── */}
+        {/* ── SEARCH RESULT QUANTITY COUNT ── */}
         {!fetching && searchVisible && (
           <View
             style={[
@@ -330,9 +403,8 @@ const Map = () => {
           </View>
         )}
 
-        {/* ── FAB STACK ── */}
+        {/* ── FLOATING CONTROLS (FAB) ── */}
         <View style={[styles.fabStack, { bottom: TAB_BAR_HEIGHT + 16 }]}>
-          {/* Search FAB */}
           <TouchableOpacity
             style={[
               styles.fab,
@@ -353,7 +425,6 @@ const Map = () => {
             />
           </TouchableOpacity>
 
-          {/* Center FAB */}
           <TouchableOpacity
             style={[
               styles.fab,
@@ -369,7 +440,7 @@ const Map = () => {
           </TouchableOpacity>
         </View>
 
-        {/* ── BOTTOM SHEET MODAL ── */}
+        {/* ── APPLE MAPS STYLE SHEET MODAL ── */}
         <Modal
           visible={modalVisible}
           transparent
@@ -382,143 +453,310 @@ const Map = () => {
               style={[styles.sheet, { backgroundColor: theme.cardBackground }]}
               onPress={() => {}}
             >
-              {/* Handle */}
-              <View
-                style={[styles.handle, { backgroundColor: theme.border }]}
-              />
-
               {selectedCompany && (
-                <View style={styles.sheetContent}>
-                  {/* Header */}
-                  <View style={styles.sheetHeader}>
-                    <View style={styles.sheetTitleBlock}>
-                      <Text style={[styles.sheetTitle, { color: theme.text }]}>
+                <View style={styles.sheetLayoutWrapper}>
+                  {/* 1. ABSOLUTE PARALLAX BACKGROUND HERO LAYER */}
+                  <Animated.View
+                    style={[
+                      styles.heroContainer,
+                      {
+                        transform: [
+                          { translateY: imageTranslateY },
+                          { scale: imageScale },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: selectedCompany.photo }}
+                      style={styles.heroImage}
+                    />
+                    <LinearGradient
+                      colors={[
+                        "transparent",
+                        "rgba(0,0,0,0.1)",
+                        theme.cardBackground,
+                      ]}
+                      style={styles.heroGradientFade}
+                    />
+                  </Animated.View>
+
+                  {/* 2. DYNAMIC STICKY HEADER FADING OVER SCROLL ELEMENT */}
+                  <Animated.View
+                    style={[
+                      styles.stickyHeader,
+                      {
+                        opacity: stickyHeaderOpacity,
+                        backgroundColor:
+                          colorScheme === "dark"
+                            ? "rgba(30,30,30,0.6)"
+                            : "rgba(255,255,255,0.6)",
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <BlurView
+                      intensity={80}
+                      tint={blurTint}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.stickyHeaderTitle, { color: theme.text }]}
+                    >
+                      {selectedCompany.name}
+                    </Text>
+                  </Animated.View>
+
+                  {/* 3. STATIC CLOSE ACTION PILL OVERLAP */}
+                  <TouchableOpacity
+                    style={styles.heroCloseButton}
+                    onPress={closeModal}
+                    activeOpacity={0.7}
+                    hitSlop={12}
+                  >
+                    <BlurView
+                      intensity={90}
+                      tint="dark"
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <Ionicons name="close" size={16} color="#ffffff" />
+                  </TouchableOpacity>
+
+                  {/* 4. MAIN INTERACTION VIEW SCRIPTER */}
+                  <Animated.ScrollView
+                    showsVerticalScrollIndicator={false}
+                    scrollEventThrottle={16}
+                    onScroll={Animated.event(
+                      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                      { useNativeDriver: true },
+                    )}
+                    contentContainerStyle={styles.scrollContent}
+                  >
+                    {/* Visual block spacer preserving space for background absolute layout frame */}
+                    <View style={{ height: HERO_HEIGHT - 35 }} />
+
+                    {/* Overlapping Rounded Company Avatar Badge */}
+                    <View
+                      style={[
+                        styles.avatarBadge,
+                        { backgroundColor: "#4CAF50" },
+                      ]}
+                    >
+                      <Ionicons name="business" size={32} color="#ffffff" />
+                    </View>
+
+                    {/* Descriptive Identity Blocks */}
+                    <View style={styles.identitySection}>
+                      <Text
+                        style={[styles.companyTitle, { color: theme.text }]}
+                      >
                         {selectedCompany.name}
                       </Text>
-                      {selectedCompany.verified && (
-                        <View
+                      <Text
+                        style={[
+                          styles.companySubtitle,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {selectedCompany.category}
+                      </Text>
+                    </View>
+
+                    {/* ── HOURS RENDER STACK ── */}
+                    <View style={styles.contentSection}>
+                      <Text
+                        style={[styles.sectionHeading, { color: theme.text }]}
+                      >
+                        Hours
+                      </Text>
+
+                      <View style={styles.dataGridRow}>
+                        <Text
                           style={[
-                            styles.verifiedBadge,
-                            { backgroundColor: theme.iconBackground },
+                            styles.statusOpenLabel,
+                            {
+                              color: selectedCompany.isOpen
+                                ? theme.primary
+                                : theme.error,
+                            },
                           ]}
                         >
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={12}
-                            color={theme.primary}
-                          />
-                          <Text
-                            style={[
-                              styles.verifiedText,
-                              { color: theme.primary },
-                            ]}
-                          >
-                            Verified
-                          </Text>
-                        </View>
-                      )}
+                          {selectedCompany.isOpen ? "Open" : "Closed"}
+                        </Text>
+                        <Text
+                          style={[styles.rightValueText, { color: theme.text }]}
+                        >
+                          {selectedCompany.hours.weekday}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.sectionDivider,
+                          { backgroundColor: theme.border },
+                        ]}
+                      />
+
+                      <View style={styles.dropdownHeaderRow}>
+                        <Text
+                          style={[
+                            styles.mutedLabelText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Normal Hours
+                        </Text>
+                        <Ionicons
+                          name="chevron-down"
+                          size={14}
+                          color={theme.textSecondary}
+                        />
+                      </View>
+
+                      <View style={styles.subTimeRow}>
+                        <Text style={[styles.dayText, { color: theme.text }]}>
+                          Mon – Wed
+                        </Text>
+                        <Text
+                          style={[styles.rightValueText, { color: theme.text }]}
+                        >
+                          {selectedCompany.hours.weekday}
+                        </Text>
+                      </View>
+                      <View style={styles.subTimeRow}>
+                        <Text style={[styles.dayText, { color: theme.text }]}>
+                          Thu – Sat
+                        </Text>
+                        <Text
+                          style={[styles.rightValueText, { color: theme.text }]}
+                        >
+                          {selectedCompany.hours.saturday}
+                        </Text>
+                      </View>
+                      <View style={styles.subTimeRow}>
+                        <Text style={[styles.dayText, { color: theme.text }]}>
+                          Sunday
+                        </Text>
+                        <Text
+                          style={[styles.rightValueText, { color: theme.text }]}
+                        >
+                          {selectedCompany.hours.sunday}
+                        </Text>
+                      </View>
                     </View>
+
+                    {/* ── DETAILS RENDER STACK ── */}
+                    <View style={styles.contentSection}>
+                      <Text
+                        style={[styles.sectionHeading, { color: theme.text }]}
+                      >
+                        Details
+                      </Text>
+
+                      <View style={styles.dataGridRow}>
+                        <Text
+                          style={[
+                            styles.mutedLabelText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Phone
+                        </Text>
+                        <TouchableOpacity>
+                          <Text style={styles.interactiveLinkText}>
+                            {selectedCompany.phone}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.sectionDivider,
+                          { backgroundColor: theme.border },
+                        ]}
+                      />
+
+                      <View style={styles.dataGridRow}>
+                        <Text
+                          style={[
+                            styles.mutedLabelText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Website
+                        </Text>
+                        <TouchableOpacity>
+                          <Text style={styles.interactiveLinkText}>
+                            {selectedCompany.website}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.sectionDivider,
+                          { backgroundColor: theme.border },
+                        ]}
+                      />
+
+                      <View
+                        style={[
+                          styles.dataGridRow,
+                          { alignItems: "flex-start" },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.mutedLabelText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Address
+                        </Text>
+                        <Text
+                          style={[
+                            styles.rightValueText,
+                            { color: theme.text, textAlign: "right", flex: 1 },
+                          ]}
+                        >
+                          {selectedCompany.address}
+                        </Text>
+                      </View>
+                    </View>
+                  </Animated.ScrollView>
+
+                  {/* Pinned Soft-Capsule Navigation CTA Row */}
+                  <View
+                    style={[
+                      styles.ctaFixedContainer,
+                      { backgroundColor: theme.cardBackground },
+                    ]}
+                  >
                     <TouchableOpacity
                       style={[
-                        styles.closeBtn,
-                        { backgroundColor: theme.iconBackground },
+                        styles.capsuleCtaButton,
+                        {
+                          backgroundColor:
+                            colorScheme === "dark" ? "#2c2c2e" : "#eaf2ff",
+                        },
                       ]}
-                      onPress={closeModal}
-                      hitSlop={8}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        closeModal();
+                        setTimeout(() => {
+                          router.push(
+                            "/(screens)/(sme)/(screens)/manufacturerProfile",
+                          );
+                        }, 200);
+                      }}
                     >
-                      <Ionicons name="close" size={16} color={theme.icon} />
+                      <View style={styles.ctaIconBadgeCircle}>
+                        <Ionicons name="arrow-redo" size={14} color="#ffffff" />
+                      </View>
+                      <Text style={styles.capsuleCtaText}>Get Directions</Text>
                     </TouchableOpacity>
                   </View>
-
-                  {/* Divider */}
-                  <View
-                    style={[styles.divider, { backgroundColor: theme.border }]}
-                  />
-
-                  {/* Stats row */}
-                  <View style={styles.statsRow}>
-                    <View
-                      style={[
-                        styles.statChip,
-                        { backgroundColor: theme.iconBackground },
-                      ]}
-                    >
-                      <Ionicons name="star" size={13} color="#F59E0B" />
-                      <Text style={[styles.statValue, { color: theme.text }]}>
-                        {selectedCompany.rating}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.statLabel,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        Rating
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statChip,
-                        { backgroundColor: theme.iconBackground },
-                      ]}
-                    >
-                      <Ionicons
-                        name="navigate-outline"
-                        size={13}
-                        color={theme.primary}
-                      />
-                      <Text style={[styles.statValue, { color: theme.text }]}>
-                        {(selectedCompany.distance / 1000).toFixed(1)} km
-                      </Text>
-                      <Text
-                        style={[
-                          styles.statLabel,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        Away
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Address row */}
-                  <View style={[styles.infoRow, { borderColor: theme.border }]}>
-                    <View
-                      style={[
-                        styles.infoIcon,
-                        { backgroundColor: theme.iconBackground },
-                      ]}
-                    >
-                      <Ionicons
-                        name="location-outline"
-                        size={15}
-                        color={theme.icon}
-                      />
-                    </View>
-                    <Text style={[styles.infoText, { color: theme.text }]}>
-                      {selectedCompany.address}
-                    </Text>
-                  </View>
-
-                  {/* CTA */}
-                  <TouchableOpacity
-                    style={[styles.cta, { backgroundColor: theme.primary }]}
-                    activeOpacity={0.85}
-                    onPress={() =>
-                      router.push(
-                        "/(screens)/(sme)/(screens)/manufacturerProfile",
-                      )
-                    }
-                  >
-                    <Text style={[styles.ctaText, { color: theme.onPrimary }]}>
-                      View Profile
-                    </Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={16}
-                      color={theme.onPrimary}
-                    />
-                  </TouchableOpacity>
                 </View>
               )}
             </Pressable>
@@ -540,7 +778,7 @@ const styles = StyleSheet.create({
   loading: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 12, fontSize: 15 },
 
-  /* Search bar */
+  /* Search bar styling */
   searchBar: {
     position: "absolute",
     left: 16,
@@ -565,7 +803,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  /* Result count pill */
+  /* Result pills */
   resultPill: {
     position: "absolute",
     alignSelf: "center",
@@ -581,7 +819,7 @@ const styles = StyleSheet.create({
   },
   resultPillText: { fontSize: 12, fontWeight: "500" },
 
-  /* Fetching pill */
+  /* Fetching updates marker */
   fetchingPill: {
     position: "absolute",
     top: 16,
@@ -594,9 +832,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
-  fetchingText: { color: "#fff", fontSize: 13 },
+  fetchingText: { fontSize: 13 },
 
-  /* FAB stack */
+  /* FAB layout */
   fabStack: {
     position: "absolute",
     right: 16,
@@ -617,95 +855,196 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
 
-  /* Modal */
+  /* Redesigned Bottom Sheet presentation layers */
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "flex-end",
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 12,
-    paddingHorizontal: 20,
-    paddingBottom: 36,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: "hidden",
+    height: SCREEN_HEIGHT * 0.88,
   },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  sheetContent: { gap: 16 },
-
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  sheetTitleBlock: { flex: 1, gap: 6 },
-  sheetTitle: { fontSize: 18, fontWeight: "700", lineHeight: 22 },
-
-  verifiedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  verifiedText: { fontSize: 11, fontWeight: "600" },
-
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-
-  divider: { height: StyleSheet.hairlineWidth },
-
-  statsRow: { flexDirection: "row", gap: 10 },
-  statChip: {
+  sheetLayoutWrapper: {
     flex: 1,
-    flexDirection: "row",
+    position: "relative",
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 110, // Leaving standard spacing clear for bottom capsule CTA button
+  },
+
+  /* Parallax Backdrop Frames */
+  heroContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HERO_HEIGHT,
+    zIndex: 0,
+  },
+  heroImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  heroGradientFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 60,
+  },
+
+  /* Sticky blurred top row elements */
+  stickyHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 56,
+    zIndex: 10,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  stickyHeaderTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    maxWidth: "65%",
+  },
+
+  heroCloseButton: {
+    position: "absolute",
+    top: 14,
+    right: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: "hidden",
+    zIndex: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  /* Profile header card contents */
+  avatarBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignSelf: "center",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 5,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  identitySection: {
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 24,
+  },
+  companyTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: -0.5,
+  },
+  companySubtitle: {
+    fontSize: 14,
+    marginTop: 2,
+    color: "#8E8E93",
+  },
+
+  /* Apple details blocks presentation layouts */
+  contentSection: {
+    marginBottom: 24,
+  },
+  sectionHeading: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 12,
+    letterSpacing: -0.3,
+  },
+  dataGridRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 10,
-    borderRadius: 10,
   },
-  statValue: { fontSize: 14, fontWeight: "600" },
-  statLabel: { fontSize: 12 },
+  dropdownHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  subTimeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  sectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.6,
+  },
+  statusOpenLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+    flex: 1,
+  },
+  dayText: {
+    fontSize: 16,
+  },
+  mutedLabelText: {
+    fontSize: 16,
+    width: 90,
+  },
+  rightValueText: {
+    fontSize: 16,
+    fontWeight: "400",
+  },
+  interactiveLinkText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "400",
+  },
 
-  infoRow: {
+  /* Bottom Fixed Action Elements */
+  ctaFixedContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 32,
+    zIndex: 15,
+  },
+  capsuleCtaButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-  },
-  infoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
     justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  infoText: { fontSize: 14, flex: 1 },
-
-  cta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    height: 50,
+    borderRadius: 25,
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 4,
   },
-  ctaText: { fontSize: 15, fontWeight: "600" },
+  ctaIconBadgeCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  capsuleCtaText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "600",
+  },
 });

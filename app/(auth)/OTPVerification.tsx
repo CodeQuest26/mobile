@@ -268,22 +268,28 @@ export default function OtpVerifyScreen() {
 
     // Hand-off route swap
     setTimeout(() => {
-      const roleStr = String(role || "").toLowerCase();
-
-      const isSme = roleStr.includes("sme") || roleStr.includes("sme_owner");
+      const roleStr = String(
+        role || user?.role || storage.getString("selectedRole") || "",
+      ).toUpperCase();
+      const isAdmin = roleStr.includes("ADMIN");
+      const isSme = roleStr.includes("SME") || roleStr.includes("SME_OWNER");
 
       // Read current auth state directly from the store to avoid stale closures
-      const { isAuthenticated: auth, user } = useAuthStore.getState();
-      const isAuth = !!auth || !!user;
+      const { isAuthenticated: auth, user: authUser } = useAuthStore.getState();
+      const isAuth = !!auth || !!authUser;
 
       if (isAuth) {
-        const destination =
-          user?.role === "SME_OWNER"
+        const destination = isAdmin
+          ? "/(screens)/(admin)/(tabs)"
+          : isSme
             ? "/(screens)/(sme)/(tabs)"
             : "/(screens)/(manufacturer)/(tabs)";
-        router.replace({ pathname: destination, params: { role } });
+        router.replace({ pathname: destination, params: { role: roleStr } });
       } else {
-        router.replace({ pathname: "/(auth)/login", params: { role } });
+        router.replace({
+          pathname: "/(auth)/login",
+          params: { role: roleStr },
+        });
       }
     }, 1800);
   };

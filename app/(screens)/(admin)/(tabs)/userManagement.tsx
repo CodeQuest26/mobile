@@ -31,6 +31,7 @@ const UserManagementScreen = () => {
       setError(null);
       const { data } = await api.get("/admin/users");
       setUsers(data);
+      console.log(users);
     } catch (err) {
       console.log(err);
     } finally {

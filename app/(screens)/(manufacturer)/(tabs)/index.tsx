@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Image,
   ImageBackground,
   LayoutChangeEvent,
   Pressable,
@@ -22,9 +23,30 @@ import OrderCard from "@/components/OrderCard";
 import Spacer from "@/components/Spacer";
 import { api } from "@/services/api";
 import { useAuthStore } from "@/store/auth";
+import { mmkvStorage } from "@/store/mmkv";
 import { router } from "expo-router";
 
 const CardImg = require("../../../../assets/images/Production.jpeg");
+
+// Same cache the profile screens read/write — see the long comment in
+// ManufacturerProfile.tsx for why this exists: there's still no
+// GET /users/factory-profile, only POST/PUT, so companyName, address,
+// and the uploaded logo can't be fetched from the backend directly.
+// This is NOT authoritative — it's whatever was last saved *from this
+// device* via EditManufacturerProfile. `user` fields remain the
+// fallback for anything not yet present in the draft.
+const DRAFT_KEY = "factoryProfileDraft";
+
+interface CachedFactoryDraft {
+  companyName?: string;
+  address?: string;
+  logoUrl?: string;
+}
+
+interface JobInfo {
+  title: string;
+  deadline?: string;
+}
 
 interface ApiJob {
   id: string;
@@ -77,6 +99,18 @@ interface HeroStats {
   escrowHeld: number;
   released: number;
   rating: number;
+}
+
+interface OrderCardData {
+  id: string;
+  job: string;
+  sme: string;
+  amount: string;
+  milestone: number;
+  milestoneLabel: string;
+  dueIn: string;
+  progress: number; // 0..1
+  urgent: boolean;
 }
 
 // --- Helper functions ---
@@ -132,21 +166,58 @@ const getProgress = (status: ApiOrder["status"]) => {
   return progressMap[status] || 0.0;
 };
 
-const computeDueInfo = (order: ApiOrder) => {
+const computeDueInfo = (
+  order: ApiOrder,
+  jobInfo?: JobInfo,
+): { dueIn: string; urgent: boolean } => {
   if (["COMPLETED", "REFUNDED", "CANCELLED"].includes(order.status)) {
     return { dueIn: "Completed", urgent: false };
   }
   if (order.status === "DELIVERED") {
     return { dueIn: "Awaiting confirmation", urgent: false };
   }
-  if (order.qualityCheckDeadline) {
-    const diff = new Date(order.qualityCheckDeadline).getTime() - Date.now();
+
+  const deadlineSource = order.qualityCheckDeadline || jobInfo?.deadline;
+  if (deadlineSource) {
+    const diff = new Date(deadlineSource).getTime() - Date.now();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days <= 3)
+    if (days < 0) {
+      return { dueIn: "Overdue", urgent: true };
+    }
+    if (days <= 3) {
       return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: true };
+    }
     return { dueIn: `${days} day${days !== 1 ? "s" : ""}`, urgent: false };
   }
+
   return { dueIn: "In progress", urgent: false };
+};
+
+// Transform a single API order to OrderCardData
+const transformOrder = (
+  order: ApiOrder,
+  jobInfoMap: Map<string, JobInfo>,
+): OrderCardData => {
+  const { milestone, label } = mapStatusToMilestone(order.status);
+  const progress = getProgress(order.status);
+  const jobInfo = jobInfoMap.get(order.jobId);
+  const { dueIn, urgent } = computeDueInfo(order, jobInfo);
+
+  const amount = `GH₵ ${order.agreedAmountGhs?.toFixed(2) || "0.00"}`;
+
+  const job = jobInfo?.title || `Job #${order.jobId?.slice(0, 8) || "Unknown"}`;
+
+  return {
+    id: order.id,
+    job,
+    sme: order.smeName || "Unknown SME",
+    amount,
+    milestone,
+    milestoneLabel: label,
+    dueIn,
+    progress,
+    urgent,
+  };
 };
 
 // --- HeroCard Component ---
@@ -160,7 +231,9 @@ interface HeroCardProps {
     town?: string;
     region?: string;
     isVerified?: boolean;
+    profileImageUrl?: string;
   } | null;
+  factoryDraft: CachedFactoryDraft | null;
   stats: HeroStats;
 }
 
@@ -170,6 +243,7 @@ const HeroCard = ({
   scrollY,
   onCompanyLayout,
   user,
+  factoryDraft,
   stats,
 }: HeroCardProps) => {
   const heroTranslateY = scrollY.interpolate({
@@ -189,19 +263,28 @@ const HeroCard = ({
     extrapolate: "clamp",
   });
 
-  const initials = user?.fullName
-    ? user.fullName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-    : "??";
-  const companyName = user?.fullName || "-";
-  const location = user?.town
-    ? `${user.town}, ${user.region || ""}`
-    : user?.region || "Unknown location";
-  const isVerified = user?.isVerified || false;
+  const companyName = factoryDraft?.companyName || user?.fullName || "-";
+
+  const initials =
+    companyName !== "-"
+      ? companyName
+          .split(" ")
+          .map((n) => n[0])
+          .filter(Boolean)
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+      : "??";
+
+  const logoUri = factoryDraft?.logoUrl || user?.profileImageUrl || null;
+
+  const location = factoryDraft?.address
+    ? factoryDraft.address
+    : user?.town
+      ? `${user.town}, ${user.region || ""}`
+      : user?.region || "Unknown location";
+
+  const isVerified = false;
 
   return (
     <FadeIn delay={0}>
@@ -266,9 +349,13 @@ const HeroCard = ({
                 router.push("/(screens)/(manufacturer)/(screens)/profile")
               }
             >
-              <Text style={[styles.heroLogoText, { color: theme.onPrimary }]}>
-                {initials}
-              </Text>
+              {logoUri ? (
+                <Image source={{ uri: logoUri }} style={styles.heroLogoImage} />
+              ) : (
+                <Text style={[styles.heroLogoText, { color: theme.onPrimary }]}>
+                  {initials}
+                </Text>
+              )}
             </Pressable>
 
             <View style={{ flex: 1 }}>
@@ -300,6 +387,7 @@ const HeroCard = ({
                     styles.heroLocation,
                     { color: theme.onPrimary + "CC" },
                   ]}
+                  numberOfLines={1}
                 >
                   {location}
                 </Text>
@@ -370,8 +458,6 @@ export default function ManufacturerHome() {
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
   const isDark = colorScheme === "dark";
 
-  // Pull user from the auth store so we don't race the store's rehydration
-  // (and the api client's Authorization header being attached).
   const { user, token, hasHydrated, getMe } = useAuthStore();
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -379,8 +465,37 @@ export default function ManufacturerHome() {
   const [companyNameTop, setCompanyNameTop] = useState<number | null>(null);
 
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
+
   const [newJobs, setNewJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [factoryDraft, setFactoryDraft] = useState<CachedFactoryDraft | null>(
+    null,
+  );
+
+  const fetchJobDetails = async (
+    jobIds: string[],
+  ): Promise<Map<string, JobInfo>> => {
+    const uniqueIds = [...new Set(jobIds.filter(Boolean))];
+    const map = new Map<string, JobInfo>();
+
+    if (uniqueIds.length === 0) return map;
+
+    const results = await Promise.allSettled(
+      uniqueIds.map((id) => api.get(`jobs/${id}`)),
+    );
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        const job = result.value.data;
+        map.set(uniqueIds[index], {
+          title: job?.title,
+          deadline: job?.deadline,
+        });
+      }
+    });
+
+    return map;
+  };
 
   const [stats, setStats] = useState<HeroStats>({
     escrowHeld: 0,
@@ -413,23 +528,13 @@ export default function ManufacturerHome() {
           (o) => !["COMPLETED", "REFUNDED", "CANCELLED"].includes(o.status),
         );
 
-        const transformedOrders = active.map((order) => {
-          const { milestone, label } = mapStatusToMilestone(order.status);
-          const progress = getProgress(order.status);
-          const { dueIn, urgent } = computeDueInfo(order);
-          return {
-            id: order.id,
-            job: order.jobId || `Job #${order.jobId?.slice(0, 8)}`,
-            sme: order.smeName || "Unknown",
-            amount: `GH₵ ${order.agreedAmountGhs?.toFixed(2) || "0.00"}`,
-            milestone,
-            milestoneLabel: label,
-            dueIn,
-            progress,
-            urgent,
-          };
-        });
-        setActiveOrders(transformedOrders);
+        const jobInfoMap = await fetchJobDetails(active.map((o) => o.jobId));
+
+        const transformed = active.map((order) =>
+          transformOrder(order, jobInfoMap),
+        );
+
+        setActiveOrders(transformed);
 
         let held = 0,
           released = 0;
@@ -480,6 +585,16 @@ export default function ManufacturerHome() {
     };
 
     fetchData();
+
+    const loadCachedFactoryDraft = async () => {
+      try {
+        const raw = await mmkvStorage.getItem(DRAFT_KEY);
+        if (raw) setFactoryDraft(JSON.parse(raw));
+      } catch (e) {
+        console.warn("Failed to load cached factory draft:", e);
+      }
+    };
+    loadCachedFactoryDraft();
   }, [hasHydrated, token]);
 
   useEffect(() => {
@@ -517,6 +632,7 @@ export default function ManufacturerHome() {
           scrollY={scrollY}
           onCompanyLayout={handleCompanyLayout}
           user={user}
+          factoryDraft={factoryDraft}
           stats={stats}
         />
 
@@ -571,35 +687,39 @@ export default function ManufacturerHome() {
                       {newJobs.map((j) => (
                         <JobPeekCard key={j.id} job={j} theme={theme} />
                       ))}
-                      <TouchableOpacity
-                        onPress={() =>
-                          router.push(
-                            "/(screens)/(manufacturer)/(tabs)/jobs" as any,
-                          )
-                        }
-                        style={[
-                          styles.jobPeekCard,
-                          styles.moreCard,
-                          {
-                            backgroundColor: theme.primary + "12",
-                            borderColor: theme.primary + "30",
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name="grid-outline"
-                          size={28}
-                          color={theme.primary}
-                        />
-                        <Text
+
+                      {/* view all card shows if the jobs are more than 2 */}
+                      {newJobs.length > 2 && (
+                        <TouchableOpacity
+                          onPress={() =>
+                            router.push(
+                              "/(screens)/(manufacturer)/(tabs)/jobs" as any,
+                            )
+                          }
                           style={[
-                            styles.moreCardText,
-                            { color: theme.primary },
+                            styles.jobPeekCard,
+                            styles.moreCard,
+                            {
+                              backgroundColor: theme.primary + "12",
+                              borderColor: theme.primary + "30",
+                            },
                           ]}
                         >
-                          View all posts
-                        </Text>
-                      </TouchableOpacity>
+                          <Ionicons
+                            name="grid-outline"
+                            size={28}
+                            color={theme.primary}
+                          />
+                          <Text
+                            style={[
+                              styles.moreCardText,
+                              { color: theme.primary },
+                            ]}
+                          >
+                            View all posts
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </Animated.ScrollView>
                   </View>
                 </FadeIn>
@@ -773,6 +893,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
+    overflow: "hidden",
+  },
+  heroLogoImage: {
+    width: "100%",
+    height: "100%",
   },
   heroLogoText: {
     fontSize: 16,

@@ -84,7 +84,7 @@ const ProductDetailsCard = ({ product, theme, onMessagePress }: any) => {
         {/* Tap indicator */}
         <View style={styles.tapIndicator}>
           <Text style={[styles.tapText, { color: theme.textSecondary }]}>
-            Tap for details →
+            Tap for details
           </Text>
         </View>
       </TouchableOpacity>

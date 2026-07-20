@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
@@ -371,9 +372,7 @@ export default function JobsScreen() {
         ListFooterComponent={
           loading ? (
             <View style={styles.loadingContainer}>
-              <Text style={{ color: theme.textSecondary }}>
-                Loading Jobs...
-              </Text>
+              <ActivityIndicator size={"small"} color={theme.primary} />
             </View>
           ) : null
         }

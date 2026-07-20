@@ -21,11 +21,11 @@ export const hasSelectedRole = (): boolean => {
   return storage.getBoolean(ROLE_KEY) ?? false;
 };
 
-export const setSelectedRole = (role: "sme" | "manufacturer") => {
+export const setSelectedRole = (role: string) => {
   storage.set(ROLE_KEY, true);
   storage.set(ROLE_VALUE_KEY, role);
 };
 
-export const getSavedRole = (): "sme" | "manufacturer" | null => {
-  return storage.getString(ROLE_VALUE_KEY) as any;
+export const getSavedRole = (): string | null => {
+  return storage.getString(ROLE_VALUE_KEY) ?? null;
 };
