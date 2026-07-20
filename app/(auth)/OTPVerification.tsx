@@ -106,7 +106,7 @@ export default function OtpVerifyScreen() {
   const { phoneNumber, role, password } = useLocalSearchParams<{
     phoneNumber?: string;
     role?: string;
-    password?: string; // passed from register screen so we can auto-login after verify
+    password?: string;
   }>();
 
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
@@ -132,7 +132,7 @@ export default function OtpVerifyScreen() {
   const inputRef = useRef<TextInput>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  // Modernized Success Animation Refs
+  // Success Animation Refs
   const successOpacity = useRef(new Animated.Value(0)).current;
   const iconScale = useRef(new Animated.Value(0.4)).current;
   const pulseRingScale = useRef(new Animated.Value(0.8)).current;
@@ -219,7 +219,8 @@ export default function OtpVerifyScreen() {
     );
   };
 
-  const triggerSuccess = () => {
+  // ── UPDATED success trigger: accepts the user's role ──
+  const triggerSuccess = (userRole: string) => {
     // 1. Fade screen in
     Animated.timing(successOpacity, {
       toValue: 1,
@@ -235,7 +236,7 @@ export default function OtpVerifyScreen() {
       friction: 7,
     }).start();
 
-    // 3. Ambient out-ward pulse ring
+    // 3. Ambient outward pulse ring
     Animated.parallel([
       Animated.timing(pulseRingScale, {
         toValue: 2.2,
@@ -266,15 +267,14 @@ export default function OtpVerifyScreen() {
       ]),
     ]).start();
 
-    // Hand-off route swap
+    // Hand-off route swap after animation
     setTimeout(() => {
-      const roleStr = String(
-        role || user?.role || storage.getString("selectedRole") || "",
-      ).toUpperCase();
-      const isAdmin = roleStr.includes("ADMIN");
-      const isSme = roleStr.includes("SME") || roleStr.includes("SME_OWNER");
+      const roleUpper = userRole.toUpperCase();
+      const isAdmin = roleUpper.includes("ADMIN");
+      const isSme =
+        roleUpper.includes("SME") || roleUpper.includes("SME_OWNER");
 
-      // Read current auth state directly from the store to avoid stale closures
+      // Double‑check authentication state from the store
       const { isAuthenticated: auth, user: authUser } = useAuthStore.getState();
       const isAuth = !!auth || !!authUser;
 
@@ -284,16 +284,18 @@ export default function OtpVerifyScreen() {
           : isSme
             ? "/(screens)/(sme)/(tabs)"
             : "/(screens)/(manufacturer)/(tabs)";
-        router.replace({ pathname: destination, params: { role: roleStr } });
+        router.replace({ pathname: destination, params: { role: roleUpper } });
       } else {
+        // Fallback to login (shouldn't happen)
         router.replace({
           pathname: "/(auth)/login",
-          params: { role: roleStr },
+          params: { role: roleUpper },
         });
       }
     }, 1800);
   };
 
+  // ── UPDATED verify: uses the user's actual role ──
   const verify = async (code: string) => {
     if (!phoneNumber || code.length < OTP_LENGTH || loading || verified) return;
 
@@ -302,22 +304,28 @@ export default function OtpVerifyScreen() {
     clearError();
 
     try {
-      // Step 1: verify the OTP
+      // Step 1: verify the OTP – store receives the user
       await verifyOtp(phoneNumber, code);
 
-      // Step 2: If coming from registration, login with saved password
+      // Step 2: If we have a password (registration flow), log in
       if (password) {
         await login(phoneNumber, password);
       }
 
-      // Step 3: Save role now that verification is complete
+      // Step 3: Read the authenticated user from the store
       const currentUser = useAuthStore.getState().user;
-      if (currentUser?.role) {
-        storage.set("selectedRole", currentUser.role);
-      }
+      // Determine the actual role: prefer the user's role, fallback to stored or URL param
+      const finalRole =
+        currentUser?.role ||
+        storage.getString("selectedRole") ||
+        role ||
+        "SME_OWNER";
+
+      // Persist the role for future sessions
+      storage.set("selectedRole", finalRole);
 
       setVerified(true);
-      triggerSuccess();
+      triggerSuccess(finalRole);
     } catch (err: any) {
       setErrorMessage(err?.message ?? "Incorrect code. Please try again.");
       setHasError(true);
@@ -388,7 +396,7 @@ export default function OtpVerifyScreen() {
           >
             We sent a 4-digit verification code to{"\n"}
             <Text style={{ color: theme.text, fontWeight: "600" }}>
-              {phoneNumber}
+              {displayPhoneNumber}
             </Text>
           </ThemedText>
 
@@ -438,7 +446,7 @@ export default function OtpVerifyScreen() {
           )}
           {loading && (
             <Text style={[styles.hintText, { color: theme.textSecondary }]}>
-              Verifying account
+              Verifying account...
             </Text>
           )}
 
@@ -505,7 +513,7 @@ export default function OtpVerifyScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Redesigned Success Interactive Overlay */}
+      {/* Success Overlay */}
       {verified && (
         <Animated.View
           style={[
@@ -519,7 +527,6 @@ export default function OtpVerifyScreen() {
           ]}
         >
           <View style={styles.successWrapper}>
-            {/* Outward Ring Component */}
             <Animated.View
               style={[
                 styles.pulseRing,
@@ -531,7 +538,6 @@ export default function OtpVerifyScreen() {
               ]}
             />
 
-            {/* Scale Pop Icon Canvas */}
             <Animated.View
               style={[
                 styles.successIconCanvas,
@@ -548,7 +554,6 @@ export default function OtpVerifyScreen() {
               />
             </Animated.View>
 
-            {/* Sliding Text Label Segment */}
             <Animated.View
               style={{
                 opacity: textOpacity,
@@ -572,7 +577,7 @@ export default function OtpVerifyScreen() {
   );
 }
 
-// --- Style Framework sheet ---
+// --- Style Framework ---
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
