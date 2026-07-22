@@ -27,7 +27,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-// INCREASED IMAGE HEIGHT FROM 200 TO 240
 const HERO_HEIGHT = 240;
 
 /* ================= TYPES ================= */
@@ -167,7 +166,7 @@ const Map = () => {
   const mapRef = useRef<any>(null);
   const searchInputRef = useRef<TextInput | null>(null);
 
-  // Animation driving value tracking sheet scroll position
+  // Separate scroll values for proper parallax
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
@@ -181,7 +180,7 @@ const Map = () => {
   const [modalVisible, setModalVisible] = useState(false);
 
   const openModal = (company: Company) => {
-    scrollY.setValue(0); // Reset animation scroll offsets
+    scrollY.setValue(0);
     setSelectedCompany(company);
     setModalVisible(true);
   };
@@ -210,8 +209,7 @@ const Map = () => {
             factory.isVerified === true,
         )
         .filter(
-          (factory) =>
-            factory.active !== false && factory.isActive !== false,
+          (factory) => factory.active !== false && factory.isActive !== false,
         )
         .map((factory) => normalizeFactory(factory, location))
         .filter((factory): factory is Company => factory !== null);
@@ -304,35 +302,47 @@ const Map = () => {
     });
   };
 
-  const handleMarkerClick = (marker: { id?: string }) => {
-    const company = filteredCompanies.find((c) => c.id === marker.id);
+  const handleMarkerClick = (marker: {
+    coordinates?: { latitude: number; longitude: number };
+    title?: string;
+  }) => {
+    if (!marker.coordinates) return;
+
+    const company = filteredCompanies.find(
+      (c) =>
+        Math.abs(c.coordinate.latitude - marker.coordinates!.latitude) <
+          0.0001 &&
+        Math.abs(c.coordinate.longitude - marker.coordinates!.longitude) <
+          0.0001,
+    );
+
     if (company) openModal(company);
   };
 
-  /* ================= PARALLAX & HEADER INTERPOLATIONS ================= */
+  /* ================= PARALLAX INTERPOLATIONS ================= */
 
-  // Scales up image elastically when pulled down
+  // Image scale - elastic zoom when pulling down
   const imageScale = scrollY.interpolate({
     inputRange: [-HERO_HEIGHT, 0],
-    outputRange: [2, 1],
+    outputRange: [2.5, 1],
     extrapolate: "clamp",
   });
 
-  // Moves image upwards at a slower velocity rate to create standard depth parallax
+  // Image translate - slower upward movement for parallax depth
   const imageTranslateY = scrollY.interpolate({
-    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
-    outputRange: [HERO_HEIGHT / 2, 0, -HERO_HEIGHT * 0.3],
+    inputRange: [0, HERO_HEIGHT],
+    outputRange: [0, -HERO_HEIGHT * 0.5],
     extrapolate: "clamp",
   });
 
-  // Controls the appearance of the top sticky navigation header
+  // Sticky header fade-in
   const stickyHeaderOpacity = scrollY.interpolate({
-    inputRange: [HERO_HEIGHT - 60, HERO_HEIGHT - 20],
+    inputRange: [HERO_HEIGHT - 80, HERO_HEIGHT - 40],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
 
-  /* ================= LOADING STACKS ================= */
+  /* ================= LOADING STATES ================= */
 
   if (loading || !userLocation) {
     return (
@@ -364,12 +374,12 @@ const Map = () => {
     );
   }
 
-  /* ================= RENDER INTERFACE ================= */
+  /* ================= RENDER ================= */
 
   return (
     <MainContainer>
       <View style={styles.container}>
-        {/* ── SEARCH BAR ── */}
+        {/* SEARCH BAR */}
         {searchVisible && (
           <View
             style={[
@@ -407,7 +417,7 @@ const Map = () => {
           </View>
         )}
 
-        {/* ── MAP CANVAS LAYER ── */}
+        {/* MAP */}
         {Platform.OS === "ios" ? (
           <AppleMaps.View
             ref={mapRef}
@@ -415,11 +425,7 @@ const Map = () => {
             cameraPosition={{ coordinates: userLocation, zoom: 14 }}
             markers={markers.map((m) => ({
               ...m,
-              tintColor:
-                (filteredCompanies.find((c) => c.id === m.id)?.rating ?? 0) >
-                4.7
-                  ? theme.primary
-                  : theme.icon,
+              tintColor: theme.primary,
             }))}
             properties={{ isMyLocationEnabled: true }}
             uiSettings={{ myLocationButtonEnabled: false }}
@@ -440,16 +446,15 @@ const Map = () => {
           />
         )}
 
-        {/* ── SYNC/FETCHING PILL ── */}
+        {/* FETCHING INDICATOR */}
         {fetching && (
           <View style={styles.fetchingPill}>
-            <ActivityIndicator color={theme.onPrimary} size="small" />
-            <Text style={[styles.fetchingText, { color: theme.onPrimary }]}>
-              Updating…
-            </Text>
+            <ActivityIndicator color="#fff" size="small" />
+            <Text style={styles.fetchingText}>Updating…</Text>
           </View>
         )}
 
+        {/* ERROR STATE */}
         {!fetching && factoryError && (
           <View
             style={[
@@ -460,20 +465,31 @@ const Map = () => {
               },
             ]}
           >
-            <Ionicons name="cloud-offline-outline" size={28} color={theme.error} />
-            <Text style={[styles.mapStateTitle, { color: theme.text }]}>Unable to load factories</Text>
-            <Text style={[styles.mapStateMessage, { color: theme.textSecondary }]}>
+            <Ionicons
+              name="cloud-offline-outline"
+              size={28}
+              color={theme.error}
+            />
+            <Text style={[styles.mapStateTitle, { color: theme.text }]}>
+              Unable to load factories
+            </Text>
+            <Text
+              style={[styles.mapStateMessage, { color: theme.textSecondary }]}
+            >
               {factoryError}
             </Text>
             <TouchableOpacity
               style={[styles.retryButton, { backgroundColor: theme.primary }]}
               onPress={retryFactories}
             >
-              <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>Try again</Text>
+              <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>
+                Try again
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
+        {/* EMPTY STATE */}
         {!fetching && !factoryError && companies.length === 0 && (
           <View
             style={[
@@ -485,14 +501,18 @@ const Map = () => {
             ]}
           >
             <Ionicons name="business-outline" size={28} color={theme.primary} />
-            <Text style={[styles.mapStateTitle, { color: theme.text }]}>No verified factories available</Text>
-            <Text style={[styles.mapStateMessage, { color: theme.textSecondary }]}>
+            <Text style={[styles.mapStateTitle, { color: theme.text }]}>
+              No verified factories available
+            </Text>
+            <Text
+              style={[styles.mapStateMessage, { color: theme.textSecondary }]}
+            >
               Verified factories with valid map coordinates will appear here.
             </Text>
           </View>
         )}
 
-        {/* ── SEARCH RESULT QUANTITY COUNT ── */}
+        {/* SEARCH RESULTS COUNT */}
         {!fetching && searchVisible && (
           <View
             style={[
@@ -513,7 +533,7 @@ const Map = () => {
           </View>
         )}
 
-        {/* ── FLOATING CONTROLS (FAB) ── */}
+        {/* FAB CONTROLS */}
         <View style={[styles.fabStack, { bottom: TAB_BAR_HEIGHT + 16 }]}>
           <TouchableOpacity
             style={[
@@ -550,7 +570,7 @@ const Map = () => {
           </TouchableOpacity>
         </View>
 
-        {/* ── APPLE MAPS STYLE SHEET MODAL ── */}
+        {/* MODAL */}
         <Modal
           visible={modalVisible}
           transparent
@@ -565,7 +585,7 @@ const Map = () => {
             >
               {selectedCompany && (
                 <View style={styles.sheetLayoutWrapper}>
-                  {/* 1. ABSOLUTE PARALLAX BACKGROUND HERO LAYER */}
+                  {/* HERO IMAGE WITH PARALLAX */}
                   <Animated.View
                     style={[
                       styles.heroContainer,
@@ -583,69 +603,51 @@ const Map = () => {
                         style={styles.heroImage}
                       />
                     ) : (
-                      <View style={styles.heroImagePlaceholder}>
+                      <View
+                        style={[
+                          styles.heroImagePlaceholder,
+                          { backgroundColor: theme.background },
+                        ]}
+                      >
                         <Ionicons
                           name="business-outline"
                           size={42}
-                          color={theme.primary}
+                          color={theme.textSecondary}
                         />
                       </View>
                     )}
 
-                    {/* Graduated blur band — replaces the single flat BlurView */}
-                    <View
-                      style={[styles.blurFadeContainer, { height: 100 }]}
+                    {/* GRADIENT OVERLAY */}
+                    <LinearGradient
+                      colors={
+                        colorScheme === "dark"
+                          ? [
+                              "rgba(0,0,0,0)",
+                              "rgba(0,0,0,0.3)",
+                              "rgba(0,0,0,0.7)",
+                              theme.cardBackground,
+                            ]
+                          : [
+                              "rgba(255,255,255,0)",
+                              "rgba(255,255,255,0.5)",
+                              "rgba(255,255,255,0.9)",
+                              theme.cardBackground,
+                            ]
+                      }
+                      locations={[0, 0.3, 0.7, 1]}
+                      style={styles.heroGradient}
                       pointerEvents="none"
-                    >
-                      <BlurView
-                        intensity={20}
-                        tint={blurTint}
-                        style={[styles.blurBand, { top: 0, height: 100 }]}
-                      />
-                      <BlurView
-                        intensity={40}
-                        tint={blurTint}
-                        style={[styles.blurBand, { top: 25, height: 75 }]}
-                      />
-                      <BlurView
-                        intensity={65}
-                        tint={blurTint}
-                        style={[styles.blurBand, { top: 50, height: 50 }]}
-                      />
-                      <BlurView
-                        intensity={90}
-                        tint={blurTint}
-                        style={[styles.blurBand, { top: 72, height: 28 }]}
-                      />
-
-                      <LinearGradient
-                        colors={[
-                          "rgba(255,255,255,0)",
-                          "rgba(255,255,255,0.04)",
-                          "rgba(255,255,255,0.12)",
-                          "rgba(255,255,255,0.3)",
-                          "rgba(255,255,255,0.6)",
-                          "rgba(255,255,255,0.85)",
-                          "rgba(255,255,255,1)",
-                        ]}
-                        locations={[0, 0.15, 0.32, 0.5, 0.68, 0.85, 1]}
-                        style={StyleSheet.absoluteFillObject}
-                        pointerEvents="none"
-                      />
-                    </View>
+                    />
                   </Animated.View>
 
-                  {/* 2. DYNAMIC STICKY HEADER FADING OVER SCROLL ELEMENT */}
+                  {/* STICKY HEADER */}
                   <Animated.View
                     style={[
                       styles.stickyHeader,
                       {
                         opacity: stickyHeaderOpacity,
-                        backgroundColor:
-                          colorScheme === "dark"
-                            ? "rgba(30,30,30,0.6)"
-                            : "rgba(255,255,255,0.6)",
-                        borderColor: theme.border,
+                        backgroundColor: theme.cardBackground,
+                        borderBottomColor: theme.border,
                       },
                     ]}
                   >
@@ -662,7 +664,7 @@ const Map = () => {
                     </Text>
                   </Animated.View>
 
-                  {/* 3. STATIC CLOSE ACTION PILL OVERLAP */}
+                  {/* CLOSE BUTTON */}
                   <TouchableOpacity
                     style={styles.heroCloseButton}
                     onPress={closeModal}
@@ -674,10 +676,10 @@ const Map = () => {
                       tint="dark"
                       style={StyleSheet.absoluteFillObject}
                     />
-                    <Ionicons name="close" size={18} color={theme.onPrimary} />
+                    <Ionicons name="close" size={18} color="#fff" />
                   </TouchableOpacity>
 
-                  {/* 4. MAIN INTERACTION VIEW SCRIPTER WITH PARALLAX EVENT */}
+                  {/* SCROLLABLE CONTENT */}
                   <Animated.ScrollView
                     showsVerticalScrollIndicator={false}
                     scrollEventThrottle={16}
@@ -687,22 +689,10 @@ const Map = () => {
                     )}
                     contentContainerStyle={styles.scrollContent}
                   >
-                    {/* Visual block spacer preserving space for background absolute layout frame */}
+                    {/* Spacer for hero */}
                     <View style={{ height: HERO_HEIGHT - 35 }} />
 
-                    {/* Overlapping Rounded Company Avatar Badge */}
-                    <View style={styles.avatarBadgeContainer}>
-                      <BlurView
-                        intensity={60}
-                        tint="light"
-                        style={styles.avatarBadgeBlur}
-                      />
-                      <View style={styles.avatarIconContainer}>
-                        <Ionicons name="business" size={32} color="#4CAF50" />
-                      </View>
-                    </View>
-
-                    {/* Descriptive Identity Blocks */}
+                    {/* COMPANY INFO */}
                     <View style={styles.identitySection}>
                       <Text
                         style={[styles.companyTitle, { color: theme.text }]}
@@ -718,22 +708,40 @@ const Map = () => {
                         {selectedCompany.category}
                       </Text>
                       <Text
-                        style={[styles.distanceText, { color: theme.textSecondary }]}
+                        style={[
+                          styles.distanceText,
+                          { color: theme.textSecondary },
+                        ]}
                       >
-                        ★ {selectedCompany.rating > 0 ? selectedCompany.rating.toFixed(1) : "No ratings"} · {selectedCompany.distance < 1000
+                        ★{" "}
+                        {selectedCompany.rating > 0
+                          ? selectedCompany.rating.toFixed(1)
+                          : "No ratings"}{" "}
+                        ·{" "}
+                        {selectedCompany.distance < 1000
                           ? `${Math.round(selectedCompany.distance)} m away`
                           : `${(selectedCompany.distance / 1000).toFixed(1)} km away`}
                       </Text>
                     </View>
 
+                    {/* ABOUT */}
                     <View style={styles.contentSection}>
-                      <Text style={[styles.sectionHeading, { color: theme.text }]}>About</Text>
-                      <Text style={[styles.descriptionText, { color: theme.textSecondary }]}>
+                      <Text
+                        style={[styles.sectionHeading, { color: theme.text }]}
+                      >
+                        About
+                      </Text>
+                      <Text
+                        style={[
+                          styles.descriptionText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
                         {selectedCompany.description}
                       </Text>
                     </View>
 
-                    {/* ── HOURS RENDER STACK ── */}
+                    {/* HOURS */}
                     <View style={styles.contentSection}>
                       <Text
                         style={[styles.sectionHeading, { color: theme.text }]}
@@ -770,11 +778,16 @@ const Map = () => {
 
                       <View style={styles.dataGridRow}>
                         <Text
-                          style={[styles.mutedLabelText, { color: theme.textSecondary }]}
+                          style={[
+                            styles.mutedLabelText,
+                            { color: theme.textSecondary },
+                          ]}
                         >
                           Verification
                         </Text>
-                        <Text style={[styles.rightValueText, { color: theme.primary }]}>
+                        <Text
+                          style={[styles.rightValueText, { color: theme.text }]}
+                        >
                           {selectedCompany.verificationStatus}
                         </Text>
                       </View>
@@ -785,22 +798,6 @@ const Map = () => {
                           { backgroundColor: theme.border },
                         ]}
                       />
-
-                      <View style={styles.dropdownHeaderRow}>
-                        <Text
-                          style={[
-                            styles.mutedLabelText,
-                            { color: theme.textSecondary },
-                          ]}
-                        >
-                          Normal Hours
-                        </Text>
-                        <Ionicons
-                          name="chevron-down"
-                          size={14}
-                          color={theme.textSecondary}
-                        />
-                      </View>
 
                       <View style={styles.subTimeRow}>
                         <Text style={[styles.dayText, { color: theme.text }]}>
@@ -834,7 +831,7 @@ const Map = () => {
                       </View>
                     </View>
 
-                    {/* ── DETAILS RENDER STACK ── */}
+                    {/* DETAILS */}
                     <View style={styles.contentSection}>
                       <Text
                         style={[styles.sectionHeading, { color: theme.text }]}
@@ -852,7 +849,12 @@ const Map = () => {
                           Phone
                         </Text>
                         <TouchableOpacity>
-                          <Text style={styles.interactiveLinkText}>
+                          <Text
+                            style={[
+                              styles.interactiveLinkText,
+                              { color: theme.primary },
+                            ]}
+                          >
                             {selectedCompany.phone}
                           </Text>
                         </TouchableOpacity>
@@ -875,7 +877,12 @@ const Map = () => {
                           Website
                         </Text>
                         <TouchableOpacity>
-                          <Text style={[styles.interactiveLinkText]}>
+                          <Text
+                            style={[
+                              styles.interactiveLinkText,
+                              { color: theme.primary },
+                            ]}
+                          >
                             {selectedCompany.website}
                           </Text>
                         </TouchableOpacity>
@@ -914,7 +921,7 @@ const Map = () => {
                     </View>
                   </Animated.ScrollView>
 
-                  {/* Pinned Soft-Capsule Navigation CTA Row */}
+                  {/* CTA BUTTON */}
                   <View
                     style={[
                       styles.ctaFixedContainer,
@@ -925,8 +932,7 @@ const Map = () => {
                       style={[
                         styles.capsuleCtaButton,
                         {
-                          backgroundColor:
-                            colorScheme === "dark" ? "#2c2c2e" : "#eaf2ff",
+                          backgroundColor: theme.primary,
                         },
                       ]}
                       activeOpacity={0.8}
@@ -939,14 +945,19 @@ const Map = () => {
                         }, 200);
                       }}
                     >
-                      <View style={styles.ctaIconBadgeCircle}>
-                        <Ionicons
-                          name="arrow-redo"
-                          size={14}
-                          color={theme.onPrimary}
-                        />
-                      </View>
-                      <Text style={styles.capsuleCtaText}>Get Directions</Text>
+                      <Ionicons
+                        name="person"
+                        size={16}
+                        color={theme.onPrimary}
+                      />
+                      <Text
+                        style={[
+                          styles.capsuleCtaText,
+                          { color: theme.onPrimary },
+                        ]}
+                      >
+                        Open Profile
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -969,6 +980,7 @@ const styles = StyleSheet.create({
 
   loading: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 12, fontSize: 15 },
+
   mapStateCard: {
     position: "absolute",
     top: "42%",
@@ -1003,7 +1015,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  /* Search bar styling */
   searchBar: {
     position: "absolute",
     left: 16,
@@ -1028,7 +1039,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  /* Result pills */
   resultPill: {
     position: "absolute",
     alignSelf: "center",
@@ -1044,7 +1054,6 @@ const styles = StyleSheet.create({
   },
   resultPillText: { fontSize: 12, fontWeight: "500" },
 
-  /* Fetching updates marker */
   fetchingPill: {
     position: "absolute",
     top: 16,
@@ -1057,9 +1066,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
-  fetchingText: { fontSize: 13 },
+  fetchingText: { fontSize: 13, color: "#fff" },
 
-  /* FAB layout */
   fabStack: {
     position: "absolute",
     right: 16,
@@ -1080,7 +1088,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
 
-  /* Redesigned Bottom Sheet presentation layers */
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -1101,7 +1108,7 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
 
-  /* Parallax Backdrop Frames */
+  // Hero parallax container
   heroContainer: {
     position: "absolute",
     top: 0,
@@ -1121,21 +1128,15 @@ const styles = StyleSheet.create({
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#E8F5E9",
   },
-  blurFadeContainer: {
+  heroGradient: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    overflow: "hidden",
+    height: 120,
   },
-  blurBand: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-  },
-  /* Sticky blurred top row elements */
+
   stickyHeader: {
     position: "absolute",
     top: 0,
@@ -1167,32 +1168,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  /* Profile header card contents */
-  avatarBadgeContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    alignSelf: "center",
-    zIndex: 5,
-    overflow: "hidden",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: -20,
-  },
-  avatarBadgeBlur: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  avatarIconContainer: {
-    width: 48,
-    height: 48,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   identitySection: {
     alignItems: "center",
     marginTop: 12,
@@ -1207,7 +1182,6 @@ const styles = StyleSheet.create({
   companySubtitle: {
     fontSize: 14,
     marginTop: 2,
-    color: "#8E8E93",
   },
   distanceText: {
     fontSize: 13,
@@ -1218,7 +1192,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  /* Apple details blocks presentation layouts */
   contentSection: {
     marginBottom: 24,
   },
@@ -1229,12 +1202,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   dataGridRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  dropdownHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -1268,11 +1235,9 @@ const styles = StyleSheet.create({
   },
   interactiveLinkText: {
     fontSize: 16,
-    color: "#007AFF",
     fontWeight: "400",
   },
 
-  /* Bottom Fixed Action Elements */
   ctaFixedContainer: {
     position: "absolute",
     bottom: 0,
@@ -1291,17 +1256,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     gap: 8,
   },
-  ctaIconBadgeCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#007AFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   capsuleCtaText: {
     fontSize: 16,
-    color: "#007AFF",
     fontWeight: "600",
   },
 });

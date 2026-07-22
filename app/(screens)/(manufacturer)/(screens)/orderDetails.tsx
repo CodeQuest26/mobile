@@ -418,7 +418,10 @@ export function OrderDetailScreen({
                 {apiJob?.attachmentUrls?.[0] && (
                   <Image
                     source={{ uri: apiJob.attachmentUrls[0] }}
-                    style={styles.orderJobImage}
+                    style={[
+                      styles.orderJobImage,
+                      { borderWidth: 1, borderColor: theme.border },
+                    ]}
                   />
                 )}
                 <Text
