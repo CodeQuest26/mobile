@@ -15,7 +15,8 @@
         "NSFaceIDUsageDescription": "Use Face ID or Touch ID to quickly and securely sign in to MakersHub.",
         "NSLocationWhenInUseUsageDescription": "Allow MakersHub to access your location to show nearby companies.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow MakersHub to access your location even in the background for better recommendations.",
-        "NSLocationAlwaysUsageDescription": "Allow MakersHub to access your location for continuous updates."
+        "NSLocationAlwaysUsageDescription": "Allow MakersHub to access your location for continuous updates.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -24,7 +25,12 @@
         "backgroundColor": "#E6F4FE"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
       "package": "com.anonymous.MakersHub",
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json"

@@ -2,9 +2,9 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 
 import {
-    getSavedRole,
-    hasCompletedOnboarding,
-    hasSelectedRole,
+  getSavedRole,
+  hasCompletedOnboarding,
+  hasSelectedRole,
 } from "@/storage/storage";
 import { useAuthStore } from "@/store/auth";
 
@@ -25,22 +25,25 @@ export default function Index() {
     const savedRole = getSavedRole();
     const liveRole = user?.role ?? savedRole;
 
-    if (!token && !isAuthenticated) {
-      router.replace("/(auth)/login");
-      return;
-    }
-
-    if (!rolePicked) {
-      router.replace("/(auth)");
-      return;
-    }
-
+    // First launch -> onboarding
     if (!onboarded) {
       router.replace("/(onboarding)");
       return;
     }
 
-    //  Force OTP whenever there's a pending phone number
+    // No role selected
+    if (!rolePicked) {
+      router.replace("/(auth)");
+      return;
+    }
+
+    // Not logged in
+    if (!token && !isAuthenticated) {
+      router.replace("/(auth)/login");
+      return;
+    }
+
+    // Pending OTP
     if (pendingVerificationPhone) {
       router.replace({
         pathname: "/(auth)/OTPVerification",
@@ -56,17 +59,19 @@ export default function Index() {
       return;
     }
 
-    // At this point user is fully authenticated and verified
     switch (liveRole) {
       case "FACTORY_OWNER":
         router.replace("/(screens)/(manufacturer)/(tabs)");
         break;
+
       case "SME_OWNER":
         router.replace("/(screens)/(sme)/(tabs)");
         break;
+
       case "ADMIN":
         router.replace("/(screens)/(admin)/(tabs)");
         break;
+
       default:
         router.replace("/(auth)/login");
     }

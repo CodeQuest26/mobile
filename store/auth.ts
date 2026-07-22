@@ -188,7 +188,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true, error: null });
 
-          await axios.post(joinUrl(BASE_URL, "auth/resend-otp"), { phoneNumber });
+          await axios.post(joinUrl(BASE_URL, "auth/resend-otp"), {
+            phoneNumber,
+          });
         } catch (error) {
           const message = handleApiError(error);
           set({ error: message });
@@ -239,7 +241,19 @@ export const useAuthStore = create<AuthState>()(
             ? err.response?.status
             : undefined;
           if (status === 401) {
-            await get().logout();
+            try {
+              await get().refreshAccessToken();
+
+              const { data } = await axios.get(joinUrl(BASE_URL, "users/me"), {
+                headers: {
+                  Authorization: `Bearer ${get().token}`,
+                },
+              });
+
+              set({ user: data });
+            } catch {
+              await get().logout();
+            }
           }
         } finally {
           set({ isLoading: false });
