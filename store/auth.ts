@@ -234,9 +234,7 @@ export const useAuthStore = create<AuthState>()(
 
           set({ user: data });
         } catch (err) {
-          // Only a 401 proves that the access token was rejected. A 403 can
-          // be a valid authenticated user lacking permission, while network
-          // errors, timeouts, and 5xx responses must never log the user out.
+          // Only a 401 proves that the access token was rejected.
           const status = axios.isAxiosError(err)
             ? err.response?.status
             : undefined;
