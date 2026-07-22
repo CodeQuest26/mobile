@@ -18,10 +18,8 @@ try {
         }) as any,
     });
   }
-} catch (error) {
-  console.warn(
-    "[Notifications] expo-notifications native module unavailable. Build a native dev client to enable push notifications.",
-  );
+} catch {
+  Notifications = null;
 }
 
 /* ─── Token registration ──────────────────────────────────────────────────── */

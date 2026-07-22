@@ -48,7 +48,7 @@ interface InputFieldProps {
   secureTextEntry: any;
   rightSlot: any;
   theme: any;
-  pholder: any;
+  pholder?: string;
 }
 
 const InputField = ({

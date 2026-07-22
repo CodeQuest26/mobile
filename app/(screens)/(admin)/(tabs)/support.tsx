@@ -1,6 +1,6 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
-import { api, handleApiError } from "@/services/api"; // Correct service import
+import { api, handleApiError } from "@/services/api";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -16,10 +16,20 @@ import {
 
 type SupportTicket = {
   id: string;
-  userFullName: string;
+  ticketNumber: string;
+  userId: string;
+  userName: string;
+  subject: string;
+  category: string;
   priority: string;
-  description: string;
   status: string;
+  targetSlaDeadline?: string;
+  createdAt: string;
+  slaBreached?: boolean;
+};
+
+type SupportTicketsResponse = {
+  content?: SupportTicket[];
 };
 
 const SupportTicketsScreen = () => {
@@ -35,9 +45,11 @@ const SupportTicketsScreen = () => {
   const fetchTickets = useCallback(async () => {
     try {
       setError(null);
-      // Correct endpoint as per standard admin dashboard patterns
-      const { data } = await api.get<SupportTicket[]>("/admin/support-tickets");
-      setTickets(data);
+      const { data } =
+        await api.get<SupportTicketsResponse | SupportTicket[]>(
+          "support/tickets",
+        );
+      setTickets(Array.isArray(data) ? data : data.content || []);
     } catch (err) {
       setError(handleApiError(err));
     } finally {
@@ -52,22 +64,23 @@ const SupportTicketsScreen = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "High":
+      case "HIGH":
+      case "URGENT":
         return theme.error;
-      case "Medium":
+      case "MEDIUM":
         return theme.warning;
-      case "Low":
+      case "LOW":
         return "#4A90E2";
       default:
         return theme.primary;
     }
   };
 
-  const renderTicket = ({ item }: any) => (
+  const renderTicket = ({ item }: { item: SupportTicket }) => (
     <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
       <View style={styles.headerRow}>
         <Text style={[styles.user, { color: theme.text }]}>
-          {item.userFullName}
+          {item.subject}
         </Text>
         <View
           style={[
@@ -88,15 +101,20 @@ const SupportTicketsScreen = () => {
       </View>
 
       <Text style={[styles.issue, { color: theme.textSecondary }]}>
-        {item.description}
+        {item.userName} • {item.category.replace(/_/g, " ")}
       </Text>
 
       <View style={styles.footerRow}>
         <Text style={[styles.status, { color: theme.text }]}>
-          Status: {item.status}
+          #{item.ticketNumber} • {item.status.replace(/_/g, " ")}
         </Text>
         <Pressable
-          onPress={() => router.push(`/admin/support/${item.id}` as any)}
+          onPress={() =>
+            router.push({
+              pathname: "/admin/support/[ticketId]" as any,
+              params: { ticketId: item.id, ticket: JSON.stringify(item) },
+            })
+          }
         >
           <Text style={[styles.viewText, { color: theme.textSecondary }]}>
             View Details →

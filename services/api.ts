@@ -167,13 +167,25 @@ api.interceptors.response.use(
 
 export const handleApiError = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
     const data = error.response?.data;
-    if (data?.violations?.length) {
-      return data.violations.map((v: any) => v.message).join("\n");
+
+    let msg = "";
+    if (typeof data === "string" && data.trim()) {
+      msg = data;
+    } else if (data?.violations?.length) {
+      msg = data.violations.map((v: any) => v.message).join("\n");
+    } else {
+      msg =
+        data?.message ??
+        data?.error ??
+        data?.details ??
+        data?.title ??
+        error.message ??
+        "Something went wrong";
     }
-    return (
-      data?.message ?? data?.error ?? error.message ?? "Something went wrong"
-    );
+
+    return status ? `[HTTP ${status}] ${msg}` : msg;
   }
   return "An unexpected error occurred";
 };

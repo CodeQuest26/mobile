@@ -70,15 +70,14 @@ interface FactoryProfilePayload {
   region?: string;
   town?: string;
   profileImageUrl?: string;
+  coverImageUrl?: string;
+  payoutAccountType?: string;
+  payoutAccountName?: string;
+  payoutAccountNumber?: string;
+  payoutBankCode?: string;
 }
 
-// Local draft shape — everything the form needs to fully restore itself,
-// including raw string inputs (like sectorTagsInput) rather than the
-// parsed payload, so partially-typed values aren't lost either.
-// `logoUrl` is persisted locally AND sent to the backend now (as
-// `profileImageUrl` — see handleSave), so it's kept as its own field
-// here rather than a raw string input, since it's set by the upload
-// flow rather than typed by the user.
+// Local draft shape — everything the form needs to fully restore itself
 interface FactoryProfileDraft {
   companyName: string;
   description: string;
@@ -90,9 +89,14 @@ interface FactoryProfileDraft {
   latitude: number | null;
   longitude: number | null;
   logoUrl: string | null;
+  coverImageUrl: string | null;
   email: string;
   region: string;
   town: string;
+  payoutAccountType: string;
+  payoutAccountName: string;
+  payoutAccountNumber: string;
+  payoutBankCode: string;
 }
 
 const emptyDraft: FactoryProfileDraft = {
@@ -106,9 +110,14 @@ const emptyDraft: FactoryProfileDraft = {
   latitude: null,
   longitude: null,
   logoUrl: null,
+  coverImageUrl: null,
   email: "",
   region: "",
   town: "",
+  payoutAccountType: "",
+  payoutAccountName: "",
+  payoutAccountNumber: "",
+  payoutBankCode: "",
 };
 
 // Parses a numeric text field into a clean integer or undefined —
@@ -183,6 +192,7 @@ export default function EditManufacturerProfile() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   // Read-only, pulled from the real user object (GET /users/me).
   // displayName is updated locally after a successful save if the
@@ -323,6 +333,44 @@ export default function EditManufacturerProfile() {
       Alert.alert("Upload failed", handleApiError(error));
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  const pickAndUploadCover = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "We need photo library access to set your cover image.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    setUploadingCover(true);
+    try {
+      const url = await uploadFileToServer(asset);
+      updateDraft({ coverImageUrl: url });
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.log(
+          "Cover upload failed — response body:",
+          error.response?.data,
+        );
+      }
+      console.error("Failed to upload cover:", error);
+      Alert.alert("Upload failed", handleApiError(error));
+    } finally {
+      setUploadingCover(false);
     }
   };
 

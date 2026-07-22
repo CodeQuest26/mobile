@@ -1,10 +1,12 @@
 import { Icon, Label } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import React from "react";
+import { useColorScheme } from "react-native";
 
 const AdminLayout = () => {
+  const colorScheme = useColorScheme();
   return (
-    <NativeTabs>
+    <NativeTabs iconColor={colorScheme === "dark" ? "#fff" : "#000"}>
       <NativeTabs.Trigger name="index">
         <Icon sf="house.fill" md="home" />
         <Label>Home</Label>

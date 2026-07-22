@@ -122,8 +122,8 @@ const Disputes = () => {
       activeOpacity={0.8}
       onPress={() =>
         router.push({
-          pathname: "/admin/disputes/[id]",
-          params: { id: item.id },
+          pathname: "/admin/disputes/[id]" as any,
+          params: { id: item.id, dispute: JSON.stringify(item) },
         } as any)
       }
     >

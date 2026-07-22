@@ -127,7 +127,7 @@ const Revenue = () => {
 
         {loading ? (
           <ActivityIndicator
-            size="large"
+            size="small"
             color={theme.primary}
             style={{ marginTop: 60 }}
           />

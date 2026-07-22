@@ -1,4 +1,3 @@
-import { api } from "@/services/api";
 import { mmkvStorage } from "@/store/mmkv";
 import axios from "axios";
 import { create } from "zustand";
@@ -7,6 +6,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 interface User {
   id: string;
   fullName: string;
+  email?: string;
   phoneNumber?: string;
   role: "SME_OWNER" | "FACTORY_OWNER" | "ENTERPRISE" | "ADMIN";
   isVerified: boolean;
@@ -65,6 +65,9 @@ const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   "https://backendtest-production-9132.up.railway.app/api/v1/";
 
+const joinUrl = (base: string, path: string) =>
+  `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+
 const handleApiError = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;
@@ -102,12 +105,6 @@ export const useAuthStore = create<AuthState>()(
       clearError: () => set({ error: null }),
 
       setToken: (token) => {
-        if (token) {
-          api.defaults.headers.common.Authorization = `Bearer ${token}`;
-        } else {
-          delete api.defaults.headers.common.Authorization;
-        }
-
         set({
           token,
           isAuthenticated: !!token,
@@ -120,7 +117,7 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: true, error: null });
 
           const { data } = await axios.post(
-            `${BASE_URL}auth/register`,
+            joinUrl(BASE_URL, "auth/register"),
             payload,
           );
 
@@ -130,6 +127,7 @@ export const useAuthStore = create<AuthState>()(
             user: {
               id: data.id,
               fullName: data.fullName,
+              email: data.email,
               phoneNumber: data.phoneNumber,
               role: data.role,
               isVerified: data.isVerified,
@@ -156,7 +154,7 @@ export const useAuthStore = create<AuthState>()(
           set({ isVerifying: true, error: null });
 
           const { data } = await axios.post<VerifyOtpResponse>(
-            `${BASE_URL}auth/verify`,
+            joinUrl(BASE_URL, "auth/verify"),
             { phoneNumber, otp },
           );
           console.log(data);
@@ -164,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
             user: {
               id: data.user?.id,
               fullName: data?.user?.fullName,
+              email: data.user?.email,
               phoneNumber: data?.user?.phoneNumber,
               role: data.user?.role,
               isVerified: data.user.isVerified,
@@ -189,7 +188,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true, error: null });
 
-          await axios.post(`${BASE_URL}auth/resend-otp`, { phoneNumber });
+          await axios.post(joinUrl(BASE_URL, "auth/resend-otp"), { phoneNumber });
         } catch (error) {
           const message = handleApiError(error);
           set({ error: message });
@@ -204,7 +203,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true, error: null });
 
-          const { data } = await axios.post(`${BASE_URL}auth/login`, {
+          const { data } = await axios.post(joinUrl(BASE_URL, "auth/login"), {
             phoneNumber,
             password,
           });
@@ -227,7 +226,9 @@ export const useAuthStore = create<AuthState>()(
           if (!get().token) return;
           set({ isLoading: true });
 
-          const { data } = await api.get("users/me");
+          const { data } = await axios.get(joinUrl(BASE_URL, "users/me"), {
+            headers: { Authorization: `Bearer ${get().token}` },
+          });
 
           set({ user: data });
         } catch (err) {
@@ -247,8 +248,6 @@ export const useAuthStore = create<AuthState>()(
 
       /* ---------------- Logout ---------------- */
       logout: async () => {
-        delete api.defaults.headers.common.Authorization;
-
         set({
           user: null,
           token: null,
@@ -273,10 +272,6 @@ export const useAuthStore = create<AuthState>()(
         if (error) {
           console.error("Failed to rehydrate auth store:", error);
           return;
-        }
-
-        if (state?.token) {
-          api.defaults.headers.common.Authorization = `Bearer ${state.token}`;
         }
 
         // Mutate the incoming state object directly instead of calling

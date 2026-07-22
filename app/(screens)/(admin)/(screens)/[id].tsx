@@ -198,10 +198,8 @@ const DisputeDetailScreen = () => {
           <Text style={[styles.title, { color: theme.text }]}>
             {formatReason(dispute.reason)}
           </Text>
-          <View
-            style={[styles.statusBadge, { backgroundColor: theme.background }]}
-          >
-            <Text style={[styles.statusText, { color: theme.textSecondary }]}>
+          <View style={[styles.statusBadge, { borderColor: theme.primary }]}>
+            <Text style={[styles.statusText, { color: theme.primary }]}>
               {dispute.status.replace(/_/g, " ")}
             </Text>
           </View>
@@ -212,7 +210,7 @@ const DisputeDetailScreen = () => {
           {formatDate(dispute.createdAt)}
         </Text>
 
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>
           DESCRIPTION
         </Text>
         <Text style={[styles.description, { color: theme.text }]}>
@@ -221,7 +219,7 @@ const DisputeDetailScreen = () => {
 
         {dispute.evidenceUrls && dispute.evidenceUrls.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            <Text style={[styles.sectionLabel, { color: theme.primary }]}>
               EVIDENCE ({dispute.evidenceUrls.length})
             </Text>
             {dispute.evidenceUrls.map((url, idx) => (
@@ -238,7 +236,7 @@ const DisputeDetailScreen = () => {
 
         {dispute.resolvedAt && (
           <>
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            <Text style={[styles.sectionLabel, { color: theme.primary }]}>
               RESOLUTION
             </Text>
             <Text style={[styles.description, { color: theme.text }]}>
@@ -258,7 +256,7 @@ const DisputeDetailScreen = () => {
 
         {!isResolved && (
           <>
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            <Text style={[styles.sectionLabel, { color: theme.primary }]}>
               RESOLVE THIS DISPUTE
             </Text>
 
@@ -273,7 +271,7 @@ const DisputeDetailScreen = () => {
                       backgroundColor:
                         selectedResolution === opt.value
                           ? theme.primary
-                          : theme.cardBackground,
+                          : "transparent",
                     },
                   ]}
                   onPress={() => setSelectedResolution(opt.value)}
@@ -299,7 +297,7 @@ const DisputeDetailScreen = () => {
               selectedResolution === "RESOLVED_SPLIT") && (
               <>
                 <Text
-                  style={[styles.sectionLabel, { color: theme.textSecondary }]}
+                  style={[styles.sectionLabel, { color: theme.primary }]}
                 >
                   REFUND AMOUNT (GHS)
                 </Text>
@@ -308,8 +306,8 @@ const DisputeDetailScreen = () => {
                     styles.input,
                     {
                       color: theme.text,
-                      borderColor: theme.border,
-                      backgroundColor: theme.background,
+                      borderColor: theme.primary,
+                      backgroundColor: "transparent",
                     },
                   ]}
                   placeholder="0.00"
@@ -321,7 +319,7 @@ const DisputeDetailScreen = () => {
               </>
             )}
 
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            <Text style={[styles.sectionLabel, { color: theme.primary }]}>
               ADMIN NOTES
             </Text>
             <TextInput
@@ -330,8 +328,8 @@ const DisputeDetailScreen = () => {
                 styles.notesInput,
                 {
                   color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.background,
+                  borderColor: theme.primary,
+                  backgroundColor: "transparent",
                 },
               ]}
               placeholder="Optional notes…"
@@ -358,7 +356,7 @@ const DisputeDetailScreen = () => {
                 <ActivityIndicator color={theme.onPrimary} size="small" />
               ) : (
                 <Text style={[styles.submitText, { color: theme.onPrimary }]}>
-                  Submit Resolution
+                  Resolve Dispute
                 </Text>
               )}
             </Pressable>
@@ -378,13 +376,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: { fontSize: 22, fontWeight: "700", flex: 1 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  statusText: { fontSize: 11, fontWeight: "700", letterSpacing: 0.3 },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  statusText: { fontSize: 11, fontWeight: "700" },
   meta: { fontSize: 13, marginTop: 4, marginBottom: 10 },
   sectionLabel: {
     fontSize: 10.5,
     fontWeight: "700",
-    letterSpacing: 1,
     marginTop: 18,
     marginBottom: 6,
   },
@@ -393,7 +395,7 @@ const styles = StyleSheet.create({
   optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   optionChip: {
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
