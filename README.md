@@ -1,5 +1,8 @@
 # Welcome to your Expo app 👋
 
+Payment checkout integration and the paired backend contract are documented in
+[docs/paystack-integration.md](docs/paystack-integration.md).
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started

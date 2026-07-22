@@ -266,57 +266,11 @@ const LoginScreen = () => {
             )}
           </TouchableOpacity>
 
-          <Spacer style={{ height: 20 }} />
-
-          <View style={styles.dividerRow}>
-            <View style={[styles.divider, { backgroundColor: theme.border }]} />
-            <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
-              or
-            </Text>
-            <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          </View>
-
-          <Spacer style={{ height: 20 }} />
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={[
-              styles.socialButton,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons name="logo-google" size={16} color={theme.text} />
-            <Text style={[styles.socialText, { color: theme.text }]}>
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
-
-          <Spacer style={{ height: 12 }} />
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={[
-              styles.socialButton,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons name="logo-apple" size={19} color={theme.text} />
-            <Text style={[styles.socialText, { color: theme.text }]}>
-              Continue with Apple
-            </Text>
-          </TouchableOpacity>
-
-          <Spacer style={{ height: 28 }} />
+          <Spacer style={{ height: 10 }} />
 
           <View style={styles.signupRow}>
             <Text style={[styles.signupPrompt, { color: theme.textSecondary }]}>
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
             </Text>
             <TouchableOpacity
               onPress={() =>

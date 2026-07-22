@@ -1,7 +1,7 @@
 import React from "react";
-import { View } from "react-native";
+import { StyleProp, View, ViewStyle } from "react-native";
 
-const Spacer = ({ style, ...props }) => {
+const Spacer = ({ style }: { style?: StyleProp<ViewStyle> }) => {
   return <View style={[{ height: 15, width: "100%" }, style]} />;
 };
 

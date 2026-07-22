@@ -147,7 +147,8 @@ const SignupScreen = () => {
   const theme = Colors[colorScheme] || Colors.light;
 
   const selectedRole = storage.getString("selectedRole");
-  const roleMeta = ROLE_META[selectedRole];
+  const roleMeta =
+    ROLE_META[selectedRole as keyof typeof ROLE_META] ?? ROLE_META.SME_OWNER;
 
   const { register } = useAuthStore();
 
@@ -155,10 +156,18 @@ const SignupScreen = () => {
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = phoneNumber.length >= 10 && password.length >= 8;
+  const passwordsMatch = password === confirmPassword;
+  const confirmTouched = confirmPassword.length > 0;
+  const canSubmit =
+    phoneNumber.length >= 10 &&
+    password.length >= 8 &&
+    confirmTouched &&
+    passwordsMatch;
 
   const handleSignup = async () => {
     const selectedRole = storage.getString("selectedRole");
@@ -279,6 +288,44 @@ const SignupScreen = () => {
 
           <Spacer style={{ height: 10 }} />
           <PasswordStrength password={password} theme={theme} />
+
+          <Spacer style={{ height: 15 }} />
+
+          {/* Confirm Password Field */}
+          <InputField
+            label="Confirm Password"
+            icon="lock-closed-outline"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry={!showConfirmPassword}
+            theme={theme}
+            rightSlot={
+              <Pressable
+                onPress={() => setShowConfirmPassword((v) => !v)}
+                style={{ height: "100%", justifyContent: "center" }}
+              >
+                <Ionicons
+                  name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={theme.textSecondary}
+                />
+              </Pressable>
+            }
+          />
+
+          {/* Confirm password mismatch error */}
+          {confirmTouched && !passwordsMatch && (
+            <Text
+              style={{
+                color: "#EF4444",
+                fontSize: 12,
+                marginTop: 4,
+                marginLeft: 4,
+              }}
+            >
+              Passwords do not match
+            </Text>
+          )}
         </View>
 
         {/* Footer */}
@@ -310,56 +357,7 @@ const SignupScreen = () => {
             </Text>
           </TouchableOpacity>
 
-          <Spacer style={{ height: 20 }} />
-
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={[styles.divider, { backgroundColor: theme.border }]} />
-            <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
-              or
-            </Text>
-            <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          </View>
-
-          <Spacer style={{ height: 20 }} />
-
-          {/* Google */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={[
-              styles.socialButton,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons name="logo-google" size={16} color={theme.text} />
-            <Text style={[styles.socialText, { color: theme.text }]}>
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
-
           <Spacer style={{ height: 10 }} />
-
-          {/* Apple */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={[
-              styles.socialButton,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons name="logo-apple" size={18} color={theme.text} />
-            <Text style={[styles.socialText, { color: theme.text }]}>
-              Continue with Apple
-            </Text>
-          </TouchableOpacity>
-
-          <Spacer style={{ height: 24 }} />
 
           {/* Sign in link */}
           <View style={styles.loginRow}>

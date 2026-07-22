@@ -9,6 +9,10 @@ const ManufacturerScreensLayout = () => {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="profile" />
         <Stack.Screen name="filterScreen" />
+        <Stack.Screen name="bidDetails" />
+        <Stack.Screen name="editProfile" />
+        <Stack.Screen name="notification" />
+        <Stack.Screen name="orderDetails" />
       </Stack>
     </GestureHandlerRootView>
   );

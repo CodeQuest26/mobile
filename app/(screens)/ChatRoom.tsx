@@ -3,9 +3,10 @@ import Colors from "@/constants/colors";
 import { api } from "@/services/api";
 import { getAvatarColor } from "@/services/avatarColor";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -125,6 +126,14 @@ const Bubble = ({
         ]}
       >
         {formatTime(item.createdAt)}
+        {isCurrentUser && (
+          <Ionicons
+            name={item.isRead ? "checkmark-done" : "checkmark"}
+            size={15}
+            color={item.isRead ? theme.primary : theme.textSecondary}
+            accessibilityLabel={item.isRead ? "Read" : "Sent"}
+          />
+        )}
       </Text>
     </View>
   );
@@ -165,15 +174,19 @@ const ChatRoom = () => {
   const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState("");
+  const [messageSearch, setMessageSearch] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  // Fetch current user and messages
-  useEffect(() => {
-    const fetchData = async () => {
+  // Poll the REST API while this screen is focused. This provides live
+  // updates without requiring a socket endpoint from the backend.
+  const loadConversation = useCallback(
+    async (background = false) => {
       try {
-        setLoading(true);
+        if (!background) setLoading(true);
+        setError(null);
         // 1. Get current user
         const userRes = await api.get("users/me");
         const user = userRes.data;
@@ -192,7 +205,8 @@ const ChatRoom = () => {
         );
 
         if (contactOrders.length === 0) {
-          setLoading(false);
+          setMessages([]);
+          setActiveOrderId(null);
           return;
         }
 
@@ -234,15 +248,26 @@ const ChatRoom = () => {
         setMessages(allMessages);
       } catch (error) {
         console.error("Error fetching chat data:", error);
+        setError("Couldn’t refresh this conversation. Please try again.");
       } finally {
-        setLoading(false);
+        if (!background) setLoading(false);
       }
-    };
+    },
+    [contactId, userType],
+  );
 
-    if (contactId) {
-      fetchData();
-    }
-  }, [contactId]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!contactId) return;
+
+      void loadConversation();
+      const refreshInterval = setInterval(() => {
+        void loadConversation(true);
+      }, 5000);
+
+      return () => clearInterval(refreshInterval);
+    }, [contactId, loadConversation]),
+  );
 
   // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
@@ -311,7 +336,13 @@ const ChatRoom = () => {
   if (!contactId) return null;
 
   const c = getAvatarColor(contactId);
-  const chatItems = getChatItems();
+  const searchTerm = messageSearch.trim().toLowerCase();
+  const chatItems = getChatItems().filter(
+    (item) =>
+      "separator" in item ||
+      !searchTerm ||
+      item.content.toLowerCase().includes(searchTerm),
+  );
   const online = contactOnline === "1";
 
   return (
@@ -355,12 +386,18 @@ const ChatRoom = () => {
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={{ color: theme.textSecondary }}>
+            <ActivityIndicator size={"small"} color={theme.primary} />
+            <Text style={{ color: theme.textSecondary, marginTop: 20 }}>
               Loading messages...
             </Text>
           </View>
         ) : (
           <>
+            {error && (
+              <Text style={[styles.refreshError, { color: theme.error }]}>
+                {error}
+              </Text>
+            )}
             <FlatList
               ref={flatListRef}
               data={chatItems}
@@ -570,6 +607,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  refreshError: {
+    fontSize: 13,
+    textAlign: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
   empty: {
     flex: 1,

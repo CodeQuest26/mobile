@@ -26,7 +26,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const HERO_HEIGHT = 200; // Height of the parallax image header
+// INCREASED IMAGE HEIGHT FROM 200 TO 240
+const HERO_HEIGHT = 240;
 
 /* ================= TYPES ================= */
 
@@ -471,14 +472,48 @@ const Map = () => {
                       source={{ uri: selectedCompany.photo }}
                       style={styles.heroImage}
                     />
-                    <LinearGradient
-                      colors={[
-                        "transparent",
-                        "rgba(0,0,0,0.1)",
-                        theme.cardBackground,
-                      ]}
-                      style={styles.heroGradientFade}
-                    />
+
+                    {/* Graduated blur band — replaces the single flat BlurView */}
+                    <View
+                      style={[styles.blurFadeContainer, { height: 100 }]}
+                      pointerEvents="none"
+                    >
+                      <BlurView
+                        intensity={20}
+                        tint={blurTint}
+                        style={[styles.blurBand, { top: 0, height: 100 }]}
+                      />
+                      <BlurView
+                        intensity={40}
+                        tint={blurTint}
+                        style={[styles.blurBand, { top: 25, height: 75 }]}
+                      />
+                      <BlurView
+                        intensity={65}
+                        tint={blurTint}
+                        style={[styles.blurBand, { top: 50, height: 50 }]}
+                      />
+                      <BlurView
+                        intensity={90}
+                        tint={blurTint}
+                        style={[styles.blurBand, { top: 72, height: 28 }]}
+                      />
+
+                      <LinearGradient
+                        colors={[
+                          "rgba(255,255,255,0)",
+                          "rgba(255,255,255,0.04)",
+                          "rgba(255,255,255,0.12)",
+                          "rgba(255,255,255,0.3)",
+                          "rgba(255,255,255,0.6)",
+                          "rgba(255,255,255,0.85)",
+                          "rgba(255,255,255,1)",
+                        ]}
+                        locations={[0, 0.15, 0.32, 0.5, 0.68, 0.85, 1]}
+                        style={StyleSheet.absoluteFillObject}
+                        pointerEvents="none"
+                      />
+                    </View>
                   </Animated.View>
 
                   {/* 2. DYNAMIC STICKY HEADER FADING OVER SCROLL ELEMENT */}
@@ -520,10 +555,10 @@ const Map = () => {
                       tint="dark"
                       style={StyleSheet.absoluteFillObject}
                     />
-                    <Ionicons name="close" size={16} color="#ffffff" />
+                    <Ionicons name="close" size={18} color={theme.onPrimary} />
                   </TouchableOpacity>
 
-                  {/* 4. MAIN INTERACTION VIEW SCRIPTER */}
+                  {/* 4. MAIN INTERACTION VIEW SCRIPTER WITH PARALLAX EVENT */}
                   <Animated.ScrollView
                     showsVerticalScrollIndicator={false}
                     scrollEventThrottle={16}
@@ -537,13 +572,15 @@ const Map = () => {
                     <View style={{ height: HERO_HEIGHT - 35 }} />
 
                     {/* Overlapping Rounded Company Avatar Badge */}
-                    <View
-                      style={[
-                        styles.avatarBadge,
-                        { backgroundColor: "#4CAF50" },
-                      ]}
-                    >
-                      <Ionicons name="business" size={32} color="#ffffff" />
+                    <View style={styles.avatarBadgeContainer}>
+                      <BlurView
+                        intensity={60}
+                        tint="light"
+                        style={styles.avatarBadgeBlur}
+                      />
+                      <View style={styles.avatarIconContainer}>
+                        <Ionicons name="business" size={32} color="#4CAF50" />
+                      </View>
                     </View>
 
                     {/* Descriptive Identity Blocks */}
@@ -687,7 +724,7 @@ const Map = () => {
                           Website
                         </Text>
                         <TouchableOpacity>
-                          <Text style={styles.interactiveLinkText}>
+                          <Text style={[styles.interactiveLinkText]}>
                             {selectedCompany.website}
                           </Text>
                         </TouchableOpacity>
@@ -752,7 +789,11 @@ const Map = () => {
                       }}
                     >
                       <View style={styles.ctaIconBadgeCircle}>
-                        <Ionicons name="arrow-redo" size={14} color="#ffffff" />
+                        <Ionicons
+                          name="arrow-redo"
+                          size={14}
+                          color={theme.onPrimary}
+                        />
                       </View>
                       <Text style={styles.capsuleCtaText}>Get Directions</Text>
                     </TouchableOpacity>
@@ -873,7 +914,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 110, // Leaving standard spacing clear for bottom capsule CTA button
+    paddingBottom: 110,
   },
 
   /* Parallax Backdrop Frames */
@@ -884,20 +925,25 @@ const styles = StyleSheet.create({
     right: 0,
     height: HERO_HEIGHT,
     zIndex: 0,
+    overflow: "hidden",
   },
   heroImage: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
   },
-  heroGradientFade: {
+  blurFadeContainer: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 60,
+    overflow: "hidden",
   },
-
+  blurBand: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
   /* Sticky blurred top row elements */
   stickyHeader: {
     position: "absolute",
@@ -909,6 +955,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
   },
   stickyHeaderTitle: {
     fontSize: 16,
@@ -920,9 +967,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 14,
     right: 16,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     overflow: "hidden",
     zIndex: 20,
     justifyContent: "center",
@@ -930,19 +977,30 @@ const styles = StyleSheet.create({
   },
 
   /* Profile header card contents */
-  avatarBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+  avatarBadgeContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
     alignSelf: "center",
-    justifyContent: "center",
-    alignItems: "center",
     zIndex: 5,
+    overflow: "hidden",
     elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: -20,
+  },
+  avatarBadgeBlur: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  avatarIconContainer: {
+    width: 48,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
   },
   identitySection: {
     alignItems: "center",

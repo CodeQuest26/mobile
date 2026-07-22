@@ -3,15 +3,14 @@ import MainContainer from "@/components/MainContainer";
 import ProductDetailsCard from "@/components/sme/ProductDetailsCard";
 import { ThemedText } from "@/components/themed-text";
 import Colors from "@/constants/colors";
+import { api, handleApiError } from "@/services/api";
 import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,8 +19,12 @@ import {
   View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
-const BASE_URL = "https://backendtest-production-9132.up.railway.app";
+const ACTIVE_ORDER_STATUSES = new Set([
+  "IN_ESCROW",
+  "IN_PRODUCTION",
+  "QUALITY_CHECK",
+  "DELIVERED",
+]);
 
 const SMEHome = () => {
   const colorScheme = useColorScheme();
@@ -31,69 +34,58 @@ const SMEHome = () => {
   const greeting = time < 12 ? "morning" : time < 16 ? "afternoon" : "evening";
 
   const user = useAuthStore();
-  const { accessToken } = useAuthStore.getState();
-
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(
-        `${BASE_URL}/api/v1/orders?page=0&size=50&sort=createdAt,desc`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-      if (!res.ok) throw new Error("Failed to fetch orders");
-      const data = await res.json();
+      setError(null);
+      // The shared client waits for auth hydration, attaches the real `token`
+      // field, and refreshes an expired session. The previous raw fetch used
+      // an `accessToken` field that the auth store does not contain.
+      const { data } = await api.get("orders", {
+        params: { page: 0, size: 50, sort: "createdAt,desc" },
+      });
       const orderList = data.content || [];
 
       // Enrich each order with job title and quantity
       const enriched = await Promise.all(
         orderList.map(async (order: any) => {
           try {
-            const jobRes = await fetch(
-              `${BASE_URL}/api/v1/jobs/${order.jobId}`,
-              {
-                headers: { Authorization: `Bearer ${accessToken}` },
-              },
-            );
-            if (jobRes.ok) {
-              const job = await jobRes.json();
-              return {
-                ...order,
-                jobTitle: job.title,
-                productType: job.productType,
-                quantity: job.quantity,
-              };
-            }
+            const { data: job } = await api.get(`jobs/${order.jobId}`);
+            return {
+              ...order,
+              jobTitle: job.title,
+              productType: job.productType,
+              quantity: job.quantity,
+            };
           } catch {}
           return { ...order, jobTitle: "Order", quantity: 0 };
         }),
       );
 
-      setOrders(enriched);
-    } catch (error) {
-      console.error("Error fetching orders:", error);
+      setOrders(
+        enriched.filter((order: any) =>
+          ACTIVE_ORDER_STATUSES.has(order.status),
+        ),
+      );
+    } catch (fetchError) {
+      console.error("Error fetching orders:", fetchError);
+      setError(handleApiError(fetchError));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const openModal = (order: any) => {
-    setSelectedOrder(order);
-    setModalVisible(true);
-  };
+  // Reload after returning from payment or order details so the displayed
+  // lifecycle status always comes from the backend.
+  useFocusEffect(
+    useCallback(() => {
+      void fetchOrders();
+    }, [fetchOrders]),
+  );
 
   return (
     <MainContainer>
@@ -184,127 +176,61 @@ const SMEHome = () => {
             color={theme.primary}
             style={{ marginTop: 40 }}
           />
+        ) : error ? (
+          <View style={styles.emptyState}>
+            <ThemedText style={styles.emptyText}>{error}</ThemedText>
+            <TouchableOpacity onPress={fetchOrders} style={styles.retryButton}>
+              <Text style={[styles.retryText, { color: theme.primary }]}>
+                Try Again
+              </Text>
+            </TouchableOpacity>
+          </View>
         ) : orders.length === 0 ? (
           <ThemedText style={styles.emptyText}>No active orders</ThemedText>
         ) : (
           orders.map((order) => (
-            <TouchableOpacity
+            <ProductDetailsCard
               key={order.id}
-              activeOpacity={0.7}
-              onPress={() => openModal(order)}
-            >
-              <ProductDetailsCard
-                product={{
-                  name: order.jobTitle || order.productType || "Order",
-                  manufacturerId: order.factoryId,
-                  manufacturer: order.factoryName,
-                  quantity: order.quantity,
-                  currentStage: order.currentProductionStage || order.status,
-                  cost: order.agreedAmountGhs,
-                }}
-                theme={theme}
-                onMessagePress={() => {
-                  // Navigate to chat room with this factory
-                  router.push({
-                    pathname: "/ChatRoom",
-                    params: {
-                      userType: "sme",
-                      contactId: order.factoryId,
-                      contactName: order.factoryName,
-                      contactInitials: order.factoryName
-                        .split(" ")
-                        .map((w: string) => w[0])
-                        .join("")
-                        .slice(0, 2),
-                      contactOnline: "0",
-                    },
-                  });
-                }}
-              />
-            </TouchableOpacity>
+              product={{
+                id: order.id,
+                name: order.jobTitle || order.productType || "Order",
+                manufacturerId: order.factoryId,
+                manufacturer: order.factoryName,
+                quantity: order.quantity,
+                currentStage: order.currentProductionStage || order.status,
+                cost: order.agreedAmountGhs,
+              }}
+              theme={theme}
+              onPress={() =>
+                router.push({
+                  pathname: "/(screens)/(sme)/(screens)/orderDetails",
+                  params: { id: order.id },
+                })
+              }
+              onMessagePress={() => {
+                // Navigate to chat room with this factory
+                router.push({
+                  pathname: "/ChatRoom",
+                  params: {
+                    userType: "sme",
+                    contactId: order.factoryId,
+                    contactName: order.factoryName || "Manufacturer",
+                    contactInitials: (order.factoryName || "Manufacturer")
+                      .split(" ")
+                      .map((w: string) => w[0])
+                      .join("")
+                      .slice(0, 2),
+                    contactOnline: "0",
+                  },
+                });
+              }}
+            />
           ))
         )}
       </ScrollView>
-
-      {/* Modal: Full order details */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[styles.modalContent, { backgroundColor: theme.background }]}
-          >
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Order Details</ThemedText>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={28} color={theme.icon} />
-              </TouchableOpacity>
-            </View>
-
-            {selectedOrder && (
-              <ScrollView style={styles.modalBody}>
-                <DetailRow
-                  label="Product"
-                  value={selectedOrder.jobTitle || "—"}
-                />
-                <DetailRow
-                  label="Manufacturer"
-                  value={selectedOrder.factoryName}
-                />
-                <DetailRow label="Status" value={selectedOrder.status} />
-                <DetailRow
-                  label="Progress"
-                  value={`${selectedOrder.currentProgressPercentage ?? 0}% - ${
-                    selectedOrder.currentProductionStage || "N/A"
-                  }`}
-                />
-                <DetailRow
-                  label="Amount"
-                  value={`GHS ${selectedOrder.agreedAmountGhs?.toFixed(2)}`}
-                />
-                <DetailRow
-                  label="Platform Fee"
-                  value={`GHS ${selectedOrder.platformFeeGhs?.toFixed(2)}`}
-                />
-                <DetailRow
-                  label="Factory Payout"
-                  value={`GHS ${selectedOrder.factoryPayoutGhs?.toFixed(2)}`}
-                />
-                <DetailRow
-                  label="Order Created"
-                  value={new Date(selectedOrder.createdAt).toLocaleString()}
-                />
-                {selectedOrder.deliveredAt && (
-                  <DetailRow
-                    label="Delivered"
-                    value={new Date(selectedOrder.deliveredAt).toLocaleString()}
-                  />
-                )}
-                {selectedOrder.completedAt && (
-                  <DetailRow
-                    label="Completed"
-                    value={new Date(selectedOrder.completedAt).toLocaleString()}
-                  />
-                )}
-                {/* Additional actions can go here */}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
     </MainContainer>
   );
 };
-
-const DetailRow = ({ label, value }: { label: string; value: string }) => (
-  <View style={styles.detailRow}>
-    <ThemedText style={styles.detailLabel}>{label}</ThemedText>
-    <Text style={styles.detailValue}>{value}</Text>
-  </View>
-);
 
 const styles = StyleSheet.create({
   header: {
@@ -357,47 +283,16 @@ const styles = StyleSheet.create({
     marginTop: 40,
     fontSize: 16,
   },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  modalContent: {
-    borderRadius: 16,
-    maxHeight: "80%",
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  emptyState: {
     alignItems: "center",
-    marginBottom: 16,
   },
-  modalTitle: {
-    fontSize: 20,
+  retryButton: {
+    padding: 12,
+    marginTop: 8,
+  },
+  retryText: {
+    fontSize: 15,
     fontWeight: "700",
-  },
-  modalBody: {
-    marginBottom: 20,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ccc",
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    flex: 1,
-  },
-  detailValue: {
-    fontSize: 14,
-    flex: 2,
-    textAlign: "right",
   },
 });
 

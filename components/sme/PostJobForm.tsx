@@ -47,7 +47,30 @@ interface FormData {
   description: string;
   deadline: Date | null;
   requirements: string[];
-  images: string[];
+  images: ImagePicker.ImagePickerAsset[];
+}
+
+async function uploadFileToServer(
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<string> {
+  const formData = new FormData();
+  const filename =
+    asset.fileName || asset.uri.split("/").pop() || `upload-${Date.now()}.jpg`;
+  const extMatch = /\.(\w+)$/.exec(filename);
+  const inferredType = extMatch
+    ? `image/${extMatch[1].toLowerCase()}`
+    : "image/jpeg";
+
+  formData.append("file", {
+    uri: asset.uri,
+    name: filename,
+    type: asset.mimeType || inferredType,
+  } as any);
+
+  const { data } = await api.post("files/upload", formData, {
+    headers: { Accept: "application/json" },
+  });
+  return data.url as string;
 }
 
 const PostJobForm = () => {
@@ -72,6 +95,7 @@ const PostJobForm = () => {
 
   const [currentRequirement, setCurrentRequirement] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -148,8 +172,7 @@ const PostJobForm = () => {
     });
 
     if (!result.canceled) {
-      const uris = result.assets.map((asset) => asset.uri);
-      updateFormData("images", [...formData.images, ...uris]);
+      updateFormData("images", [...formData.images, ...result.assets]);
     }
   };
 
@@ -168,7 +191,7 @@ const PostJobForm = () => {
     });
 
     if (!result.canceled) {
-      updateFormData("images", [...formData.images, result.assets[0].uri]);
+      updateFormData("images", [...formData.images, result.assets[0]]);
     }
   };
 
@@ -226,26 +249,36 @@ const PostJobForm = () => {
 
     setIsSubmitting(true);
 
-    const specifications = formData.requirements.length
-      ? `${formData.description}
+    try {
+      let attachmentUrls: string[] = [];
+      if (formData.images.length > 0) {
+        setIsUploadingImages(true);
+        attachmentUrls = await Promise.all(
+          formData.images.map((asset) => uploadFileToServer(asset)),
+        );
+        setIsUploadingImages(false);
+      }
+
+      const specifications = formData.requirements.length
+        ? `${formData.description}
 
 Requirements:
 - ${formData.requirements.join("\n- ")}`
-      : formData.description;
+        : formData.description;
 
-    const payload = {
-      title: formData.product,
-      productType: formData.product,
-      sectorTag: formData.category,
-      quantity: Number(formData.quantity),
-      specifications,
-      budgetMinGhs: Number(formData.budget),
-      budgetMaxGhs: Number(formData.budget),
-      deliveryAddress: formData.location,
-      deadline: formData.deadline?.toISOString(),
-    };
+      const payload = {
+        title: formData.product,
+        productType: formData.product,
+        sectorTag: formData.category,
+        quantity: Number(formData.quantity),
+        specifications,
+        budgetMinGhs: Number(formData.budget),
+        budgetMaxGhs: Number(formData.budget),
+        deliveryAddress: formData.location,
+        deadline: formData.deadline?.toISOString(),
+        attachmentUrls,
+      };
 
-    try {
       await api.post("jobs", payload);
 
       Alert.alert(
@@ -265,6 +298,7 @@ Requirements:
         ],
       );
     } catch (error) {
+      setIsUploadingImages(false);
       const message = handleApiError(error);
       Alert.alert("Error", message || "Failed to post job. Please try again.");
     } finally {
@@ -538,10 +572,10 @@ Requirements:
                   </Text>
                 </TouchableOpacity>
 
-                {formData.images.map((uri, index) => (
+                {formData.images.map((asset, index) => (
                   <View key={index} style={styles.imageThumbnailWrap}>
                     <Image
-                      source={{ uri }}
+                      source={{ uri: asset.uri }}
                       style={[styles.thumbnail, { borderColor: theme.border }]}
                     />
                     <TouchableOpacity
@@ -730,7 +764,9 @@ Requirements:
               >
                 {isSubmitting ? (
                   <Text style={[styles.submitText, { color: theme.onPrimary }]}>
-                    Posting Job...
+                    {isUploadingImages
+                      ? "Uploading Images..."
+                      : "Posting Job..."}
                   </Text>
                 ) : (
                   <>

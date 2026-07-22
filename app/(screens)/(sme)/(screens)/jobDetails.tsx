@@ -8,8 +8,8 @@ import { BidStatus, getDaysUntilDeadline } from "@/constants/Jobstore";
 import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -219,9 +219,11 @@ const JobDetails = () => {
     }
   }, [id]);
 
-  useEffect(() => {
-    fetchJobDetails();
-  }, [fetchJobDetails]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchJobDetails();
+    }, [fetchJobDetails]),
+  );
 
   const handleAcceptBid = async () => {
     if (!selectedBid) return;
@@ -230,7 +232,10 @@ const JobDetails = () => {
       setAcceptingBidId(selectedBid.id);
       await api.patch(`bids/${selectedBid.id}/accept`);
       await fetchJobDetails();
-      setSelectedBid(null);
+      // Keep the modal open and transition to the payment step by updating the bid status
+      setSelectedBid((prev) =>
+        prev ? { ...prev, status: "accepted" as BidStatus } : null,
+      );
     } catch (err) {
       if (axios.isAxiosError(err)) {
         console.log(
@@ -488,6 +493,7 @@ const JobDetails = () => {
         manufacturer={selectedBid?.manufacturer ?? null}
         bid={selectedBid}
         orderId={selectedBid?.id}
+        jobId={id}
         theme={theme}
         onClose={() => setSelectedBid(null)}
         onAccept={handleAcceptBid}

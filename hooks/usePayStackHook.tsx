@@ -19,7 +19,8 @@ export type PaystackAuthorizationModalTheme = {
 };
 
 export type UsePaystackAuthorizationOptions = {
-  onSuccess?: () => void;
+  /** Called after Paystack reaches our configured callback URL. */
+  onCheckoutComplete?: (reference: string) => void;
   onClose?: () => void;
 };
 
@@ -29,7 +30,6 @@ export type PaystackAuthorizationModalProps = {
   loading: boolean;
   theme: PaystackAuthorizationModalTheme;
   onClose: () => void;
-  onSuccess: () => void;
   onLoadStart: () => void;
   onLoadEnd: () => void;
   onShouldStartLoadWithRequest: (request: { url: string }) => boolean;
@@ -47,7 +47,6 @@ export const PaystackAuthorizationModal = memo(
     onShouldStartLoadWithRequest,
   }: PaystackAuthorizationModalProps) => {
     if (!visible) return null;
-    console.log(authorizationUrl);
     return (
       <Modal
         visible={visible}
@@ -102,6 +101,8 @@ export const PaystackAuthorizationModal = memo(
   },
 );
 
+PaystackAuthorizationModal.displayName = "PaystackAuthorizationModal";
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -151,8 +152,10 @@ const styles = StyleSheet.create({
  *
  * Key methods:
  *   - closeAuthorization()      → resets state AND fires onClose callback (user dismissed)
- *   - closeAuthorizationSilent() → resets state WITHOUT firing onClose (use for retry flow)
- *   - openAuthorizationUrl(url) → opens the modal with the given URL
+ *   - openAuthorizationUrl(url, reference) → opens the modal with the given URL
+ *
+ * This hook deliberately does not verify or report payment success. The host
+ * screen owns the native verification experience after checkout completes.
  */
 export const usePaystackAuthorization = (
   options: UsePaystackAuthorizationOptions = {},
@@ -160,28 +163,22 @@ export const usePaystackAuthorization = (
   const [visible, setVisible] = useState(false);
   const [authorizationUrl, setAuthorizationUrl] = useState("");
   const [loading, setLoading] = useState(true);
-  const successFiredRef = useRef(false);
-  const onSuccessRef = useRef(options.onSuccess);
+  const completionHandledRef = useRef(false);
+  const paymentReferenceRef = useRef("");
+  const onCheckoutCompleteRef = useRef(options.onCheckoutComplete);
   const onCloseRef = useRef(options.onClose);
 
   useEffect(() => {
-    onSuccessRef.current = options.onSuccess;
+    onCheckoutCompleteRef.current = options.onCheckoutComplete;
     onCloseRef.current = options.onClose;
-  }, [options.onSuccess, options.onClose]);
+  }, [options.onCheckoutComplete, options.onClose]);
 
   useEffect(() => {
     if (visible) {
-      successFiredRef.current = false;
+      completionHandledRef.current = false;
       setLoading(true);
     }
   }, [visible, authorizationUrl]);
-
-  /** Resets modal state only — does NOT fire onClose callback. Use this for retries. */
-  const closeAuthorizationSilent = useCallback(() => {
-    setVisible(false);
-    setAuthorizationUrl("");
-    setLoading(true);
-  }, []);
 
   const handleLoadStart = useCallback(() => {
     setLoading(true);
@@ -195,59 +192,104 @@ export const usePaystackAuthorization = (
   const closeAuthorization = useCallback(() => {
     setVisible(false);
     setAuthorizationUrl("");
+    paymentReferenceRef.current = "";
     setLoading(true);
     onCloseRef.current?.();
   }, []);
 
-  const resolveSuccess = useCallback(() => {
+  const completeCheckout = useCallback((reference: string) => {
     setVisible(false);
     setAuthorizationUrl("");
+    paymentReferenceRef.current = "";
     setLoading(true);
-    onSuccessRef.current?.();
+    onCheckoutCompleteRef.current?.(reference);
   }, []);
 
-  const openAuthorizationUrl = useCallback((url: string) => {
-    if (!url) {
+  const openAuthorizationUrl = useCallback((url: string, reference: string) => {
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
       throw new Error("No payment authorization URL received from server");
     }
-    successFiredRef.current = false;
+
+    if (
+      parsedUrl.protocol !== "https:" ||
+      parsedUrl.hostname !== "checkout.paystack.com" ||
+      parsedUrl.port !== "" ||
+      !reference
+    ) {
+      throw new Error("The server returned an invalid Paystack checkout URL.");
+    }
+
+    completionHandledRef.current = false;
+    paymentReferenceRef.current = reference;
     setAuthorizationUrl(url);
     setLoading(true);
     setVisible(true);
   }, []);
 
+  const isCallbackUrl = useCallback((url: string) => {
+    try {
+      const target = new URL(url);
+      const callback = new URL(
+        process.env.EXPO_PUBLIC_PAYSTACK_CALLBACK_URL ??
+          "https://backendtest-production-9132.up.railway.app/api/v1/payments/callback",
+      );
+      return (
+        target.protocol === callback.protocol &&
+        target.hostname === callback.hostname &&
+        target.port === callback.port &&
+        target.pathname === callback.pathname
+      );
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const isPaystackCloseUrl = useCallback((url: string) => {
+    try {
+      const target = new URL(url);
+      return (
+        target.protocol === "https:" &&
+        target.hostname === "standard.paystack.co" &&
+        target.port === "" &&
+        target.pathname === "/close" &&
+        target.search === "" &&
+        target.hash === ""
+      );
+    } catch {
+      return false;
+    }
+  }, []);
+
   const handleShouldStartLoad = useCallback(
     (request: { url: string }): boolean => {
       const url = request.url || "";
-
-      const isSuccess =
-        url.includes("callback") ||
-        url.includes("trxref") ||
-        url.includes("success") ||
-        url.includes("reference");
-
-      const isCancel = url.includes("cancel") || url.includes("close");
-
-      if (isSuccess && !successFiredRef.current) {
-        successFiredRef.current = true;
-        resolveSuccess();
+      if (isPaystackCloseUrl(url)) {
+        if (!completionHandledRef.current) {
+          completionHandledRef.current = true;
+          closeAuthorization();
+        }
         return false;
       }
 
-      if (isCancel) {
-        closeAuthorization();
+      if (isCallbackUrl(url)) {
+        if (completionHandledRef.current) return false;
+        completionHandledRef.current = true;
+        const reference = paymentReferenceRef.current;
+        completeCheckout(reference);
         return false;
       }
 
       return true;
     },
-    [closeAuthorization, resolveSuccess],
+    [closeAuthorization, completeCheckout, isCallbackUrl, isPaystackCloseUrl],
   );
 
   return {
     openAuthorizationUrl,
     closeAuthorization,
-    closeAuthorizationSilent,
     visible,
     authorizationUrl,
     loading,

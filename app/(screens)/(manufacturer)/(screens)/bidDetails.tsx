@@ -61,12 +61,6 @@ const timeAgo = (iso: string) => {
   return `${days} days ago`;
 };
 
-const defaultImages = [
-  "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=600",
-  "https://images.unsplash.com/photo-1563784462386-044fd95e9852?auto=format&fit=crop&q=80&w=400",
-  "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&q=80&w=400",
-];
-
 export default function BidDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
@@ -134,12 +128,7 @@ export default function BidDetailsScreen() {
     );
   }
 
-  // API only gives us attachmentUrls, not a dedicated "images" field —
-  // fall back to placeholder images when none were attached to the job.
-  const jobImages =
-    job.attachmentUrls && job.attachmentUrls.length > 0
-      ? job.attachmentUrls
-      : defaultImages;
+  const jobImages = job.attachmentUrls || [];
 
   const handleSubmitBid = async () => {
     if (!bidAmount.trim()) {
@@ -323,34 +312,36 @@ export default function BidDetailsScreen() {
           </View>
         </FadeIn>
 
-        <FadeIn delay={60}>
-          <View style={[styles.card, { padding: 0 }]}>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: theme.text, marginLeft: 35 },
-              ]}
-            >
-              Reference Gallery
-            </Text>
+        {jobImages.length > 0 && (
+          <FadeIn delay={60}>
+            <View style={[styles.card, { padding: 0 }]}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.text, marginLeft: 35 },
+                ]}
+              >
+                Reference Gallery
+              </Text>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.galleryContainer}
-            >
-              {jobImages.map((img, index) => (
-                <TouchableOpacity
-                  key={index}
-                  activeOpacity={0.9}
-                  onPress={() => setSelectedImage(img)}
-                >
-                  <Image source={{ uri: img }} style={styles.galleryImage} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </FadeIn>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.galleryContainer}
+              >
+                {jobImages.map((img, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    activeOpacity={0.9}
+                    onPress={() => setSelectedImage(img)}
+                  >
+                    <Image source={{ uri: img }} style={styles.galleryImage} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </FadeIn>
+        )}
 
         {job.specifications && (
           <FadeIn delay={100}>

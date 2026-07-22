@@ -246,6 +246,8 @@ const Chat = () => {
     };
 
     fetchConversations();
+    const refreshInterval = setInterval(fetchConversations, 5000);
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const contacts = useMemo(() => {

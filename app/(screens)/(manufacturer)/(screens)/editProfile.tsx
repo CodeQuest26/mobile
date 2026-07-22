@@ -742,7 +742,7 @@ export default function EditManufacturerProfile() {
               >
                 Your account name stays in sync with the company name below —
                 editing it here updates both. Phone number is set at
-                registration and can't be changed here. Tap the logo to upload a
+                registration and can&apos;t be changed here. Tap the logo to upload a
                 company photo.
               </Text>
             </View>

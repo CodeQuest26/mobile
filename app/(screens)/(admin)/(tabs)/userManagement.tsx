@@ -1,6 +1,6 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
-import { api } from "@/services/api";
+import { api, handleApiError } from "@/services/api";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -15,39 +15,80 @@ import {
   View,
 } from "react-native";
 
+type ManagedUser = {
+  id: string;
+  fullName?: string;
+  phoneNumber?: string;
+  isVerified?: boolean;
+};
+
+type PagedUsers = {
+  content: ManagedUser[];
+  totalPages: number;
+};
+
+const USERS_PER_PAGE = 100;
+
 const UserManagementScreen = () => {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"];
 
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (isRefresh = false) => {
     try {
+      if (!isRefresh) setLoading(true);
       setError(null);
-      const { data } = await api.get("/admin/users");
-      setUsers(data);
-      console.log(users);
+      const firstPage = await api.get<PagedUsers>("admin/users", {
+        params: { page: 0, size: USERS_PER_PAGE, sort: "createdAt,desc" },
+      });
+      const remainingPages = Array.from(
+        { length: Math.max(0, firstPage.data.totalPages - 1) },
+        (_, index) =>
+          api.get<PagedUsers>("admin/users", {
+            params: {
+              page: index + 1,
+              size: USERS_PER_PAGE,
+              sort: "createdAt,desc",
+            },
+          }),
+      );
+      const pages = await Promise.all(remainingPages);
+      setUsers([
+        ...(firstPage.data.content || []),
+        ...pages.flatMap((page) => page.data.content || []),
+      ]);
     } catch (err) {
-      console.log(err);
+      console.error("Failed to fetch users:", err);
+      setError(handleApiError(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchUsers();
-  }, []);
+    void fetchUsers(true);
+  }, [fetchUsers]);
+
+  const filteredUsers = users.filter((user) => {
+    const term = search.trim().toLowerCase();
+    return (
+      !term ||
+      user.fullName?.toLowerCase().includes(term) ||
+      user.phoneNumber?.toLowerCase().includes(term)
+    );
+  });
 
   const renderUser = ({ item }: { item: any }) => (
     <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
@@ -122,12 +163,15 @@ const UserManagementScreen = () => {
         </Text>
       ) : (
         <FlatList
-          data={users.filter((u) =>
-            u.fullName?.toLowerCase().includes(search.toLowerCase()),
-          )}
+          data={filteredUsers}
           keyExtractor={(item) => item.id}
           renderItem={renderUser}
           contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              No users found
+            </Text>
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -176,6 +220,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   manageText: { color: "#4A90E2", fontWeight: "600" },
+  emptyText: { textAlign: "center", marginTop: 36, fontSize: 15 },
 });
 
 export default UserManagementScreen;

@@ -1,9 +1,10 @@
-import { BidStatus, BidWithManufacturer } from "@/constants/Jobstore";
+import { BidStatus } from "@/constants/Jobstore";
 import {
   PaystackAuthorizationModal,
   usePaystackAuthorization,
 } from "@/hooks/usePayStackHook";
-import { api } from "@/services/api";
+import { api, handleApiError } from "@/services/api";
+import { setPaymentCompletionHandler } from "@/services/paymentCompletion";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -29,23 +30,31 @@ const BID_STATUS: Record<BidStatus, { label: string; icon: string }> = {
 
 interface ManufacturerModalProps {
   visible: boolean;
-  manufacturer: BidWithManufacturer["manufacturer"] | null;
-  bid: BidWithManufacturer | null;
+  manufacturer: any;
+  bid: any;
   /** The order ID associated with this bid (needed for payment initiation) */
-  orderId: string;
+  orderId?: string | null;
+  /** Job route to return to after native payment verification. */
+  jobId?: string | null;
   theme: any;
   onClose: () => void;
   onAccept: () => void;
   onReject: () => void;
-  /** Called after a successful payment (the hook fires onSuccess) */
+  /** Called after a successful payment. */
   onPaymentComplete?: () => void;
 }
+
+type PaymentInitiationResponse = {
+  reference: string;
+  authorization_url: string;
+};
 
 const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
   visible,
   manufacturer,
   bid,
   orderId,
+  jobId,
   theme,
   onClose,
   onAccept,
@@ -55,6 +64,7 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
   const [isInitiating, setIsInitiating] = useState(false);
   const [isManufacturerVisible, setIsManufacturerVisible] = useState(visible);
   const [paymentFlowActive, setPaymentFlowActive] = useState(false);
+  const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -78,11 +88,20 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
     handleLoadEnd,
     handleShouldStartLoad,
   } = usePaystackAuthorization({
-    onSuccess: () => {
+    onCheckoutComplete: (reference) => {
       setPaymentFlowActive(false);
       setIsManufacturerVisible(false);
       onClose();
-      onPaymentComplete?.();
+      setPaymentCompletionHandler(onPaymentComplete);
+      router.push({
+        pathname: "/(screens)/(sme)/(screens)/paymentStatus",
+        params: {
+          reference,
+          orderId: checkoutOrderId ?? orderId ?? "",
+          jobId: jobId ?? "",
+          originRoute: "jobDetails",
+        },
+      });
     },
     onClose: () => {
       setPaymentFlowActive(false);
@@ -98,49 +117,48 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
 
   // Called when the “Initiate Payment” button is pressed
   const handleInitiatePayment = useCallback(async () => {
-    if (!orderId) {
-      Alert.alert("Missing order", "No order found for this bid.");
-      return;
-    }
-
     setIsInitiating(true);
     try {
-      // Pre-check the order
-      const { data: order } = await api.get(`orders`);
-      const order_id = order?.content?.filter((i: any) => i.bidId === bid?.id);
-      // --- Replace with your actual API call (fetch/axios) ---
-      const { data } = await api.post("payments/initiate", {
-        orderId: order_id[0]?.id,
+      // Find the order associated with this bid
+      const { data: orderResponse } = await api.get(`orders`, {
+        params: { page: 0, size: 100 },
       });
+      const matchedOrder = orderResponse?.content?.find(
+        (o: any) => o.bidId === bid?.id,
+      );
+      const actualOrderId = matchedOrder?.id || orderId;
 
-      const authorizationUrl = data.authorization_url;
-      // -------------------------------------------------------
+      if (!actualOrderId) {
+        throw new Error("No order found for this bid.");
+      }
 
-      if (!authorizationUrl) {
-        throw new Error("No authorization URL returned");
+      // Start the payment checkout
+      const { data } = await api.post<PaymentInitiationResponse>(
+        "payments/initiate",
+        { orderId: actualOrderId },
+      );
+
+      const { authorization_url: authorizationUrl, reference } = data;
+
+      if (!authorizationUrl || !reference) {
+        throw new Error(
+          "No Paystack checkout details were returned from the server.",
+        );
       }
 
       setPaymentFlowActive(true);
       setIsManufacturerVisible(false);
-      openAuthorizationUrl(authorizationUrl);
+      setCheckoutOrderId(actualOrderId);
+      openAuthorizationUrl(authorizationUrl, reference);
     } catch (error: unknown) {
-      const responseStatus = (error as { response?: { status?: number } })
-        ?.response?.status;
-      const responseData = (error as { response?: { data?: unknown } })
-        ?.response?.data;
-
-      console.log("Payment initiation error:", responseStatus, responseData);
-      Alert.alert(
-        "Couldn't start payment",
-        "We weren't able to start the checkout. Please try again.",
-      );
+      Alert.alert("Couldn't start payment", handleApiError(error));
     } finally {
       setIsInitiating(false);
     }
-  }, [orderId, openAuthorizationUrl]);
+  }, [bid?.id, orderId, openAuthorizationUrl]);
 
   if (!manufacturer || !bid) return null;
-  const bidStatus = BID_STATUS[bid.status];
+  const bidStatus = BID_STATUS[bid.status as BidStatus];
 
   return (
     <>
@@ -206,7 +224,7 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                       >
                         {manufacturer.name
                           .split(" ")
-                          .map((w) => w[0])
+                          .map((w: string) => w[0])
                           .join("")
                           .slice(0, 2)}
                       </Text>
@@ -269,7 +287,7 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                 Specialties
               </Text>
               <View style={styles.tagsWrap}>
-                {manufacturer.specialties.map((s) => (
+                {manufacturer.specialties.map((s: string) => (
                   <View
                     key={s}
                     style={[
@@ -472,7 +490,7 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                         contactName: manufacturer.name,
                         contactInitials: manufacturer.name
                           .split(" ")
-                          .map((w) => w[0])
+                          .map((w: string) => w[0])
                           .join("")
                           .slice(0, 2),
                         contactOnline: "0",
@@ -517,7 +535,6 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
           primary: theme.primary,
         }}
         onClose={closeAuthorization}
-        onSuccess={() => {}}
         onLoadStart={handleLoadStart}
         onLoadEnd={handleLoadEnd}
         onShouldStartLoadWithRequest={handleShouldStartLoad}

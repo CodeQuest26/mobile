@@ -38,16 +38,18 @@ interface ApiOrder {
     | "DISPUTED"
     | "REFUNDED"
     | "CANCELLED";
-  qualityCheckDeadline?: string; // ISO date-time
+  qualityCheckDeadline?: string;
   deliveredAt?: string;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+  overallRating?: number | null;
 }
 
 interface JobInfo {
   title: string;
   deadline?: string;
+  attachmentUrls?: string[];
 }
 
 // The shape expected by OrderCard
@@ -55,12 +57,15 @@ interface OrderCardData {
   id: string;
   job: string;
   sme: string;
+  smeLogo: string | null;
   amount: string;
   milestone: number;
   milestoneLabel: string;
   dueIn: string;
-  progress: number; // 0..1
+  progress: number;
   urgent: boolean;
+  jobImage?: string | null;
+  rating?: number | null;
 }
 
 type TabType = "active" | "completed";
@@ -149,6 +154,7 @@ export default function ManufacturerOrders() {
   const transformOrder = (
     order: ApiOrder,
     jobInfoMap: Map<string, JobInfo>,
+    ratingMap: Map<string, number>,
   ): OrderCardData => {
     const { milestone, label } = mapStatusToMilestone(order.status);
     const progress = getProgress(order.status);
@@ -160,16 +166,22 @@ export default function ManufacturerOrders() {
     const job =
       jobInfo?.title || `Job #${order.jobId?.slice(0, 8) || "Unknown"}`;
 
+    const rating =
+      order.overallRating ?? ratingMap.get(order.id) ?? null;
+
     return {
       id: order.id,
       job,
       sme: order.smeName || "Unknown SME",
+      smeLogo: null,
       amount,
       milestone,
       milestoneLabel: label,
       dueIn,
       progress,
       urgent,
+      jobImage: jobInfo?.attachmentUrls?.[0] ?? null,
+      rating,
     };
   };
 
@@ -192,6 +204,7 @@ export default function ManufacturerOrders() {
         map.set(uniqueIds[index], {
           title: job?.title,
           deadline: job?.deadline,
+          attachmentUrls: job?.attachmentUrls,
         });
       }
     });
@@ -216,8 +229,28 @@ export default function ManufacturerOrders() {
 
       const jobInfoMap = await fetchJobDetails(apiOrders.map((o) => o.jobId));
 
+      // Fetch reviews for completed orders that don't already have a rating
+      const completedWithoutRating = apiOrders.filter(
+        (o) =>
+          o.status === "COMPLETED" &&
+          o.overallRating == null,
+      );
+      const ratingMap = new Map<string, number>();
+      if (completedWithoutRating.length > 0) {
+        const reviewResults = await Promise.allSettled(
+          completedWithoutRating.map((o) =>
+            api.get(`reviews/${o.id}`).then((res) => ({ id: o.id, data: res.data })),
+          ),
+        );
+        reviewResults.forEach((r) => {
+          if (r.status === "fulfilled" && r.value.data?.overallRating) {
+            ratingMap.set(r.value.id, r.value.data.overallRating);
+          }
+        });
+      }
+
       const transformed = apiOrders.map((order) =>
-        transformOrder(order, jobInfoMap),
+        transformOrder(order, jobInfoMap, ratingMap),
       );
       setOrders(transformed);
     } catch (err) {
@@ -314,7 +347,7 @@ export default function ManufacturerOrders() {
                   color={theme.error + "80"}
                 />
                 <Text style={[styles.emptyText, { color: theme.text }]}>
-                  Couldn't load your orders
+                  Couldn&apos;t load your orders
                 </Text>
                 <Text
                   style={[styles.errorSubtext, { color: theme.textSecondary }]}

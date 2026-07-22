@@ -22,7 +22,13 @@ import Spacer from "../../components/Spacer";
 import Colors from "../../constants/colors";
 
 const OTP_LENGTH = 4;
-const RESEND_COUNTDOWN = 30;
+const RESEND_COUNTDOWN = 300; // 5 minutes
+
+const formatCountdown = (totalSeconds: number) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
 
 const OtpBox = ({
   value,
@@ -110,6 +116,7 @@ export default function OtpVerifyScreen() {
   }>();
 
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
+  const resendOtp = useAuthStore((s) => s.resendOtp);
   const login = useAuthStore((s) => s.login);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const authError = useAuthStore((s) => s.error);
@@ -128,6 +135,8 @@ export default function OtpVerifyScreen() {
   const [verified, setVerified] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_COUNTDOWN);
   const [canResend, setCanResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   const inputRef = useRef<TextInput>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -335,14 +344,27 @@ export default function OtpVerifyScreen() {
     }
   };
 
-  const handleResend = () => {
-    if (!canResend) return;
-    setOtp("");
-    setHasError(false);
-    setErrorMessage(null);
-    setFocusedIndex(0);
-    startCountdown();
-    inputRef.current?.focus();
+  const handleResend = async () => {
+    if (!canResend || resendLoading) return;
+    const phone = displayPhoneNumber;
+    if (!phone) return;
+
+    setResendLoading(true);
+    setResendError(null);
+    try {
+      await resendOtp(phone);
+      // Reset OTP input and restart the countdown on success
+      setOtp("");
+      setHasError(false);
+      setErrorMessage(null);
+      setFocusedIndex(0);
+      startCountdown();
+      inputRef.current?.focus();
+    } catch (err: any) {
+      setResendError(err?.message ?? "Failed to resend code. Try again.");
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   return (
@@ -453,13 +475,21 @@ export default function OtpVerifyScreen() {
           {/* Counter Controls */}
           <View style={styles.resendRow}>
             <Text style={[styles.resendPrompt, { color: theme.textSecondary }]}>
-              Didn't receive a code?{" "}
+              Didn&apos;t receive a code?{" "}
             </Text>
             {canResend ? (
-              <TouchableOpacity onPress={handleResend}>
-                <Text style={[styles.resendLink, { color: theme.primary }]}>
-                  Resend
-                </Text>
+              <TouchableOpacity
+                onPress={handleResend}
+                disabled={resendLoading}
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                {resendLoading ? (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : (
+                  <Text style={[styles.resendLink, { color: theme.primary }]}>
+                    Resend
+                  </Text>
+                )}
               </TouchableOpacity>
             ) : (
               <Text
@@ -467,11 +497,16 @@ export default function OtpVerifyScreen() {
               >
                 Resend in{" "}
                 <Text style={{ color: theme.primary, fontWeight: "600" }}>
-                  {countdown}s
+                  {formatCountdown(countdown)}
                 </Text>
               </Text>
             )}
           </View>
+          {resendError && (
+            <Text style={[styles.errorText, { marginTop: 8 }]}>
+              {resendError}
+            </Text>
+          )}
         </View>
 
         {/* Footer Submit CTA */}

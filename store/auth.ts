@@ -12,6 +12,7 @@ interface User {
   isVerified: boolean;
   region?: string;
   profileImageUrl?: string;
+  createdAt?: string;
 }
 
 interface RegisterPayload {
@@ -51,6 +52,7 @@ interface AuthState {
   login: (phoneNumber: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   verifyOtp: (phoneNumber: string, otp: string) => Promise<void>;
+  resendOtp: (phoneNumber: string) => Promise<void>;
   logout: () => Promise<void>;
   getMe: () => Promise<void>;
 
@@ -181,6 +183,21 @@ export const useAuthStore = create<AuthState>()(
           throw new Error(message);
         } finally {
           set({ isVerifying: false });
+        }
+      },
+
+      /* ---------------- Resend OTP ---------------- */
+      resendOtp: async (phoneNumber) => {
+        try {
+          set({ isLoading: true, error: null });
+
+          await axios.post(`${BASE_URL}auth/resend-otp`, { phoneNumber });
+        } catch (error) {
+          const message = handleApiError(error);
+          set({ error: message });
+          throw new Error(message);
+        } finally {
+          set({ isLoading: false });
         }
       },
 

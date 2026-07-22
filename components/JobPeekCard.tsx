@@ -219,6 +219,8 @@ const JobPeekCard = memo(
   },
 );
 
+JobPeekCard.displayName = "JobPeekCard";
+
 export default JobPeekCard;
 
 const styles = StyleSheet.create({

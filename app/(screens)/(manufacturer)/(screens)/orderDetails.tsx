@@ -1,5 +1,7 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
+import ReviewForm from "@/components/sme/ReviewForm";
+import ReportIssueModal from "@/components/sme/ReportIssueModal";
 import Colors from "@/constants/colors";
 import { api, handleApiError } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -34,6 +37,7 @@ interface ApiOrder {
   id: string;
   jobId: string;
   smeName: string;
+  factoryName?: string;
   agreedAmountGhs: number;
   status: OrderStatus;
   qualityCheckDeadline?: string;
@@ -48,6 +52,16 @@ interface ApiJob {
   quantity?: number;
   specifications?: string;
   deliveryAddress?: string;
+  attachmentUrls?: string[];
+}
+
+interface ReviewData {
+  overallRating: number;
+  qualityRating?: number;
+  timelinessRating?: number;
+  communicationRating?: number;
+  comment?: string;
+  createdAt: string;
 }
 
 interface TimelineItem {
@@ -117,7 +131,41 @@ const MANUFACTURER_ADVANCEABLE: Partial<Record<OrderStatus, OrderStatus>> = {
   QUALITY_CHECK: "DELIVERED",
 };
 
-export default function OrderDetailScreen() {
+type OrderDetailScreenProps = {
+  role?: "manufacturer" | "sme";
+};
+
+// Read-only star row used in the manufacturer review display
+const ReviewStarRow = ({
+  label,
+  value,
+  theme,
+}: {
+  label: string;
+  value: number;
+  theme: any;
+}) => (
+  <View style={styles.reviewStarRow}>
+    <Text style={[styles.reviewStarLabel, { color: theme.textSecondary }]}>
+      {label}
+    </Text>
+    <View style={styles.reviewStars}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Ionicons
+          key={n}
+          name={n <= value ? "star" : "star-outline"}
+          size={16}
+          color={n <= value ? "#F59E0B" : theme.textSecondary}
+          style={{ marginLeft: 1 }}
+        />
+      ))}
+    </View>
+  </View>
+);
+
+export function OrderDetailScreen({
+  role = "manufacturer",
+}: OrderDetailScreenProps) {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] || Colors.light;
@@ -127,6 +175,8 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [review, setReview] = useState<ReviewData | null>(null);
 
   const fetchOrder = useCallback(async () => {
     if (!id) return;
@@ -136,14 +186,28 @@ export default function OrderDetailScreen() {
       const { data: orderData } = await api.get(`orders/${id}`);
       setApiOrder(orderData);
 
-      // Job fetch is best-effort — if it fails, the order itself still
-      // renders, just without title/quantity/specifications/address.
+      // Job fetch is best-effort
       try {
         const { data: jobData } = await api.get(`jobs/${orderData.jobId}`);
         setApiJob(jobData);
       } catch (jobErr) {
         console.warn("Failed to load job details for order:", jobErr);
         setApiJob(null);
+      }
+
+      // Fetch review if order is completed
+      setReview(null);
+      if (orderData.status === "COMPLETED") {
+        try {
+          const { data: reviewData } = await api.get(
+            `reviews/${orderData.id}`,
+          );
+          if (reviewData?.overallRating) {
+            setReview(reviewData);
+          }
+        } catch {
+          // No review exists yet — that's fine
+        }
       }
     } catch (err) {
       console.error("Failed to load order:", err);
@@ -177,6 +241,37 @@ export default function OrderDetailScreen() {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handleConfirmDelivery = async () => {
+    if (!apiOrder) return;
+
+    Alert.alert(
+      "Confirm delivery",
+      "Only confirm once you have received the order and checked it.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm received",
+          onPress: async () => {
+            setUpdating(true);
+            try {
+              await api.post(`orders/${apiOrder.id}/confirm-delivery`, {
+                qualityAccepted: true,
+              });
+              // Reload the canonical backend state, which should now be
+              // COMPLETED, before returning the SME to the refreshed home.
+              await fetchOrder();
+            } catch (err) {
+              console.error("Failed to confirm delivery:", err);
+              Alert.alert("Couldn't confirm delivery", handleApiError(err));
+            } finally {
+              setUpdating(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (loading) {
@@ -237,7 +332,9 @@ export default function OrderDetailScreen() {
         ? "Refunded"
         : apiOrder.status === "CANCELLED"
           ? "Cancelled"
-          : STAGE_LABELS[milestone];
+          : apiOrder.status === "PAYMENT_PENDING"
+            ? "Awaiting Payment"
+            : STAGE_LABELS[milestone];
 
   // Dates come from real fields where they exist; stages this order
   // hasn't reached yet, or that the API doesn't timestamp individually
@@ -258,7 +355,10 @@ export default function OrderDetailScreen() {
 
   const order = {
     job: apiJob?.title || `Job #${apiOrder.jobId.slice(0, 8)}`,
-    sme: apiOrder.smeName || "Unknown SME",
+    counterparty:
+      role === "sme"
+        ? apiOrder.factoryName || "Manufacturer"
+        : apiOrder.smeName || "Unknown SME",
     amount: `GH₵ ${apiOrder.agreedAmountGhs?.toFixed(2) || "0.00"}`,
     milestoneLabel,
     dueIn,
@@ -273,6 +373,19 @@ export default function OrderDetailScreen() {
 
   const canAdvance = Boolean(MANUFACTURER_ADVANCEABLE[apiOrder.status]);
   const isCompleted = isTerminal;
+
+  // 7-day report window (SME only): order must be COMPLETED and completedAt
+  // must be within the last 7 days.
+  const canReportIssue =
+    role === "sme" &&
+    !["REFUNDED", "CANCELLED", "DISPUTED"].includes(apiOrder.status) &&
+    (() => {
+      if (apiOrder.status !== "COMPLETED") return true;
+      if (!apiOrder.completedAt) return false;
+      const elapsed =
+        Date.now() - new Date(apiOrder.completedAt).getTime();
+      return elapsed < 7 * 24 * 60 * 60 * 1000;
+    })();
 
   return (
     <>
@@ -307,7 +420,13 @@ export default function OrderDetailScreen() {
               ]}
             >
               <View style={styles.jobRow}>
-                <Text style={[styles.jobName, { color: theme.text }]}>
+                {apiJob?.attachmentUrls?.[0] && (
+                  <Image
+                    source={{ uri: apiJob.attachmentUrls[0] }}
+                    style={styles.orderJobImage}
+                  />
+                )}
+                <Text style={[styles.jobName, { color: theme.text, flex: apiJob?.attachmentUrls?.[0] ? 1 : undefined }]}>
                   {order.job}
                 </Text>
                 {apiOrder.status === "DISPUTED" && (
@@ -324,7 +443,7 @@ export default function OrderDetailScreen() {
                 )}
               </View>
               <Text style={[styles.smeName, { color: theme.textSecondary }]}>
-                {order.sme}
+                {order.counterparty}
               </Text>
               <View style={styles.divider} />
               <View style={styles.amountRow}>
@@ -515,8 +634,71 @@ export default function OrderDetailScreen() {
             </View>
           </FadeIn>
 
+          {/* ── Manufacturer-only: Review from SME ── */}
+          {role === "manufacturer" && review && (
+            <FadeIn delay={240}>
+              <View
+                style={[
+                  styles.card,
+                  { backgroundColor: theme.cardBackground },
+                ]}
+              >
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  Review from SME
+                </Text>
+
+                {/* Star rows */}
+                <ReviewStarRow
+                  label="Overall"
+                  value={review.overallRating}
+                  theme={theme}
+                />
+                {review.qualityRating != null && review.qualityRating > 0 && (
+                  <ReviewStarRow
+                    label="Quality"
+                    value={review.qualityRating}
+                    theme={theme}
+                  />
+                )}
+                {review.timelinessRating != null &&
+                  review.timelinessRating > 0 && (
+                    <ReviewStarRow
+                      label="Timeliness"
+                      value={review.timelinessRating}
+                      theme={theme}
+                    />
+                  )}
+                {review.communicationRating != null &&
+                  review.communicationRating > 0 && (
+                    <ReviewStarRow
+                      label="Communication"
+                      value={review.communicationRating}
+                      theme={theme}
+                    />
+                  )}
+
+                {review.comment ? (
+                  <Text
+                    style={[
+                      styles.reviewComment,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    &ldquo;{review.comment}&rdquo;
+                  </Text>
+                ) : null}
+
+                <Text
+                  style={[styles.reviewDate, { color: theme.textSecondary }]}
+                >
+                  {formatDate(review.createdAt)}
+                </Text>
+              </View>
+            </FadeIn>
+          )}
+
           {/* Action Buttons */}
-          {!isCompleted && canAdvance && (
+          {role === "manufacturer" && !isCompleted && canAdvance && (
             <FadeIn delay={280}>
               <View style={styles.actionButtons}>
                 <TouchableOpacity
@@ -538,17 +720,76 @@ export default function OrderDetailScreen() {
             </FadeIn>
           )}
 
-          {!isCompleted && apiOrder.status === "DELIVERED" && (
+          {role === "manufacturer" && !isCompleted && apiOrder.status === "DELIVERED" && (
             <Text style={[styles.awaitingText, { color: theme.textSecondary }]}>
               Waiting on the buyer to confirm delivery.
             </Text>
           )}
 
+          {role === "sme" && apiOrder.status === "DELIVERED" && (
+            <FadeIn delay={280}>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: theme.primary }]}
+                  onPress={handleConfirmDelivery}
+                  disabled={updating}
+                >
+                  {updating ? (
+                    <ActivityIndicator size="small" color={theme.onPrimary} />
+                  ) : (
+                    <Text style={[styles.actionBtnText, { color: theme.onPrimary }]}>
+                      Confirm Delivery
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </FadeIn>
+          )}
+
+          {/* ── SME-only: Review section (COMPLETED orders) ── */}
+          {role === "sme" && isCompleted && (
+            <FadeIn delay={300}>
+              <View
+                style={[
+                  styles.card,
+                  { backgroundColor: theme.cardBackground },
+                ]}
+              >
+                <ReviewForm orderId={apiOrder.id} theme={theme} />
+              </View>
+            </FadeIn>
+          )}
+
+          {/* ── SME-only: Report Issue button ── */}
+          {canReportIssue && (
+            <FadeIn delay={340}>
+              <TouchableOpacity
+                style={[styles.reportBtn, { borderColor: "#EF4444" }]}
+                onPress={() => setReportModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flag-outline" size={18} color="#EF4444" />
+                <Text style={styles.reportBtnText}>Report an Issue</Text>
+              </TouchableOpacity>
+            </FadeIn>
+          )}
+
           <View style={{ height: 40 }} />
         </ScrollView>
       </MainContainer>
+
+      <ReportIssueModal
+        visible={reportModalVisible}
+        orderId={apiOrder.id}
+        theme={theme}
+        onClose={() => setReportModalVisible(false)}
+      />
     </>
   );
+}
+
+export default function ManufacturerOrderDetailScreen() {
+  return <OrderDetailScreen role="manufacturer" />;
 }
 
 const styles = StyleSheet.create({
@@ -579,6 +820,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+  },
+  orderJobImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
   },
   jobName: {
     fontSize: 18,
@@ -708,6 +955,45 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
     fontStyle: "italic",
+  },
+  reportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 13,
+    marginTop: 8,
+  },
+  reportBtnText: {
+    color: "#EF4444",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  reviewStarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  reviewStarLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  reviewStars: {
+    flexDirection: "row",
+  },
+  reviewComment: {
+    fontSize: 14,
+    fontStyle: "italic",
+    lineHeight: 21,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  reviewDate: {
+    fontSize: 12,
+    marginTop: 4,
   },
   notFound: {
     flex: 1,

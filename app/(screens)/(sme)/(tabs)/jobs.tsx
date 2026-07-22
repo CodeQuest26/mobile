@@ -1,4 +1,5 @@
 import MainContainer from "@/components/MainContainer";
+import OrderCard, { type Order as OrderCardData } from "@/components/OrderCard";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import { api } from "@/services/api";
@@ -37,7 +38,7 @@ interface JobApiResponse {
   deadline: string;
   attachmentUrls?: string[];
   deliveryAddress?: string;
-  status: string; // OPEN, DRAFT, etc.
+  status: string; // DRAFT, OPEN, BIDDING, AWARDED, IN_PRODUCTION, COMPLETED, CANCELLED
   createdAt: string;
   updatedAt: string;
 }
@@ -65,17 +66,48 @@ interface BidApiResponse {
   createdAt: string;
 }
 
+interface OrderApiResponse {
+  id: string;
+  jobId: string;
+  factoryName?: string;
+  agreedAmountGhs?: number;
+  status: string;
+  updatedAt: string;
+}
+
 type JobStatus = "active" | "completed" | "draft";
 
 // ---------- Helpers ----------
+// Job.status enum per the API spec: DRAFT, OPEN, BIDDING, AWARDED,
+// IN_PRODUCTION, COMPLETED, CANCELLED. Written as an exhaustive switch
+// (rather than a couple of if-checks) so a new/renamed status can't
+// silently fall through into the wrong tab.
 function mapApiStatusToTab(status: string): JobStatus {
-  if (status === "DRAFT") return "draft";
-  if (status === "COMPLETED") return "completed";
-  // OPEN, BIDDING, AWARDED, IN_PRODUCTION → "active"
-  return "active";
+  switch (status?.toUpperCase()) {
+    case "DRAFT":
+      return "draft";
+    case "COMPLETED":
+    case "CANCELLED":
+      // No separate "cancelled" tab exists in this UI — grouping cancelled
+      // jobs with completed keeps them out of "Active" rather than
+      // defaulting there, since they're no longer actionable either way.
+      return "completed";
+    case "OPEN":
+    case "BIDDING":
+    case "AWARDED":
+    case "IN_PRODUCTION":
+      return "active";
+    default:
+      console.warn("Unrecognized job status from API:", status);
+      return "active";
+  }
 }
 
-function transformJob(job: JobApiResponse, bids: BidApiResponse[]) {
+function transformJob(
+  job: JobApiResponse,
+  bids: BidApiResponse[],
+  orderStatus?: string,
+) {
   const budget =
     job.budgetMinGhs && job.budgetMaxGhs
       ? `GHS ${job.budgetMinGhs} – ${job.budgetMaxGhs}`
@@ -89,7 +121,13 @@ function transformJob(job: JobApiResponse, bids: BidApiResponse[]) {
     image: job.attachmentUrls?.[0] ?? null,
     bidsCount: bids.length,
     bids,
-    status: mapApiStatusToTab(job.status),
+    // Delivery confirmation completes the order. Some backend versions do
+    // not also update Job.status, so use the related order as the source of
+    // truth for the SME's completed tab.
+    status:
+      orderStatus?.toUpperCase() === "COMPLETED"
+        ? "completed"
+        : mapApiStatusToTab(job.status),
     rawStatus: job.status,
   };
 }
@@ -362,6 +400,7 @@ const MyJobs = () => {
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
   const [activeTab, setActiveTab] = useState<JobStatus>("active");
   const [jobs, setJobs] = useState<ReturnType<typeof transformJob>[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<OrderCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -380,9 +419,46 @@ const MyJobs = () => {
         "jobs/my-jobs?page=0&size=1000",
       );
 
-      console.log("Jobs response:", response.data);
-
       const jobsArray = response.data.content ?? [];
+      const ordersResponse = await api.get<{ content: OrderApiResponse[] }>(
+        "orders",
+        { params: { page: 0, size: 1000, sort: "updatedAt,desc" } },
+      );
+      const latestOrderStatusByJob = new Map<string, string>();
+      (ordersResponse.data.content ?? [])
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        )
+        .forEach((order) => {
+          if (!latestOrderStatusByJob.has(order.jobId)) {
+            latestOrderStatusByJob.set(order.jobId, order.status);
+          }
+        });
+
+      const jobsById = new Map(jobsArray.map((job) => [job.id, job]));
+      setCompletedOrders(
+        (ordersResponse.data.content ?? [])
+          .filter((order) => order.status?.toUpperCase() === "COMPLETED")
+          .map((order) => {
+            const job = jobsById.get(order.jobId);
+            return {
+              id: order.id,
+              job: job?.title || `Job #${order.jobId.slice(0, 8)}`,
+              // The shared order card calls this field `sme`; in this buyer
+              // view it is the manufacturing counterparty.
+              sme: order.factoryName || "Manufacturer",
+              smeLogo: null,
+              amount: `GH₵ ${order.agreedAmountGhs?.toFixed(2) || "0.00"}`,
+              milestone: 4,
+              milestoneLabel: "Completed",
+              dueIn: "Completed",
+              progress: 1,
+              urgent: false,
+              jobImage: job?.attachmentUrls?.[0] ?? null,
+            };
+          }),
+      );
 
       const jobsWithBids = await Promise.all(
         jobsArray.map(async (jobApi) => {
@@ -391,10 +467,18 @@ const MyJobs = () => {
               `jobs/${jobApi.id}/bids`,
             );
 
-            return transformJob(jobApi, bidsResponse.data);
+            return transformJob(
+              jobApi,
+              bidsResponse.data,
+              latestOrderStatusByJob.get(jobApi.id),
+            );
           } catch (error) {
             // still show job if bids fail
-            return transformJob(jobApi, []);
+            return transformJob(
+              jobApi,
+              [],
+              latestOrderStatusByJob.get(jobApi.id),
+            );
           }
         }),
       );
@@ -429,7 +513,13 @@ const MyJobs = () => {
 
   const filteredJobs = jobs.filter((j) => j.status === activeTab);
   const tabCount = (key: JobStatus) =>
-    jobs.filter((j) => j.status === key).length;
+    key === "completed"
+      ? completedOrders.length
+      : jobs.filter((j) => j.status === key).length;
+  const hasItems =
+    activeTab === "completed"
+      ? completedOrders.length > 0
+      : filteredJobs.length > 0;
 
   const tabs: { key: JobStatus; label: string }[] = [
     { key: "active", label: "Active" },
@@ -572,16 +662,33 @@ const MyJobs = () => {
                 <Text style={styles.emptyBtnText}>Retry</Text>
               </TouchableOpacity>
             </View>
-          ) : filteredJobs.length > 0 ? (
-            filteredJobs.map((job, i) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                theme={theme}
-                delay={100 + i * 60}
-                isDark={isDark}
-              />
-            ))
+          ) : hasItems ? (
+            activeTab === "completed" ? (
+              completedOrders.map((order, i) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  theme={theme}
+                  delay={100 + i * 60}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(screens)/(sme)/(screens)/orderDetails",
+                      params: { id: order.id },
+                    })
+                  }
+                />
+              ))
+            ) : (
+              filteredJobs.map((job, i) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  theme={theme}
+                  delay={100 + i * 60}
+                  isDark={isDark}
+                />
+              ))
+            )
           ) : (
             <EmptyState activeTab={activeTab} theme={theme} />
           )}
@@ -595,7 +702,6 @@ const MyJobs = () => {
 
 export default MyJobs;
 
-// (styles remain the same as before – omitted here for brevity)
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
@@ -732,7 +838,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     letterSpacing: -0.4,
-    // marginBottom: 10,
   },
   emptySubtitle: {
     fontSize: 15,

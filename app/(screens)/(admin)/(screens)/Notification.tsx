@@ -477,6 +477,7 @@ import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { api, handleApiError } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
@@ -628,7 +629,7 @@ const Notification = () => {
       activeOpacity={0.7}
       style={[
         styles.card,
-        { backgroundColor: theme.card },
+        { backgroundColor: theme.cardBackground },
         !item.isRead && styles.unreadCard,
       ]}
     >

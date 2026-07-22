@@ -178,7 +178,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       </Text>
 
       <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-        Enter your phone number or email address. We'll send a verification code
+        Enter your phone number or email address. We&apos;ll send a verification code
         to reset your password.
       </Text>
 
@@ -234,7 +234,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
         Check Your {contactType === "phone" ? "Phone" : "Email"}
       </Text>
       <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-        We've sent a 6-digit verification code to{"\n"}
+        We&apos;ve sent a 6-digit verification code to{"\n"}
         <Text style={{ fontWeight: "700", color: theme.primary }}>
           {getMaskedContact()}
         </Text>
@@ -268,7 +268,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       </TouchableOpacity>
       <View style={styles.resendRow}>
         <Text style={[styles.resendText, { color: theme.textSecondary }]}>
-          Didn't receive the code?{" "}
+          Didn&apos;t receive the code?{" "}
         </Text>
         <TouchableOpacity onPress={resendCode} disabled={countdown > 0}>
           <Text

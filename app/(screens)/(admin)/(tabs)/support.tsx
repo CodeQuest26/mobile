@@ -14,12 +14,20 @@ import {
   View,
 } from "react-native";
 
+type SupportTicket = {
+  id: string;
+  userFullName: string;
+  priority: string;
+  description: string;
+  status: string;
+};
+
 const SupportTicketsScreen = () => {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"];
 
-  const [tickets, setTickets] = useState([]);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +36,7 @@ const SupportTicketsScreen = () => {
     try {
       setError(null);
       // Correct endpoint as per standard admin dashboard patterns
-      const { data } = await api.get("/admin/support-tickets");
+      const { data } = await api.get<SupportTicket[]>("/admin/support-tickets");
       setTickets(data);
     } catch (err) {
       setError(handleApiError(err));

@@ -29,7 +29,7 @@ const BID_STATUS: Record<BidStatus, { label: string; icon: string }> = {
 };
 
 interface BidCardProps {
-  bid: BidWithManufacturer;
+  bid: any;
   theme: any;
   delay?: number;
   onPress: () => void;
@@ -37,7 +37,7 @@ interface BidCardProps {
 
 const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
   const { manufacturer } = bid;
-  const bidStatus = BID_STATUS[bid.status];
+  const bidStatus = BID_STATUS[bid.status as BidStatus];
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   return (
@@ -89,7 +89,7 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
                     >
                       {manufacturer.name
                         .split(" ")
-                        .map((w) => w[0])
+                        .map((w: string) => w[0])
                         .join("")
                         .slice(0, 2)}
                     </Text>

@@ -8,12 +8,19 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import ReviewForm from "./ReviewForm";
 
-const ProductDetailsCard = ({ product, theme, onMessagePress }: any) => {
+const ProductDetailsCard = ({ product, theme, onMessagePress, onPress }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
   const progress = product?.progress || 65;
 
+  const isCompleted = product?.status === "COMPLETED";
+
   const handleCardPress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
     setModalVisible(true);
   };
 
@@ -259,6 +266,18 @@ const ProductDetailsCard = ({ product, theme, onMessagePress }: any) => {
                     </Text>
                   </View>
 
+                  {/* ── Review section — only for completed orders ── */}
+                  {isCompleted && (
+                    <View
+                      style={[
+                        styles.reviewSection,
+                        { borderTopColor: theme.border },
+                      ]}
+                    >
+                      <ReviewForm orderId={product.id} theme={theme} />
+                    </View>
+                  )}
+
                   {/* Message Button */}
                   <TouchableOpacity
                     style={[
@@ -448,6 +467,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     letterSpacing: 0.3,
+  },
+
+  // Review section
+  reviewSection: {
+    borderTopWidth: 1,
+    paddingTop: 20,
+    marginBottom: 8,
+    gap: 4,
   },
 });
 

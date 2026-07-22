@@ -63,18 +63,20 @@ interface Job {
   sme: string;
   rating?: number;
   bids?: number;
+  image?: string;
 }
 
 interface EnhancedJobPeek {
   id: string;
   product: string;
-  quantity: number;
+  quantity: string;
   budget: string;
   location: string;
   category: string;
   timeAgo: string;
   rating: number;
   bids: number;
+  image?: string;
 }
 
 export default function JobsScreen() {
@@ -123,6 +125,7 @@ export default function JobsScreen() {
         sme: job.smeName || "Unknown Client",
         rating: 0,
         bids: 0,
+        image: job.attachmentUrls?.[0],
       }));
       setJobs(transformed);
     } catch (error) {
@@ -195,13 +198,14 @@ export default function JobsScreen() {
       filteredJobs.map((job) => ({
         id: job.id,
         product: job.product,
-        quantity: job.quantity,
+        quantity: `${job.quantity.toLocaleString()} pcs`,
         budget: job.budget,
         location: job.location,
         category: job.category,
         timeAgo: getTimeAgo(job.postedAt),
         rating: job.rating ?? 0,
         bids: job.bids ?? 0,
+        image: job.image,
       })),
     [filteredJobs],
   );
@@ -227,9 +231,11 @@ export default function JobsScreen() {
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: theme.text }]}>Job Board</Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            {loading
-              ? "Loading..."
-              : `${jobsToRender.length} open job${jobsToRender.length !== 1 ? "s" : ""}`}
+            {loading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              `${jobsToRender.length} open job${jobsToRender.length !== 1 ? "s" : ""}`
+            )}
           </Text>
         </View>
 

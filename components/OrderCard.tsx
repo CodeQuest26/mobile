@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,6 +23,8 @@ export type Order = {
   dueIn: string;
   progress: number;
   urgent: boolean;
+  jobImage?: string | null;
+  rating?: number | null;
 };
 
 //  FadeIn
@@ -64,18 +67,24 @@ const OrderCard = ({
   order,
   theme,
   delay,
+  onPress,
+  onReviewPress,
 }: {
   order: Order;
   theme: any;
   delay: number;
+  onPress?: () => void;
+  onReviewPress?: () => void;
 }) => (
   <FadeIn delay={delay}>
     <TouchableOpacity
-      onPress={() =>
-        router.push({
-          pathname: "/(screens)/(manufacturer)/(screens)/orderDetails",
-          params: { id: order.id },
-        })
+      onPress={
+        onPress ??
+        (() =>
+          router.push({
+            pathname: "/(screens)/(manufacturer)/(screens)/orderDetails",
+            params: { id: order.id },
+          }))
       }
       style={[
         styles.orderCard,
@@ -86,6 +95,12 @@ const OrderCard = ({
     >
       {/* Top row */}
       <View style={styles.orderTop}>
+        {order.jobImage && (
+          <Image
+            source={{ uri: order.jobImage }}
+            style={styles.orderImage}
+          />
+        )}
         <View style={{ flex: 1 }}>
           {order.urgent && (
             <View style={[styles.urgentPill, { backgroundColor: "#EF444415" }]}>
@@ -116,13 +131,23 @@ const OrderCard = ({
             {order.milestoneLabel}
           </Text>
         </View>
-        <Text style={[styles.dueText, { color: theme.textSecondary }]}>
-          Due in {order.dueIn}
-        </Text>
+        <View style={styles.msRight}>
+          {order.rating != null && order.rating > 0 && (
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={12} color="#F59E0B" />
+              <Text style={[styles.ratingText, { color: theme.text }]}>
+                {order.rating.toFixed(1)}
+              </Text>
+            </View>
+          )}
+          <Text style={[styles.dueText, { color: theme.textSecondary }]}>
+            {order.dueIn === "Completed" ? "Completed" : `Due in ${order.dueIn}`}
+          </Text>
+        </View>
       </View>
 
       {/* Progress bar */}
-      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}> 
         <View
           style={[
             styles.progressFill,
@@ -133,6 +158,16 @@ const OrderCard = ({
           ]}
         />
       </View>
+
+      {onReviewPress && order.progress >= 1 && (
+        <TouchableOpacity
+          onPress={onReviewPress}
+          style={[styles.reviewButton, { borderColor: theme.primary }]}
+        >
+          <Ionicons name="star-outline" size={16} color={theme.primary} />
+          <Text style={[styles.reviewButtonText, { color: theme.primary }]}>Review order</Text>
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   </FadeIn>
 );
@@ -150,6 +185,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 12,
+    gap: 12,
+  },
+  orderImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
   },
   urgentPill: {
     flexDirection: "row",
@@ -205,6 +246,20 @@ const styles = StyleSheet.create({
   dueText: {
     fontSize: 12,
   },
+  msRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
   progressTrack: {
     height: 6,
     borderRadius: 3,
@@ -214,6 +269,17 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
+  reviewButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  reviewButtonText: { fontSize: 13, fontWeight: "700" },
   progressLabels: {
     flexDirection: "row",
     justifyContent: "space-between",

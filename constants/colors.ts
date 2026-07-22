@@ -1,6 +1,4 @@
 // constants/colors.ts
-import { ColorSchemeName } from "react-native";
-
 export type Theme = {
   text: string;
   textSecondary: string;
@@ -19,7 +17,7 @@ export type Theme = {
 
 const primaryColor = "#4CB37E";
 
-export const Colors: Record<NonNullable<ColorSchemeName>, Theme> = {
+export const Colors: Record<"light" | "dark" | "unspecified", Theme> = {
   light: {
     text: "#1C1C1E",
     textSecondary: "#6C757D",
@@ -45,6 +43,21 @@ export const Colors: Record<NonNullable<ColorSchemeName>, Theme> = {
     primary: primaryColor,
     onPrimary: "#FFFFFF",
     border: "#4A4A4C",
+    shadow: "#000000",
+    warning: "#F59E0B",
+    error: "#fa4343",
+    info: primaryColor,
+  },
+  unspecified: {
+    text: "#1C1C1E",
+    textSecondary: "#6C757D",
+    background: "#F8F8F8",
+    cardBackground: "#FFFFFF",
+    icon: "#6C757D",
+    iconBackground: "#EFEFEF",
+    primary: primaryColor,
+    onPrimary: "#FFFFFF",
+    border: "#E0E0E0",
     shadow: "#000000",
     warning: "#F59E0B",
     error: "#fa4343",
