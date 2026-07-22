@@ -28,9 +28,21 @@ const BID_STATUS: Record<BidStatus, { label: string; icon: string }> = {
   rejected: { label: "Rejected", icon: "close-circle" },
 };
 
+export interface ManufacturerProfile {
+  id: string;
+  name: string;
+  logo: string | null;
+  verified: boolean;
+  rating: number;
+  reviewCount: number;
+  location: string;
+  description: string;
+  specialties: string[];
+}
+
 interface ManufacturerModalProps {
   visible: boolean;
-  manufacturer: any;
+  manufacturer: ManufacturerProfile | null;
   bid: any;
   /** The order ID associated with this bid (needed for payment initiation) */
   orderId?: string | null;
@@ -246,18 +258,31 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                         />
                       )}
                     </View>
-                    <View style={styles.ratingRow}>
-                      <StarRating rating={manufacturer.rating} />
+                    {manufacturer.rating > 0 || manufacturer.reviewCount > 0 ? (
+                      <View style={styles.ratingRow}>
+                        <StarRating rating={manufacturer.rating} />
+                        <Text
+                          style={[
+                            styles.ratingText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          {manufacturer.rating > 0
+                            ? manufacturer.rating.toFixed(1)
+                            : "No rating"} ({manufacturer.reviewCount}{" "}
+                          reviews)
+                        </Text>
+                      </View>
+                    ) : (
                       <Text
                         style={[
                           styles.ratingText,
                           { color: theme.textSecondary },
                         ]}
                       >
-                        {manufacturer.rating} ({manufacturer.reviewCount}{" "}
-                        reviews)
+                        No reviews yet
                       </Text>
-                    </View>
+                    )}
                     <Text
                       style={[
                         styles.manufacturerLocation,
@@ -287,21 +312,29 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                 Specialties
               </Text>
               <View style={styles.tagsWrap}>
-                {manufacturer.specialties.map((s: string) => (
-                  <View
-                    key={s}
-                    style={[
-                      styles.tag,
-                      { backgroundColor: theme.primary + "15" },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.tagText, { color: theme.textSecondary }]}
+                {manufacturer.specialties.length > 0 ? (
+                  manufacturer.specialties.map((s: string) => (
+                    <View
+                      key={s}
+                      style={[
+                        styles.tag,
+                        { backgroundColor: theme.primary + "15" },
+                      ]}
                     >
-                      {s}
-                    </Text>
-                  </View>
-                ))}
+                      <Text
+                        style={[styles.tagText, { color: theme.textSecondary }]}
+                      >
+                        {s}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text
+                    style={[styles.noDataText, { color: theme.textSecondary }]}
+                  >
+                    No specialties provided
+                  </Text>
+                )}
               </View>
 
               {/* Bid details */}
@@ -619,6 +652,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   tagText: { fontSize: 13, fontWeight: "600" },
+  noDataText: { fontSize: 13 },
   bidDetailCard: {
     borderRadius: 16,
     padding: 16,

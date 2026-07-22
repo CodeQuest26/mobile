@@ -1,5 +1,6 @@
 import Spacer from "@/components/Spacer";
-import { BidStatus, BidWithManufacturer } from "@/constants/Jobstore";
+import { BidStatus } from "@/constants/Jobstore";
+import type { ManufacturerProfile } from "./ManufacturerModal";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useRef } from "react";
 import {
@@ -11,7 +12,6 @@ import {
   View,
 } from "react-native";
 import FadeIn from "../common/FadeIn";
-import StarRating from "./StarRating";
 
 const BID_STATUS: Record<BidStatus, { label: string; icon: string }> = {
   pending: {
@@ -29,7 +29,12 @@ const BID_STATUS: Record<BidStatus, { label: string; icon: string }> = {
 };
 
 interface BidCardProps {
-  bid: any;
+  bid: {
+    status: BidStatus;
+    amount: string;
+    deliveryDays: number;
+    manufacturer: ManufacturerProfile;
+  };
   theme: any;
   delay?: number;
   onPress: () => void;
@@ -144,11 +149,12 @@ const BidCard = ({ bid, theme, delay = 0, onPress }: BidCardProps) => {
                   flexDirection: "row",
                 }}
               >
-                <StarRating rating={manufacturer.rating} />
                 <Text
                   style={[styles.bidRatingText, { color: theme.textSecondary }]}
                 >
-                  {manufacturer.rating}
+                  {manufacturer.rating > 0 || manufacturer.reviewCount > 0
+                    ? `${manufacturer.rating > 0 ? manufacturer.rating.toFixed(1) : "No rating"} (${manufacturer.reviewCount} reviews)`
+                    : "No reviews yet"}
                 </Text>
               </View>
 

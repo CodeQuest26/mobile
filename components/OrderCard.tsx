@@ -96,10 +96,7 @@ const OrderCard = ({
       {/* Top row */}
       <View style={styles.orderTop}>
         {order.jobImage && (
-          <Image
-            source={{ uri: order.jobImage }}
-            style={styles.orderImage}
-          />
+          <Image source={{ uri: order.jobImage }} style={styles.orderImage} />
         )}
         <View style={{ flex: 1 }}>
           {order.urgent && (
@@ -134,20 +131,22 @@ const OrderCard = ({
         <View style={styles.msRight}>
           {order.rating != null && order.rating > 0 && (
             <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
+              <Ionicons name="star" size={12} color={theme.waring} />
               <Text style={[styles.ratingText, { color: theme.text }]}>
                 {order.rating.toFixed(1)}
               </Text>
             </View>
           )}
           <Text style={[styles.dueText, { color: theme.textSecondary }]}>
-            {order.dueIn === "Completed" ? "Completed" : `Due in ${order.dueIn}`}
+            {order.dueIn === "Completed"
+              ? "Completed"
+              : `Due in ${order.dueIn}`}
           </Text>
         </View>
       </View>
 
       {/* Progress bar */}
-      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}> 
+      <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
         <View
           style={[
             styles.progressFill,
@@ -165,7 +164,9 @@ const OrderCard = ({
           style={[styles.reviewButton, { borderColor: theme.primary }]}
         >
           <Ionicons name="star-outline" size={16} color={theme.primary} />
-          <Text style={[styles.reviewButtonText, { color: theme.primary }]}>Review order</Text>
+          <Text style={[styles.reviewButtonText, { color: theme.primary }]}>
+            Review order
+          </Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>

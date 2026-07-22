@@ -26,6 +26,44 @@ const ACTIVE_ORDER_STATUSES = new Set([
   "DELIVERED",
 ]);
 
+const ORDER_PROGRESS_BY_STATUS: Record<string, number> = {
+  PAYMENT_PENDING: 0,
+  IN_ESCROW: 10,
+  IN_PRODUCTION: 40,
+  QUALITY_CHECK: 70,
+  DELIVERED: 90,
+  COMPLETED: 100,
+  DISPUTED: 50,
+  REFUNDED: 100,
+  CANCELLED: 100,
+};
+
+const ORDER_STAGE_BY_STATUS: Record<string, string> = {
+  PAYMENT_PENDING: "Awaiting Payment",
+  IN_ESCROW: "Payment Secured",
+  IN_PRODUCTION: "In Production",
+  QUALITY_CHECK: "Quality Check",
+  DELIVERED: "Delivered",
+  COMPLETED: "Completed",
+  DISPUTED: "Disputed",
+  REFUNDED: "Refunded",
+  CANCELLED: "Cancelled",
+};
+
+const getOrderStatusDetails = (status?: string) => {
+  const normalizedStatus = status?.toUpperCase() || "";
+  return {
+    status: normalizedStatus,
+    progress: ORDER_PROGRESS_BY_STATUS[normalizedStatus] ?? 0,
+    stage: ORDER_STAGE_BY_STATUS[normalizedStatus] || "Status unavailable",
+  };
+};
+
+const formatAgreedAmount = (amount?: number) =>
+  typeof amount === "number" && Number.isFinite(amount)
+    ? `GH₵ ${amount.toFixed(2)}`
+    : "—";
+
 const SMEHome = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
@@ -57,12 +95,18 @@ const SMEHome = () => {
             const { data: job } = await api.get(`jobs/${order.jobId}`);
             return {
               ...order,
-              jobTitle: job.title,
+              jobTitle: job.title || job.productType,
               productType: job.productType,
-              quantity: job.quantity,
+              quantity: job.quantity ?? "—",
+              description: job.specifications || "No specifications provided.",
             };
           } catch {}
-          return { ...order, jobTitle: "Order", quantity: 0 };
+          return {
+            ...order,
+            jobTitle: "Order",
+            quantity: "—",
+            description: "No specifications provided.",
+          };
         }),
       );
 
@@ -172,7 +216,7 @@ const SMEHome = () => {
       <ScrollView showsHorizontalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator
-            size="large"
+            size="small"
             color={theme.primary}
             style={{ marginTop: 40 }}
           />
@@ -194,11 +238,13 @@ const SMEHome = () => {
               product={{
                 id: order.id,
                 name: order.jobTitle || order.productType || "Order",
-                manufacturerId: order.factoryId,
-                manufacturer: order.factoryName,
-                quantity: order.quantity,
-                currentStage: order.currentProductionStage || order.status,
-                cost: order.agreedAmountGhs,
+                manufacturer: order.factoryName || "Manufacturer",
+                quantity: order.quantity ?? "—",
+                currentStage: getOrderStatusDetails(order.status).stage,
+                progress: getOrderStatusDetails(order.status).progress,
+                status: getOrderStatusDetails(order.status).status,
+                cost: formatAgreedAmount(order.agreedAmountGhs),
+                description: order.description || "No specifications provided.",
               }}
               theme={theme}
               onPress={() =>
@@ -208,7 +254,6 @@ const SMEHome = () => {
                 })
               }
               onMessagePress={() => {
-                // Navigate to chat room with this factory
                 router.push({
                   pathname: "/ChatRoom",
                   params: {

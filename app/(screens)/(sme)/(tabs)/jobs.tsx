@@ -103,6 +103,10 @@ function mapApiStatusToTab(status: string): JobStatus {
   }
 }
 
+// Job.budget is rendered as a range ("GHS 1000 – 2000"); the card only
+// wants to display the first (minimum) figure, not the full range.
+const budgetFloor = (budget: string) => budget.split(/[-–]/)[0].trim();
+
 function transformJob(
   job: JobApiResponse,
   bids: BidApiResponse[],
@@ -252,7 +256,7 @@ const JobCard = ({
 
                   <StatPill
                     icon="cash-outline"
-                    label={job.budget}
+                    label={budgetFloor(job.budget)}
                     theme={theme}
                   />
                 </View>
@@ -268,7 +272,7 @@ const JobCard = ({
                         borderColor: theme.border,
                       },
                     ]}
-                    resizeMode="contain"
+                    resizeMode="cover"
                   />
                 ) : (
                   <View
@@ -780,13 +784,14 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   cardQty: { fontSize: 13, fontWeight: "500" },
-  cardImage: { width: 72, height: 72, borderRadius: 14 },
+  cardImage: { width: 80, height: 80, borderRadius: 14, overflow: "hidden" },
   cardImagePlaceholder: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
   },
   divider: { height: 1, marginBottom: 12, opacity: 0.5 },
   statPill: {

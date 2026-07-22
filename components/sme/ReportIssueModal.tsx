@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Spacer from "../Spacer";
 
 type DisputeReason =
   | "QUALITY_BELOW_SPEC"
@@ -31,7 +32,7 @@ export interface ReportIssueModalProps {
   visible: boolean;
   orderId: string;
   theme: any;
-  onClose: () => void;
+  onClose: (submitted?: boolean) => void;
 }
 
 const ReportIssueModal = ({
@@ -55,8 +56,9 @@ const ReportIssueModal = ({
   };
 
   const handleClose = () => {
+    const wasSubmitted = submitted;
     reset();
-    onClose();
+    onClose(wasSubmitted);
   };
 
   const handleSubmit = async () => {
@@ -73,8 +75,7 @@ const ReportIssueModal = ({
       setSubmitting(true);
       setError(null);
 
-      await api.post("disputes", {
-        orderId,
+      await api.post(`orders/${orderId}/dispute`, {
         reason,
         description: description.trim(),
       });
@@ -82,10 +83,15 @@ const ReportIssueModal = ({
       setSubmitted(true);
     } catch (err) {
       if (isAxiosError(err)) {
+        const serverMsg =
+          err.response?.data?.message ??
+          err.response?.data?.error ??
+          err.response?.data?.detail;
         setError(
-          err.response?.status === 409
-            ? "A dispute has already been raised for this order."
-            : "Failed to submit report. Please try again.",
+          serverMsg ??
+            (err.response?.status === 409
+              ? "A dispute has already been raised for this order."
+              : "Failed to submit report. Please try again."),
         );
       } else {
         setError("Failed to submit report. Please try again.");
@@ -104,10 +110,7 @@ const ReportIssueModal = ({
     >
       <View style={styles.overlay}>
         <View
-          style={[
-            styles.container,
-            { backgroundColor: theme.cardBackground },
-          ]}
+          style={[styles.container, { backgroundColor: theme.cardBackground }]}
         >
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
@@ -129,14 +132,9 @@ const ReportIssueModal = ({
               <Text style={[styles.successTitle, { color: theme.text }]}>
                 Issue Reported
               </Text>
-              <Text
-                style={[
-                  styles.successSub,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                Our team will review it shortly. You&apos;ll be notified of
-                any updates.
+              <Text style={[styles.successSub, { color: theme.textSecondary }]}>
+                Our team will review it shortly. You&apos;ll be notified of any
+                updates.
               </Text>
               <TouchableOpacity
                 style={[styles.doneBtn, { backgroundColor: theme.primary }]}
@@ -213,7 +211,7 @@ const ReportIssueModal = ({
               />
 
               {error && (
-                <Text style={[styles.errorText, { color: "#EF4444" }]}>
+                <Text style={[styles.errorText, { color: theme.error }]}>
                   {error}
                 </Text>
               )}
@@ -232,13 +230,14 @@ const ReportIssueModal = ({
                 activeOpacity={0.8}
               >
                 {submitting ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={theme.onPrimary} size="small" />
                 ) : (
                   <Text style={styles.submitBtnText}>Submit Report</Text>
                 )}
               </TouchableOpacity>
             </>
           )}
+          <Spacer style={{ height: 30 }} />
         </View>
       </View>
     </Modal>

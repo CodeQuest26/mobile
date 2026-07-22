@@ -1,10 +1,14 @@
 import ThemeProvider from "@/contexts/ThemeContext";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 const RootLayout = () => {
+  // Registers push notification permissions and FCM token for the whole session.
+  useNotifications();
+
   return (
     <KeyboardProvider>
       <ThemeProvider>

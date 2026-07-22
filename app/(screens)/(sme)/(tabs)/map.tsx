@@ -1,5 +1,6 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
+import { api, handleApiError } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -40,8 +41,10 @@ interface Company {
   verified: boolean;
   address: string;
   distance: number;
-  photo: string;
+  photo: string | null;
   phone: string;
+  description: string;
+  verificationStatus: string;
   website: string;
   isOpen: boolean;
   hours: {
@@ -51,74 +54,104 @@ interface Company {
   };
 }
 
+interface FactoryApiResponse {
+  id: string;
+  companyName?: string | null;
+  name?: string | null;
+  description?: string | null;
+  sectorTags?: string[] | null;
+  address?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  coordinates?: {
+    latitude?: number | string | null;
+    longitude?: number | string | null;
+  } | null;
+  verificationStatus?: string | null;
+  isVerified?: boolean | null;
+  rating?: number | null;
+  averageRating?: number | null;
+  profileImageUrl?: string | null;
+  logoUrl?: string | null;
+  ownerPhoneNumber?: string | null;
+  phoneNumber?: string | null;
+  website?: string | null;
+  isOpen?: boolean | null;
+  active?: boolean | null;
+  isActive?: boolean | null;
+  hours?: Company["hours"] | null;
+}
+
 type UserLocation = {
   latitude: number;
   longitude: number;
 };
 
-/* ================= MOCK DATA ================= */
+/* ================= BACKEND DATA ================= */
 
-const generateMockCompanies = (
-  centerLat: number,
-  centerLon: number,
-  radiusKm = 5,
-  count = 15,
-): Company[] => {
-  const names = [
-    "Precision Machining Co.",
-    "SteelCraft Industries",
-    "EcoPack Solutions",
-    "Apex Metalworks",
-    "NanoFab Technologies",
-    "Green Energy Components",
-    "Northside Casting",
-    "Westend Assembly",
-    "East Bay Electronics",
-    "Sunrise Robotics",
-  ];
+const toFiniteNumber = (value: number | string | null | undefined) => {
+  const numberValue = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
 
-  const categories = [
-    "Industrial Manufacturer",
-    "Metal Fabrication",
-    "Packaging Solutions",
-    "CNC Machining Center",
-    "Electronics Assembly",
-  ];
+const distanceInMeters = (
+  from: UserLocation,
+  to: { latitude: number; longitude: number },
+) => {
+  const earthRadius = 6_371_000;
+  const lat1 = (from.latitude * Math.PI) / 180;
+  const lat2 = (to.latitude * Math.PI) / 180;
+  const deltaLat = ((to.latitude - from.latitude) * Math.PI) / 180;
+  const deltaLon = ((to.longitude - from.longitude) * Math.PI) / 180;
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
-  const companies: Company[] = [];
-  for (let i = 0; i < count; i++) {
-    const offsetLat = (Math.random() - 0.5) * (radiusKm / 111);
-    const offsetLon =
-      (Math.random() - 0.5) *
-      (radiusKm / (111 * Math.cos(centerLat * (Math.PI / 180))));
-    const lat = centerLat + offsetLat;
-    const lon = centerLon + offsetLon;
-    const rating = +(4 + Math.random()).toFixed(1);
-    const verified = Math.random() > 0.2;
-    const distance = Math.sqrt(offsetLat ** 2 + offsetLon ** 2) * 111 * 1000;
-    const seedName = names[i % names.length];
+const normalizeFactory = (
+  factory: FactoryApiResponse,
+  userLocation: UserLocation,
+): Company | null => {
+  const latitude = toFiniteNumber(
+    factory.latitude ?? factory.coordinates?.latitude,
+  );
+  const longitude = toFiniteNumber(
+    factory.longitude ?? factory.coordinates?.longitude,
+  );
 
-    companies.push({
-      id: `c_${i}`,
-      name: seedName,
-      category: categories[i % categories.length],
-      coordinate: { latitude: lat, longitude: lon },
-      rating,
-      verified,
-      address: `${Math.floor(Math.random() * 1000)} Fillmore St\nKumasi, Ghana`,
-      distance,
-      photo: `https://picsum.photos/seed/${i + 10}/600/400`,
-      phone: `+233 (415) ${400 + i}-${5000 + i}`,
-      website: `${seedName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-      isOpen: Math.random() > 0.3,
-      hours: {
-        weekday: "10:00 – 00:00",
-        saturday: "10:00 – 02:00",
-        sunday: "10:00 – 00:00",
-      },
-    });
+  if (latitude === null || longitude === null) return null;
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return null;
   }
-  return companies.filter((c) => c.rating >= 4.5 && c.verified);
+
+  const name = factory.companyName || factory.name || "Manufacturer";
+  const rating = factory.averageRating ?? factory.rating ?? 0;
+
+  return {
+    id: factory.id,
+    name,
+    category: factory.sectorTags?.join(" • ") || "Manufacturer",
+    coordinate: { latitude, longitude },
+    rating: typeof rating === "number" && Number.isFinite(rating) ? rating : 0,
+    verified:
+      factory.isVerified === true || factory.verificationStatus === "VERIFIED",
+    address: factory.address || "Address not provided",
+    distance: distanceInMeters(userLocation, { latitude, longitude }),
+    photo: factory.profileImageUrl || factory.logoUrl || null,
+    phone: factory.ownerPhoneNumber || factory.phoneNumber || "Not provided",
+    description: factory.description || "No description provided.",
+    verificationStatus:
+      factory.verificationStatus ||
+      (factory.isVerified === true ? "VERIFIED" : "UNVERIFIED"),
+    website: factory.website || "Not provided",
+    isOpen: factory.isOpen ?? false,
+    hours: factory.hours || {
+      weekday: "Not provided",
+      saturday: "Not provided",
+      sunday: "Not provided",
+    },
+  };
 };
 
 /* ================= COMPONENT ================= */
@@ -143,6 +176,7 @@ const Map = () => {
   const [searchVisible, setSearchVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
+  const [factoryError, setFactoryError] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -159,9 +193,36 @@ const Map = () => {
 
   const fetchCompanies = async (lat: number, lon: number) => {
     setFetching(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setCompanies(generateMockCompanies(lat, lon, 8, 20));
-    setFetching(false);
+    setFactoryError(null);
+    try {
+      const response = await api.get("/factories", {
+        params: { page: 0, size: 1000 },
+      });
+      const payload = response.data;
+      const factories: FactoryApiResponse[] = Array.isArray(payload)
+        ? payload
+        : payload?.content || payload?.factories || [];
+      const location = { latitude: lat, longitude: lon };
+      const normalizedCompanies = factories
+        .filter(
+          (factory) =>
+            (factory.verificationStatus || "").toUpperCase() === "VERIFIED" ||
+            factory.isVerified === true,
+        )
+        .filter(
+          (factory) =>
+            factory.active !== false && factory.isActive !== false,
+        )
+        .map((factory) => normalizeFactory(factory, location))
+        .filter((factory): factory is Company => factory !== null);
+
+      setCompanies(normalizedCompanies);
+    } catch (error) {
+      setCompanies([]);
+      setFactoryError(handleApiError(error));
+    } finally {
+      setFetching(false);
+    }
   };
 
   const filteredCompanies = useMemo(() => {
@@ -225,6 +286,12 @@ const Map = () => {
         coordinates: userLocation,
         zoom: 15,
       });
+    }
+  };
+
+  const retryFactories = () => {
+    if (userLocation) {
+      void fetchCompanies(userLocation.latitude, userLocation.longitude);
     }
   };
 
@@ -383,6 +450,48 @@ const Map = () => {
           </View>
         )}
 
+        {!fetching && factoryError && (
+          <View
+            style={[
+              styles.mapStateCard,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Ionicons name="cloud-offline-outline" size={28} color={theme.error} />
+            <Text style={[styles.mapStateTitle, { color: theme.text }]}>Unable to load factories</Text>
+            <Text style={[styles.mapStateMessage, { color: theme.textSecondary }]}>
+              {factoryError}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: theme.primary }]}
+              onPress={retryFactories}
+            >
+              <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!fetching && !factoryError && companies.length === 0 && (
+          <View
+            style={[
+              styles.mapStateCard,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Ionicons name="business-outline" size={28} color={theme.primary} />
+            <Text style={[styles.mapStateTitle, { color: theme.text }]}>No verified factories available</Text>
+            <Text style={[styles.mapStateMessage, { color: theme.textSecondary }]}>
+              Verified factories with valid map coordinates will appear here.
+            </Text>
+          </View>
+        )}
+
         {/* ── SEARCH RESULT QUANTITY COUNT ── */}
         {!fetching && searchVisible && (
           <View
@@ -468,10 +577,20 @@ const Map = () => {
                       },
                     ]}
                   >
-                    <Image
-                      source={{ uri: selectedCompany.photo }}
-                      style={styles.heroImage}
-                    />
+                    {selectedCompany.photo ? (
+                      <Image
+                        source={{ uri: selectedCompany.photo }}
+                        style={styles.heroImage}
+                      />
+                    ) : (
+                      <View style={styles.heroImagePlaceholder}>
+                        <Ionicons
+                          name="business-outline"
+                          size={42}
+                          color={theme.primary}
+                        />
+                      </View>
+                    )}
 
                     {/* Graduated blur band — replaces the single flat BlurView */}
                     <View
@@ -598,6 +717,20 @@ const Map = () => {
                       >
                         {selectedCompany.category}
                       </Text>
+                      <Text
+                        style={[styles.distanceText, { color: theme.textSecondary }]}
+                      >
+                        ★ {selectedCompany.rating > 0 ? selectedCompany.rating.toFixed(1) : "No ratings"} · {selectedCompany.distance < 1000
+                          ? `${Math.round(selectedCompany.distance)} m away`
+                          : `${(selectedCompany.distance / 1000).toFixed(1)} km away`}
+                      </Text>
+                    </View>
+
+                    <View style={styles.contentSection}>
+                      <Text style={[styles.sectionHeading, { color: theme.text }]}>About</Text>
+                      <Text style={[styles.descriptionText, { color: theme.textSecondary }]}>
+                        {selectedCompany.description}
+                      </Text>
                     </View>
 
                     {/* ── HOURS RENDER STACK ── */}
@@ -625,6 +758,24 @@ const Map = () => {
                           style={[styles.rightValueText, { color: theme.text }]}
                         >
                           {selectedCompany.hours.weekday}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.sectionDivider,
+                          { backgroundColor: theme.border },
+                        ]}
+                      />
+
+                      <View style={styles.dataGridRow}>
+                        <Text
+                          style={[styles.mutedLabelText, { color: theme.textSecondary }]}
+                        >
+                          Verification
+                        </Text>
+                        <Text style={[styles.rightValueText, { color: theme.primary }]}>
+                          {selectedCompany.verificationStatus}
                         </Text>
                       </View>
 
@@ -818,6 +969,39 @@ const styles = StyleSheet.create({
 
   loading: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 12, fontSize: 15 },
+  mapStateCard: {
+    position: "absolute",
+    top: "42%",
+    left: 24,
+    right: 24,
+    alignItems: "center",
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+  },
+  mapStateTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  mapStateMessage: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
 
   /* Search bar styling */
   searchBar: {
@@ -932,6 +1116,13 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "cover",
   },
+  heroImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F5E9",
+  },
   blurFadeContainer: {
     position: "absolute",
     left: 0,
@@ -1017,6 +1208,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
     color: "#8E8E93",
+  },
+  distanceText: {
+    fontSize: 13,
+    marginTop: 6,
+  },
+  descriptionText: {
+    fontSize: 15,
+    lineHeight: 22,
   },
 
   /* Apple details blocks presentation layouts */

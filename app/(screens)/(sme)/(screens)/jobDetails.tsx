@@ -1,7 +1,9 @@
 import FadeIn from "@/components/common/FadeIn";
 import MainContainer from "@/components/MainContainer";
 import BidCard from "@/components/sme/BidCard";
-import ManufacturerModal from "@/components/sme/ManufacturerModal";
+import ManufacturerModal, {
+  type ManufacturerProfile,
+} from "@/components/sme/ManufacturerModal";
 import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import { BidStatus, getDaysUntilDeadline } from "@/constants/Jobstore";
@@ -46,7 +48,42 @@ interface BidApiResponse {
   jobId: string;
   factoryId: string;
   factoryName: string;
-  factorySectorTags: string[];
+  factorySectorTags?: string[];
+  factory?: {
+    id?: string;
+    name?: string;
+    companyName?: string;
+    logoUrl?: string | null;
+    profileImageUrl?: string | null;
+    verified?: boolean;
+    isVerified?: boolean;
+    rating?: number | null;
+    averageRating?: number | null;
+    reviewCount?: number | null;
+    ratingCount?: number | null;
+    location?: string | null;
+    address?: string | null;
+    town?: string | null;
+    region?: string | null;
+    description?: string | null;
+    sectorTags?: string[];
+    specialties?: string[];
+  };
+  factoryLogoUrl?: string | null;
+  factoryProfileImageUrl?: string | null;
+  factoryVerified?: boolean;
+  factoryRating?: number | null;
+  factoryAverageRating?: number | null;
+  factoryReviewCount?: number | null;
+  factoryRatingCount?: number | null;
+  factoryLocation?: string | null;
+  factoryAddress?: string | null;
+  factoryTown?: string | null;
+  factoryRegion?: string | null;
+  reviewCount?: number | null;
+  ratingCount?: number | null;
+  averageRating?: number | null;
+  factoryDescription?: string | null;
   pricePerUnitGhs: number;
   totalPriceGhs: number;
   productionDays: number;
@@ -64,18 +101,6 @@ interface OrderApiResponse {
 }
 
 // ---------- Local display types (what BidCard / ManufacturerModal expect) ----------
-interface DisplayManufacturer {
-  id: string;
-  name: string;
-  logo: string | null;
-  verified: boolean;
-  rating: number;
-  reviewCount: number;
-  location: string;
-  description: string;
-  specialties: string[];
-}
-
 interface DisplayBid {
   id: string;
   status: BidStatus;
@@ -83,7 +108,7 @@ interface DisplayBid {
   deliveryDays: number;
   notes: string;
   submittedAt: string;
-  manufacturer: DisplayManufacturer;
+  manufacturer: ManufacturerProfile;
 }
 
 interface DisplayJob {
@@ -107,11 +132,72 @@ function mapApiStatusToTab(status: string): DisplayJob["status"] {
 }
 
 function mapBidStatus(status: string): BidStatus {
-  if (status === "ACCEPTED") return "accepted";
-  if (status === "REJECTED" || status === "WITHDRAWN" || status === "EXPIRED") {
+  const normalizedStatus = status?.toUpperCase();
+  if (normalizedStatus === "ACCEPTED") return "accepted";
+  if (
+    normalizedStatus === "REJECTED" ||
+    normalizedStatus === "WITHDRAWN" ||
+    normalizedStatus === "EXPIRED"
+  ) {
     return "rejected";
   }
   return "pending";
+}
+
+function transformManufacturer(bid: BidApiResponse): ManufacturerProfile {
+  const factory = bid.factory;
+  const rating =
+    factory?.averageRating ??
+    factory?.rating ??
+    bid.factoryAverageRating ??
+    bid.averageRating ??
+    bid.factoryRating;
+  const reviewCount =
+    factory?.reviewCount ??
+    factory?.ratingCount ??
+    bid.factoryReviewCount ??
+    bid.factoryRatingCount ??
+    bid.reviewCount ??
+    bid.ratingCount;
+
+  return {
+    id: factory?.id || bid.factoryId,
+    name:
+      factory?.companyName ||
+      factory?.name ||
+      bid.factoryName ||
+      "Manufacturer",
+    logo:
+      factory?.logoUrl ||
+      factory?.profileImageUrl ||
+      bid.factoryLogoUrl ||
+      bid.factoryProfileImageUrl ||
+      null,
+    verified:
+      factory?.verified ?? factory?.isVerified ?? bid.factoryVerified ?? false,
+    rating: typeof rating === "number" && Number.isFinite(rating) ? rating : 0,
+    reviewCount:
+      typeof reviewCount === "number" && Number.isFinite(reviewCount)
+        ? reviewCount
+        : 0,
+    location:
+      factory?.location ||
+      factory?.address ||
+      factory?.town ||
+      factory?.region ||
+      bid.factoryLocation ||
+      bid.factoryAddress ||
+      [bid.factoryTown, bid.factoryRegion].filter(Boolean).join(", ") ||
+      "Location not provided",
+    description:
+      factory?.description ||
+      bid.factoryDescription ||
+      "No company description provided.",
+    specialties: [
+      ...(factory?.sectorTags || factory?.specialties || []),
+      ...(bid.factorySectorTags || []),
+    ].filter((tag, index, tags) => Boolean(tag) && tags.indexOf(tag) === index),
+  };
 }
 
 function transformBid(bid: BidApiResponse): DisplayBid {
@@ -126,17 +212,7 @@ function transformBid(bid: BidApiResponse): DisplayBid {
       month: "short",
       year: "numeric",
     }),
-    manufacturer: {
-      id: bid.factoryId,
-      name: bid.factoryName,
-      logo: null,
-      verified: false,
-      rating: 0,
-      reviewCount: 0,
-      location: "Location not available",
-      description: "Detailed factory profile isn't available yet.",
-      specialties: bid.factorySectorTags ?? [],
-    },
+    manufacturer: transformManufacturer(bid),
   };
 }
 
@@ -381,7 +457,7 @@ const JobDetails = () => {
                       styles.heroImage,
                       { borderWidth: 1, borderColor: theme.border },
                     ]}
-                    resizeMode="contain"
+                    resizeMode="cover"
                   />
                 )}
               </View>
@@ -546,7 +622,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   heroQuantity: { fontSize: 14, fontWeight: "500" },
-  heroImage: { width: 80, height: 80, borderRadius: 14 },
+  heroImage: { width: 80, height: 80, borderRadius: 14, overflow: "hidden" },
   heroDescription: {
     fontSize: 14,
     lineHeight: 21,

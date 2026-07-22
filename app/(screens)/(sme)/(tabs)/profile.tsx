@@ -188,7 +188,7 @@ export default function SMEProfile() {
     verified: user?.isVerified || false,
     city: (user as any)?.town || "City",
     region: user?.region || "Region",
-    email: "N/A", // not returned by /users/me — see note below
+    email: user?.email || "N/A",
     phone: user?.phoneNumber || "N/A",
     avatarUri: user?.profileImageUrl || null,
     coverUri: null as string | null,

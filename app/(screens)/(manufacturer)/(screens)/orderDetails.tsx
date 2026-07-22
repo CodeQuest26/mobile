@@ -1,7 +1,7 @@
 import { FadeIn } from "@/components/FadeIn";
 import MainContainer from "@/components/MainContainer";
-import ReviewForm from "@/components/sme/ReviewForm";
 import ReportIssueModal from "@/components/sme/ReportIssueModal";
+import ReviewForm from "@/components/sme/ReviewForm";
 import Colors from "@/constants/colors";
 import { api, handleApiError } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -199,9 +199,7 @@ export function OrderDetailScreen({
       setReview(null);
       if (orderData.status === "COMPLETED") {
         try {
-          const { data: reviewData } = await api.get(
-            `reviews/${orderData.id}`,
-          );
+          const { data: reviewData } = await api.get(`reviews/${orderData.id}`);
           if (reviewData?.overallRating) {
             setReview(reviewData);
           }
@@ -231,9 +229,7 @@ export function OrderDetailScreen({
       await api.patch(`orders/${apiOrder.id}/status`, {
         newStatus: nextStatus,
       });
-      // Refetch rather than optimistically patching local state, so
-      // the timeline dates and progress reflect what the server
-      // actually persisted (e.g. real deliveredAt timestamps).
+
       await fetchOrder();
     } catch (err) {
       console.error("Failed to update order status:", err);
@@ -382,8 +378,7 @@ export function OrderDetailScreen({
     (() => {
       if (apiOrder.status !== "COMPLETED") return true;
       if (!apiOrder.completedAt) return false;
-      const elapsed =
-        Date.now() - new Date(apiOrder.completedAt).getTime();
+      const elapsed = Date.now() - new Date(apiOrder.completedAt).getTime();
       return elapsed < 7 * 24 * 60 * 60 * 1000;
     })();
 
@@ -426,7 +421,15 @@ export function OrderDetailScreen({
                     style={styles.orderJobImage}
                   />
                 )}
-                <Text style={[styles.jobName, { color: theme.text, flex: apiJob?.attachmentUrls?.[0] ? 1 : undefined }]}>
+                <Text
+                  style={[
+                    styles.jobName,
+                    {
+                      color: theme.text,
+                      flex: apiJob?.attachmentUrls?.[0] ? 1 : undefined,
+                    },
+                  ]}
+                >
                   {order.job}
                 </Text>
                 {apiOrder.status === "DISPUTED" && (
@@ -638,10 +641,7 @@ export function OrderDetailScreen({
           {role === "manufacturer" && review && (
             <FadeIn delay={240}>
               <View
-                style={[
-                  styles.card,
-                  { backgroundColor: theme.cardBackground },
-                ]}
+                style={[styles.card, { backgroundColor: theme.cardBackground }]}
               >
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   Review from SME
@@ -720,11 +720,15 @@ export function OrderDetailScreen({
             </FadeIn>
           )}
 
-          {role === "manufacturer" && !isCompleted && apiOrder.status === "DELIVERED" && (
-            <Text style={[styles.awaitingText, { color: theme.textSecondary }]}>
-              Waiting on the buyer to confirm delivery.
-            </Text>
-          )}
+          {role === "manufacturer" &&
+            !isCompleted &&
+            apiOrder.status === "DELIVERED" && (
+              <Text
+                style={[styles.awaitingText, { color: theme.textSecondary }]}
+              >
+                Waiting on the buyer to confirm delivery.
+              </Text>
+            )}
 
           {role === "sme" && apiOrder.status === "DELIVERED" && (
             <FadeIn delay={280}>
@@ -737,7 +741,9 @@ export function OrderDetailScreen({
                   {updating ? (
                     <ActivityIndicator size="small" color={theme.onPrimary} />
                   ) : (
-                    <Text style={[styles.actionBtnText, { color: theme.onPrimary }]}>
+                    <Text
+                      style={[styles.actionBtnText, { color: theme.onPrimary }]}
+                    >
                       Confirm Delivery
                     </Text>
                   )}
@@ -750,10 +756,7 @@ export function OrderDetailScreen({
           {role === "sme" && isCompleted && (
             <FadeIn delay={300}>
               <View
-                style={[
-                  styles.card,
-                  { backgroundColor: theme.cardBackground },
-                ]}
+                style={[styles.card, { backgroundColor: theme.cardBackground }]}
               >
                 <ReviewForm orderId={apiOrder.id} theme={theme} />
               </View>
@@ -782,7 +785,12 @@ export function OrderDetailScreen({
         visible={reportModalVisible}
         orderId={apiOrder.id}
         theme={theme}
-        onClose={() => setReportModalVisible(false)}
+        onClose={(submitted) => {
+          setReportModalVisible(false);
+          if (submitted) {
+            fetchOrder();
+          }
+        }}
       />
     </>
   );

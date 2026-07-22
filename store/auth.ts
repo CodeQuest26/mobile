@@ -155,8 +155,6 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isVerifying: true, error: null });
 
-          // The backend actually returns tokens here, not a
-          // { message } payload — capture them for real.
           const { data } = await axios.post<VerifyOtpResponse>(
             `${BASE_URL}auth/verify`,
             { phoneNumber, otp },
@@ -233,14 +231,13 @@ export const useAuthStore = create<AuthState>()(
 
           set({ user: data });
         } catch (err) {
-          // Only treat this as a real session failure on 401/403 — an
-          // expired/invalid token. A network error, timeout, or 5xx
-          // shouldn't silently log the user out; that was previously
-          // wiping valid sessions on any transient failure.
+          // Only a 401 proves that the access token was rejected. A 403 can
+          // be a valid authenticated user lacking permission, while network
+          // errors, timeouts, and 5xx responses must never log the user out.
           const status = axios.isAxiosError(err)
             ? err.response?.status
             : undefined;
-          if (status === 401 || status === 403) {
+          if (status === 401) {
             await get().logout();
           }
         } finally {

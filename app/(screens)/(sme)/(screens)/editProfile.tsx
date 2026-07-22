@@ -1,9 +1,12 @@
+import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import { useTheme } from "@/contexts/ThemeContext";
+import { api, handleApiError } from "@/services/api";
+import { useAuthStore } from "@/store/auth";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,7 +35,7 @@ const FieldInput = ({
   theme,
   keyboardType,
   autoCapitalize,
-  multiline,
+  editable = true,
 }: {
   label: string;
   icon: string;
@@ -42,7 +45,7 @@ const FieldInput = ({
   theme: Theme;
   keyboardType?: any;
   autoCapitalize?: any;
-  multiline?: boolean;
+  editable?: boolean;
 }) => (
   <View style={styles.fieldWrapper}>
     <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
@@ -51,21 +54,20 @@ const FieldInput = ({
     <View
       style={[
         styles.fieldRow,
-        multiline && styles.fieldRowMultiline,
-        { backgroundColor: theme.cardBackground, borderColor: theme.border },
+        {
+          backgroundColor: editable
+            ? theme.cardBackground
+            : theme.border + "30",
+          borderColor: theme.border,
+          opacity: editable ? 1 : 0.7,
+        },
       ]}
     >
-      <Ionicons
-        name={icon as any}
-        size={18}
-        color={theme.textSecondary}
-        style={multiline ? styles.fieldIconTop : undefined}
-      />
+      <Ionicons name={icon as any} size={18} color={theme.textSecondary} />
       <TextInput
         style={[
           styles.fieldInput,
-          multiline && styles.fieldInputMultiline,
-          { color: theme.text },
+          { color: editable ? theme.text : theme.textSecondary },
         ]}
         value={value}
         onChangeText={onChangeText}
@@ -73,8 +75,7 @@ const FieldInput = ({
         placeholderTextColor={theme.textSecondary + "80"}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
-        multiline={multiline}
-        textAlignVertical={multiline ? "top" : "center"}
+        editable={editable}
       />
     </View>
   </View>
@@ -103,13 +104,47 @@ const EditProfile = () => {
   const { theme, colorScheme } = useTheme();
   const isDark = colorScheme === "dark";
 
+  const user = useAuthStore((s) => s.user);
+  const getMe = useAuthStore((s) => s.getMe);
+
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState("Company Name");
+  const [companyName, setCompanyName] = useState("");
   const [city, setCity] = useState("");
   const [region, setRegion] = useState("");
-  const [email, setEmail] = useState("user@example.com");
-  const [phone, setPhone] = useState("+233 55 123 4567");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [loadingUser, setLoadingUser] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Load existing profile details from store & backend
+  useEffect(() => {
+    let mounted = true;
+    async function loadData() {
+      try {
+        await getMe();
+      } catch (err) {
+        console.warn("[EditProfile] Failed to fetch current user:", err);
+      } finally {
+        if (mounted) setLoadingUser(false);
+      }
+    }
+    loadData();
+    return () => {
+      mounted = false;
+    };
+  }, [getMe]);
+
+  // Sync state when user updates
+  useEffect(() => {
+    if (user) {
+      setCompanyName(user.fullName || "");
+      setCity((user as any)?.town || "");
+      setRegion(user.region || "");
+      setPhone(user.phoneNumber || "");
+      setAvatarUri(user.profileImageUrl || null);
+    }
+  }, [user]);
 
   const initials =
     companyName
@@ -117,10 +152,9 @@ const EditProfile = () => {
       .filter(Boolean)
       .slice(0, 2)
       .map((w) => w[0]?.toUpperCase())
-      .join("") || "CN";
+      .join("") || "SME";
 
-  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSave = companyName.trim().length > 0 && isValidEmail && !saving;
+  const canSave = companyName.trim().length > 0 && !saving && !uploadingImage;
 
   const handlePickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -137,20 +171,105 @@ const EditProfile = () => {
       aspect: [1, 1],
       quality: 0.8,
     });
-    if (!result.canceled) {
+    if (!result.canceled && result.assets?.[0]?.uri) {
       setAvatarUri(result.assets[0].uri);
     }
   };
 
-  const handleSave = () => {
+  const uploadAvatarIfLocal = async (
+    localUri: string,
+  ): Promise<string | null> => {
+    // If it's already a remote URL, no need to re-upload
+    if (localUri.startsWith("http://") || localUri.startsWith("https://")) {
+      return localUri;
+    }
+
+    setUploadingImage(true);
+    try {
+      const filename = localUri.split("/").pop() || "avatar.jpg";
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : "image/jpeg";
+
+      const formData = new FormData();
+      formData.append("file", {
+        uri: localUri,
+        name: filename,
+        type,
+      } as any);
+
+      const { data } = await api.post("files/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      return data?.url || data?.fileUrl || null;
+    } catch (err) {
+      console.error("[EditProfile] Failed to upload avatar:", err);
+      Alert.alert(
+        "Image Upload Failed",
+        "Could not upload profile picture. Continuing with existing picture.",
+      );
+      return user?.profileImageUrl || null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
-    // TODO: call your update-profile API here
-    setTimeout(() => {
+
+    try {
+      let finalAvatarUrl = user?.profileImageUrl || null;
+      if (avatarUri && avatarUri !== user?.profileImageUrl) {
+        finalAvatarUrl = await uploadAvatarIfLocal(avatarUri);
+      }
+
+      const payload = {
+        fullName: companyName.trim(),
+        region: region.trim() || undefined,
+        town: city.trim() || undefined,
+        profileImageUrl: finalAvatarUrl || undefined,
+        email: email,
+      };
+
+      await api.put("users/profile", payload);
+      await getMe();
+
+      Alert.alert("Success", "Profile updated successfully.", [
+        {
+          text: "OK",
+          onPress: () => router.back(),
+        },
+      ]);
+    } catch (err) {
+      console.error("[EditProfile] Update failed:", err);
+      const msg = handleApiError(err);
+      Alert.alert("Update Failed", msg);
+    } finally {
       setSaving(false);
-      router.back();
-    }, 1200);
+    }
   };
+
+  if (loadingUser && !user) {
+    return (
+      <View
+        style={[
+          styles.screen,
+          styles.center,
+          { backgroundColor: theme.background },
+        ]}
+      >
+        <ActivityIndicator size="small" color={theme.primary} />
+        <Text
+          style={{ marginTop: 12, color: theme.textSecondary, fontSize: 14 }}
+        >
+          Loading profile...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -181,7 +300,7 @@ const EditProfile = () => {
             { backgroundColor: canSave ? theme.primary : theme.border },
           ]}
         >
-          {saving ? (
+          {saving || uploadingImage ? (
             <ActivityIndicator size="small" color={theme.onPrimary} />
           ) : (
             <Text
@@ -211,6 +330,7 @@ const EditProfile = () => {
             <Pressable
               onPress={handlePickAvatar}
               style={styles.avatarPressable}
+              disabled={saving || uploadingImage}
             >
               <View
                 style={[
@@ -237,7 +357,11 @@ const EditProfile = () => {
                   },
                 ]}
               >
-                <Ionicons name="camera" size={14} color={theme.onPrimary} />
+                {uploadingImage ? (
+                  <ActivityIndicator size="small" color={theme.onPrimary} />
+                ) : (
+                  <Ionicons name="camera" size={14} color={theme.onPrimary} />
+                )}
               </View>
             </Pressable>
             <Text style={[styles.avatarHint, { color: theme.textSecondary }]}>
@@ -262,7 +386,7 @@ const EditProfile = () => {
             <View style={styles.row}>
               <View style={styles.halfField}>
                 <FieldInput
-                  label="City"
+                  label="City / Town"
                   icon="location-outline"
                   value={city}
                   onChangeText={setCity}
@@ -289,19 +413,6 @@ const EditProfile = () => {
           {/* Contact */}
           <Section title="Contact" theme={theme}>
             <FieldInput
-              label="Email Address"
-              icon="mail-outline"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              theme={theme}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-
-            <View style={styles.fieldGap} />
-
-            <FieldInput
               label="Phone Number"
               icon="call-outline"
               value={phone}
@@ -309,6 +420,21 @@ const EditProfile = () => {
               placeholder="+233 ** *** ****"
               theme={theme}
               keyboardType="phone-pad"
+              editable={false}
+            />
+
+            <Spacer />
+
+            <FieldInput
+              label="Email Address"
+              icon="mail-outline"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="business@example.com"
+              theme={theme}
+              keyboardType="email-address"
+              editable={true}
+              autoCapitalize={false}
             />
           </Section>
 
@@ -323,7 +449,10 @@ export default EditProfile;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-
+  center: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -451,23 +580,11 @@ const styles = StyleSheet.create({
     height: 50,
     gap: 10,
   },
-  fieldRowMultiline: {
-    height: 90,
-    alignItems: "flex-start",
-    paddingVertical: 12,
-  },
-  fieldIconTop: {
-    marginTop: 2,
-  },
   fieldInput: {
     flex: 1,
     fontSize: 14.5,
     fontWeight: "500",
     padding: 0,
     height: "100%",
-  },
-  fieldInputMultiline: {
-    height: "100%",
-    lineHeight: 20,
   },
 });

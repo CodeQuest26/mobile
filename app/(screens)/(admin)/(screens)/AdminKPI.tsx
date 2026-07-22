@@ -1,12 +1,7 @@
 import Colors from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  useColorScheme
-} from "react-native";
+import { Pressable, StyleSheet, Text, useColorScheme } from "react-native";
 
 const AdminKPICard = ({ title, value, color, icon, onPress }: any) => {
   const colorScheme = useColorScheme();
@@ -18,7 +13,6 @@ const AdminKPICard = ({ title, value, color, icon, onPress }: any) => {
       style={[
         styles.card,
         {
-          borderLeftColor: color,
           backgroundColor: theme.cardBackground,
         },
       ]}
@@ -39,7 +33,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     width: 150,
     height: 150,
-    borderLeftWidth: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

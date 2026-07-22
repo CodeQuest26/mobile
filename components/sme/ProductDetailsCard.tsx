@@ -10,11 +10,38 @@ import {
 } from "react-native";
 import ReviewForm from "./ReviewForm";
 
-const ProductDetailsCard = ({ product, theme, onMessagePress, onPress }: any) => {
-  const [modalVisible, setModalVisible] = useState(false);
-  const progress = product?.progress || 65;
+export interface ProductDetails {
+  id: string;
+  name: string;
+  manufacturer: string;
+  quantity: number | string;
+  cost: number | string;
+  currentStage: string;
+  progress: number;
+  status: string;
+  description: string;
+}
 
-  const isCompleted = product?.status === "COMPLETED";
+interface ProductDetailsCardProps {
+  product: ProductDetails;
+  theme: any;
+  onMessagePress?: (product: ProductDetails) => void;
+  onPress?: () => void;
+}
+
+const ProductDetailsCard = ({
+  product,
+  theme,
+  onMessagePress,
+  onPress,
+}: ProductDetailsCardProps) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const rawProgress = Number(product.progress);
+  const progress = Number.isFinite(rawProgress)
+    ? Math.max(0, Math.min(100, rawProgress))
+    : 0;
+
+  const isCompleted = product.status.toUpperCase() === "COMPLETED";
 
   const handleCardPress = () => {
     if (onPress) {
@@ -40,10 +67,10 @@ const ProductDetailsCard = ({ product, theme, onMessagePress, onPress }: any) =>
         <View style={styles.header}>
           <View style={styles.productInfo}>
             <Text style={[styles.productName, { color: theme.text }]}>
-              {product.name}
+              {product.name || "Order"}
             </Text>
             <Text style={[styles.manufacturer, { color: theme.textSecondary }]}>
-              {product.manufacturer}
+              {product.manufacturer || "Manufacturer"}
             </Text>
           </View>
 
@@ -262,7 +289,7 @@ const ProductDetailsCard = ({ product, theme, onMessagePress, onPress }: any) =>
                       Description
                     </Text>
                     <Text style={[styles.detailValue, { color: theme.text }]}>
-                      {product.description}
+                      {product.description || "No specifications provided."}
                     </Text>
                   </View>
 

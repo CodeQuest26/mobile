@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
-  ImageSourcePropType,
   Platform,
   StyleSheet,
   Text,
@@ -76,9 +75,9 @@ const JobPeekCard = memo(
       );
     };
 
-    const defaultImage: ImageSourcePropType = require("../assets/images/factory.jpeg");
-    const imageSource: ImageSourcePropType =
-      imageError || !job.image ? defaultImage : { uri: job.image };
+    // No image, or the remote image failed to load — show an icon
+    // placeholder instead of a static fallback photo.
+    const showPlaceholder = imageError || !job.image;
 
     return (
       <AnimatedTouchable
@@ -101,50 +100,59 @@ const JobPeekCard = memo(
       >
         {/* ── Photo ── */}
         <View style={styles.imageContainer}>
-          <Image
-            source={imageSource}
-            style={styles.jobImage}
-            resizeMode="cover"
-            onLoadStart={() => setImageLoading(true)}
-            onLoadEnd={() => setImageLoading(false)}
-            onError={() => {
-              setImageError(true);
-              setImageLoading(false);
-            }}
-          />
-
-          {imageLoading && (
+          {showPlaceholder ? (
             <View
-              style={[styles.imageLoader, { backgroundColor: theme.border }]}
+              style={[
+                styles.imagePlaceholder,
+                { backgroundColor: theme.border + "40" },
+              ]}
             >
-              <ActivityIndicator size="small" color={theme.primary} />
+              <Ionicons
+                name="business-outline"
+                size={28}
+                color={theme.textSecondary}
+              />
             </View>
+          ) : (
+            <>
+              <Image
+                source={{ uri: job.image }}
+                style={styles.jobImage}
+                resizeMode="cover"
+                onLoadStart={() => setImageLoading(true)}
+                onLoadEnd={() => setImageLoading(false)}
+                onError={() => {
+                  setImageError(true);
+                  setImageLoading(false);
+                }}
+              />
+
+              {imageLoading && (
+                <View
+                  style={[
+                    styles.imageLoader,
+                    { backgroundColor: theme.border },
+                  ]}
+                >
+                  <ActivityIndicator size="small" color={theme.primary} />
+                </View>
+              )}
+            </>
           )}
 
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.55)"]}
-            style={styles.imageOverlay}
-          />
+          {!showPlaceholder && (
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.55)"]}
+              style={styles.imageOverlay}
+            />
+          )}
 
-          {job.timeAgo && (
+          {job.timeAgo && !showPlaceholder && (
             <View style={styles.timeAgoRow}>
               <Ionicons name="time-outline" size={11} color={theme.onPrimary} />
               <Text style={styles.timeAgoText}>{job.timeAgo}</Text>
             </View>
           )}
-
-          {/* {job.category && (
-            <AnimatedView
-              style={[styles.stamp, { borderColor: theme.primary }, stampStyle]}
-            >
-              <Text
-                style={[styles.stampText, { color: theme.primary }]}
-                numberOfLines={1}
-              >
-                {job.category}
-              </Text>
-            </AnimatedView>
-          )} */}
         </View>
 
         <View style={styles.perforationRow}>
@@ -237,6 +245,12 @@ const styles = StyleSheet.create({
   // Photo
   imageContainer: { position: "relative", height: 112 },
   jobImage: { width: "100%", height: "100%" },
+  imagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   imageLoader: {
     position: "absolute",
     top: 0,

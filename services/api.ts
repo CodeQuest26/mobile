@@ -82,22 +82,26 @@ const processQueue = (error: unknown, token: string | null = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const original = error.config as InternalAxiosRequestConfig & {
+    const original = error.config as (InternalAxiosRequestConfig & {
       _retry?: boolean;
-    };
+    }) | undefined;
 
     const { token, refreshToken } = useAuthStore.getState();
 
     // Only treat this as "session expired" if we actually had a token.
     // A 401 with no token at all is just an unauthenticated request,
     // not a reason to attempt refresh or log the user out.
-    if (error.response?.status === 401 && !original._retry && token) {
+    if (error.response?.status === 401 && original && !original._retry && token) {
       if (!refreshToken) {
         await useAuthStore.getState().logout();
         return Promise.reject(error);
       }
 
       if (isRefreshing) {
+        // Mark queued requests as retried before replaying them. If the new
+        // access token is also rejected, this prevents an endless refresh
+        // loop for that request.
+        original._retry = true;
         // Queue subsequent requests until the in-flight refresh resolves.
         return new Promise((resolve, reject) => {
           refreshQueue.push({ resolve, reject });
@@ -113,13 +117,19 @@ api.interceptors.response.use(
       try {
         // Per the spec's RefreshRequest schema, refreshToken goes in the
         // JSON body — not an Authorization header.
-        const { data } = await axios.post(joinUrl(BASE_URL, "auth/refresh"), {
-          refreshToken,
-        });
+        const { data } = await axios.post(
+          joinUrl(BASE_URL, "auth/refresh"),
+          { refreshToken },
+          { timeout: 15_000 },
+        );
 
         // Matches TokenResponse schema.
         const newToken: string = data.accessToken;
         const newRefreshToken: string | undefined = data.refreshToken;
+
+        if (!newToken) {
+          throw new Error("Refresh response did not include an access token.");
+        }
 
         useAuthStore.getState().setToken(newToken);
         if (newRefreshToken) {
@@ -132,7 +142,17 @@ api.interceptors.response.use(
         return api(original);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        await useAuthStore.getState().logout();
+
+        // A network error, timeout, or server failure does not prove that
+        // the user's session is invalid. Keep the persisted credentials so a
+        // later request can retry refresh instead of unexpectedly logging the
+        // user out. Only an explicit auth rejection invalidates the session.
+        const refreshStatus = axios.isAxiosError(refreshError)
+          ? refreshError.response?.status
+          : undefined;
+        if (refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403) {
+          await useAuthStore.getState().logout();
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

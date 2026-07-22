@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { useBiometrics } from "@/hooks/useBiometrics";
 import { useAuthStore } from "@/store/auth";
 import { storage } from "@/store/mmkv";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -47,6 +48,7 @@ interface InputFieldProps {
   secureTextEntry: any;
   rightSlot: any;
   theme: any;
+  pholder: any;
 }
 
 const InputField = ({
@@ -57,6 +59,7 @@ const InputField = ({
   secureTextEntry,
   rightSlot,
   theme,
+  pholder,
 }: InputFieldProps) => {
   return (
     <View style={styles.fieldWrapper}>
@@ -72,6 +75,7 @@ const InputField = ({
         <Ionicons
           name={icon as any}
           color={theme.textSecondary}
+          size={24}
           style={{ marginRight: 10 }}
         />
 
@@ -81,7 +85,7 @@ const InputField = ({
           onChangeText={onChangeText}
           secureTextEntry={secureTextEntry}
           placeholderTextColor={theme.textSecondary + "80"}
-          placeholder={label}
+          placeholder={pholder ? pholder : label}
         />
         {rightSlot}
       </View>
@@ -112,6 +116,13 @@ const LoginScreen = () => {
 
   const canSubmit = phoneNumber.length >= 10 && password.length >= 8;
 
+  const biometrics = useBiometrics();
+  // Determine the right icon: Face ID on iOS face, fingerprint elsewhere.
+  const biometricIcon =
+    biometrics.biometricLabel === "Face ID"
+      ? "scan-outline"
+      : "finger-print-outline";
+
   const { login } = useAuthStore();
 
   const routeForRole = (role?: string) => {
@@ -139,6 +150,21 @@ const LoginScreen = () => {
         storage.set("selectedRole", roleForFlow);
       }
 
+      // On successful login, offer to enable biometric for next time.
+      if (biometrics.isAvailable && !biometrics.isEnabled) {
+        Alert.alert(
+          `Enable ${biometrics.biometricLabel}?`,
+          `Sign in faster next time using ${biometrics.biometricLabel}.`,
+          [
+            { text: "Not now", style: "cancel" },
+            {
+              text: "Enable",
+              onPress: () => biometrics.setEnabled(true),
+            },
+          ],
+        );
+      }
+
       // Not yet verified — this account still needs to complete OTP.
       router.replace({
         pathname: "/OTPVerification",
@@ -150,6 +176,38 @@ const LoginScreen = () => {
       setLoading(false);
     }
   };
+
+  const handleBiometricLogin = async () => {
+    const success = await biometrics.authenticate(
+      `Sign in to MakersHub with ${biometrics.biometricLabel}`,
+    );
+    if (!success) {
+      Alert.alert(
+        "Authentication Failed",
+        "Biometric authentication was not successful. Please sign in with your credentials.",
+      );
+      return;
+    }
+    // Biometric passed — navigate to the authenticated area directly.
+    const storedRole = storage.getString("selectedRole");
+    const destination =
+      storedRole === "ADMIN"
+        ? "/(screens)/(admin)/(tabs)"
+        : storedRole === "FACTORY_OWNER"
+          ? "/(screens)/(manufacturer)/(tabs)"
+          : "/(screens)/(sme)/(tabs)";
+    router.replace(destination as any);
+  };
+
+  // Auto-prompt biometric when available, enabled, and the user already has
+  // an authenticated session (token present in store).
+  useEffect(() => {
+    const token = useAuthStore.getState().token;
+    if (biometrics.isAvailable && biometrics.isEnabled && token) {
+      handleBiometricLogin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [biometrics.isAvailable, biometrics.isEnabled]);
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
@@ -203,6 +261,7 @@ const LoginScreen = () => {
             theme={theme}
             secureTextEntry={undefined}
             rightSlot={undefined}
+            pholder="+233-XX-XXX-XXXX"
           />
 
           <Spacer style={{ height: 15 }} />
@@ -265,6 +324,52 @@ const LoginScreen = () => {
               </Text>
             )}
           </TouchableOpacity>
+
+          {/* Biometric sign-in button — only shown when hardware & opt-in are ready */}
+          {biometrics.isAvailable && biometrics.isEnabled && (
+            <>
+              <Spacer style={{ height: 16 }} />
+              <View style={styles.dividerRow}>
+                <View
+                  style={[styles.divider, { backgroundColor: theme.border }]}
+                />
+                <Text
+                  style={[styles.dividerText, { color: theme.textSecondary }]}
+                >
+                  or
+                </Text>
+                <View
+                  style={[styles.divider, { backgroundColor: theme.border }]}
+                />
+              </View>
+              <Spacer style={{ height: 16 }} />
+              <TouchableOpacity
+                onPress={handleBiometricLogin}
+                disabled={biometrics.isAuthenticating}
+                activeOpacity={0.8}
+                style={[
+                  styles.biometricButton,
+                  {
+                    borderColor: theme.border,
+                    backgroundColor: theme.cardBackground,
+                  },
+                ]}
+              >
+                {biometrics.isAuthenticating ? (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : (
+                  <Ionicons
+                    name={biometricIcon as any}
+                    size={28}
+                    color={theme.primary}
+                  />
+                )}
+                <Text style={[styles.biometricText, { color: theme.text }]}>
+                  Sign in with {biometrics.biometricLabel}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <Spacer style={{ height: 10 }} />
 
@@ -337,17 +442,16 @@ const styles = StyleSheet.create({
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   divider: { flex: 1, height: 1 },
   dividerText: { fontSize: 13 },
-  socialButton: {
+  biometricButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: 15,
+    height: 54,
     gap: 10,
   },
-  googleG: { fontSize: 17, fontWeight: "800" },
-  socialText: { fontSize: 15, fontWeight: "500" },
+  biometricText: { fontSize: 15, fontWeight: "600" },
   signupRow: {
     flexDirection: "row",
     justifyContent: "center",

@@ -4,10 +4,12 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import { isAxiosError } from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -50,44 +52,155 @@ interface FormData {
   images: ImagePicker.ImagePickerAsset[];
 }
 
+const INITIAL_FORM_DATA: FormData = {
+  category: "",
+  product: "",
+  quantity: "",
+  budget: "",
+  location: "",
+  description: "",
+  deadline: null,
+  requirements: [],
+  images: [],
+};
+
+class ImageUnavailableError extends Error {
+  constructor() {
+    super("Image unavailable—please choose it again.");
+    this.name = "ImageUnavailableError";
+  }
+}
+
+class ImageUploadError extends Error {
+  constructor(
+    readonly kind: "server" | "network",
+    message: string,
+  ) {
+    super(message);
+    this.name = "ImageUploadError";
+  }
+}
+
+const imageDiagnostics = (asset: ImagePicker.ImagePickerAsset) => ({
+  uri: asset.uri,
+  fileName: asset.fileName,
+  mimeType: asset.mimeType,
+});
+
+const IMAGE_MIME_TYPES_BY_EXTENSION: Record<string, string> = {
+  avif: "image/avif",
+  bmp: "image/bmp",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  ico: "image/x-icon",
+  jfif: "image/jpeg",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  webp: "image/webp",
+};
+
+const getImageUploadMetadata = (asset: ImagePicker.ImagePickerAsset) => {
+  const filename =
+    asset.fileName?.trim() ||
+    decodeURIComponent(asset.uri.split("/").pop() || "") ||
+    `upload-${Date.now()}.jpg`;
+  const extension = filename.split(".").pop()?.toLowerCase() || "";
+  const pickerMimeType = asset.mimeType?.split(";", 1)[0].toLowerCase();
+  const mimeType = pickerMimeType?.startsWith("image/")
+    ? pickerMimeType === "image/jpg"
+      ? "image/jpeg"
+      : pickerMimeType
+    : IMAGE_MIME_TYPES_BY_EXTENSION[extension] || "image/jpeg";
+
+  return { filename, mimeType };
+};
+
+/** ImagePicker can return a URI for an asset that is no longer readable. */
+const assertImageAssetAvailable = async (
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<void> => {
+  if (!asset.uri?.trim()) {
+    throw new ImageUnavailableError();
+  }
+
+  if (__DEV__) {
+    console.debug("[PostJobForm] Selected image", imageDiagnostics(asset));
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    Image.getSize(
+      asset.uri,
+      () => resolve(),
+      () => reject(new ImageUnavailableError()),
+    );
+  });
+};
+
 async function uploadFileToServer(
   asset: ImagePicker.ImagePickerAsset,
 ): Promise<string> {
+  await assertImageAssetAvailable(asset);
+
   const formData = new FormData();
-  const filename =
-    asset.fileName || asset.uri.split("/").pop() || `upload-${Date.now()}.jpg`;
-  const extMatch = /\.(\w+)$/.exec(filename);
-  const inferredType = extMatch
-    ? `image/${extMatch[1].toLowerCase()}`
-    : "image/jpeg";
+  const { filename, mimeType } = getImageUploadMetadata(asset);
 
   formData.append("file", {
     uri: asset.uri,
     name: filename,
-    type: asset.mimeType || inferredType,
+    type: mimeType,
   } as any);
 
-  const { data } = await api.post("files/upload", formData, {
-    headers: { Accept: "application/json" },
-  });
-  return data.url as string;
+  let data;
+  try {
+    ({ data } = await api.post("files/upload", formData, {
+      headers: {
+        Accept: "application/json",
+        // api has a global JSON content type. Clear it here so Axios/RN can
+        // generate the multipart content type with its boundary.
+        "Content-Type": undefined,
+      },
+      timeout: 60_000,
+    }));
+  } catch (error) {
+    if (__DEV__) {
+      console.error("[PostJobForm] Image upload failed", {
+        ...imageDiagnostics(asset),
+        status: isAxiosError(error) ? error.response?.status : undefined,
+        response: isAxiosError(error) ? error.response?.data : undefined,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (isAxiosError(error)) {
+      if (error.response) {
+        throw new ImageUploadError("server", handleApiError(error));
+      }
+      throw new ImageUploadError(
+        "network",
+        error.code === "ECONNABORTED"
+          ? "The image upload timed out. Please try again."
+          : "Could not reach the image upload service. Please check your connection and try again.",
+      );
+    }
+    throw error;
+  }
+
+  const fileUrl = data?.url || data?.fileUrl || data?.path;
+  if (!fileUrl) {
+    throw new Error("Image upload succeeded but no URL was returned.");
+  }
+  return fileUrl as string;
 }
 
 const PostJobForm = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"] ?? Colors.light;
 
-  const [formData, setFormData] = useState<FormData>({
-    category: "",
-    product: "",
-    quantity: "",
-    budget: "",
-    location: "",
-    description: "",
-    deadline: null,
-    requirements: [],
-    images: [],
-  });
+  const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA);
 
   // Real-time error indicator states
   const [quantityError, setQuantityError] = useState("");
@@ -101,6 +214,17 @@ const PostJobForm = () => {
 
   const updateFormData = (field: keyof FormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Restores the form to a blank slate — used after a successful post
+  // when the user chooses "Post Another".
+  const resetForm = () => {
+    setFormData(INITIAL_FORM_DATA);
+    setCurrentRequirement("");
+    setQuantityError("");
+    setBudgetError("");
+    setShowDatePicker(false);
+    setShowCategoryModal(false);
   };
 
   // Handles text normalization depending on strict field constraints
@@ -166,12 +290,32 @@ const PostJobForm = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsMultipleSelection: true,
       quality: 0.8,
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      shouldDownloadFromNetwork: true,
     });
 
     if (!result.canceled) {
+      const assetsAreAvailable = await Promise.all(
+        result.assets.map(async (asset) => {
+          try {
+            await assertImageAssetAvailable(asset);
+            return true;
+          } catch {
+            return false;
+          }
+        }),
+      );
+      if (assetsAreAvailable.some((available) => !available)) {
+        Alert.alert(
+          "Image unavailable",
+          "One or more selected images could not be read. Please choose them again.",
+        );
+        return;
+      }
       updateFormData("images", [...formData.images, ...result.assets]);
     }
   };
@@ -187,11 +331,20 @@ const PostJobForm = () => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
       quality: 0.8,
     });
 
     if (!result.canceled) {
-      updateFormData("images", [...formData.images, result.assets[0]]);
+      try {
+        await assertImageAssetAvailable(result.assets[0]);
+        updateFormData("images", [...formData.images, result.assets[0]]);
+      } catch {
+        Alert.alert(
+          "Image unavailable",
+          "The photo could not be read. Please take it again.",
+        );
+      }
     }
   };
 
@@ -253,9 +406,10 @@ const PostJobForm = () => {
       let attachmentUrls: string[] = [];
       if (formData.images.length > 0) {
         setIsUploadingImages(true);
-        attachmentUrls = await Promise.all(
-          formData.images.map((asset) => uploadFileToServer(asset)),
-        );
+
+        for (const asset of formData.images) {
+          attachmentUrls.push(await uploadFileToServer(asset));
+        }
         setIsUploadingImages(false);
       }
 
@@ -294,13 +448,34 @@ Requirements:
           {
             text: "Post Another",
             style: "default",
+            onPress: resetForm,
           },
         ],
       );
     } catch (error) {
       setIsUploadingImages(false);
-      const message = handleApiError(error);
-      Alert.alert("Error", message || "Failed to post job. Please try again.");
+      if (error instanceof ImageUnavailableError) {
+        Alert.alert(
+          "Image unavailable",
+          "Image unavailable—please choose it again.",
+        );
+      } else if (error instanceof ImageUploadError) {
+        Alert.alert(
+          error.kind === "server"
+            ? "Image upload failed"
+            : "Upload unavailable",
+          error.message,
+        );
+      } else {
+        const message = handleApiError(error);
+        if (__DEV__) {
+          console.error("[PostJobForm] Failed to post job", error);
+        }
+        Alert.alert(
+          "Error",
+          message || "Failed to post job. Please try again.",
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -695,7 +870,7 @@ Requirements:
                       <Ionicons
                         name="trash-outline"
                         size={18}
-                        color="#EF4444"
+                        color={theme.error}
                       />
                     </TouchableOpacity>
                   </View>
@@ -758,16 +933,11 @@ Requirements:
                     backgroundColor: isSubmitting
                       ? theme.border
                       : theme.primary,
-                    shadowColor: theme.primary,
                   },
                 ]}
               >
                 {isSubmitting ? (
-                  <Text style={[styles.submitText, { color: theme.onPrimary }]}>
-                    {isUploadingImages
-                      ? "Uploading Images..."
-                      : "Posting Job..."}
-                  </Text>
+                  <ActivityIndicator size={"small"} color={theme.primary} />
                 ) : (
                   <>
                     <Ionicons
@@ -941,10 +1111,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
   submitIcon: {
     marginRight: 8,
