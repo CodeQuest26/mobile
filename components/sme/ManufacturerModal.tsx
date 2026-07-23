@@ -269,8 +269,8 @@ const ManufacturerModal: React.FC<ManufacturerModalProps> = ({
                         >
                           {manufacturer.rating > 0
                             ? manufacturer.rating.toFixed(1)
-                            : "No rating"} ({manufacturer.reviewCount}{" "}
-                          reviews)
+                            : "No rating"}{" "}
+                          ({manufacturer.reviewCount} reviews)
                         </Text>
                       </View>
                     ) : (

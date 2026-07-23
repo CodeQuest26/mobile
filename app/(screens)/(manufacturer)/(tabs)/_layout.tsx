@@ -6,6 +6,11 @@ import { Platform, StyleSheet, useColorScheme } from "react-native";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
+  const iosVersion = Platform.OS === "ios" ? Number(Platform.Version) : 0;
+
+  const chatIcon =
+    iosVersion >= 26 ? "message.fill" : "bubble.left.and.bubble.right.fill";
+
   if (Platform.OS === "ios") {
     return (
       <NativeTabs iconColor={colorScheme === "dark" ? "#fff" : "#000"}>
@@ -25,7 +30,7 @@ export default function TabLayout() {
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger role="search" name="chat">
-          <Icon sf="message.fill" />
+          <Icon sf={chatIcon} />
           <Label>Chat</Label>
         </NativeTabs.Trigger>
       </NativeTabs>
