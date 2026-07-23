@@ -93,7 +93,9 @@ api.interceptors.response.use(
     // not a reason to attempt refresh or log the user out.
     if (error.response?.status === 401 && original && !original._retry && token) {
       if (!refreshToken) {
-        await useAuthStore.getState().logout();
+        await useAuthStore.getState().forceLogout(
+          'Your session has expired. Please log in again.',
+        );
         return Promise.reject(error);
       }
 
@@ -151,7 +153,14 @@ api.interceptors.response.use(
           ? refreshError.response?.status
           : undefined;
         if (refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403) {
-          await useAuthStore.getState().logout();
+          // Extract the server's reason (e.g. "Account suspended") so the
+          // toast can show a meaningful message instead of the generic fallback.
+          const serverMsg = axios.isAxiosError(refreshError)
+            ? (refreshError.response?.data?.message as string | undefined)
+            : undefined;
+          await useAuthStore.getState().forceLogout(
+            serverMsg ?? 'Your session has expired. Please log in again.',
+          );
         }
         return Promise.reject(refreshError);
       } finally {

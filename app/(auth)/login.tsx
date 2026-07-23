@@ -24,7 +24,7 @@ import Colors from "../../constants/colors";
 
 const ROLE_META = {
   SME_OWNER: {
-    label: "Business Owner",
+    label: "Enterprise",
     icon: "briefcase-outline",
     tagline: "Manage your business, on the go.",
   },
@@ -49,6 +49,7 @@ interface InputFieldProps {
   rightSlot: any;
   theme: any;
   pholder?: string;
+  keyboardType: string;
 }
 
 const InputField = ({
@@ -60,6 +61,7 @@ const InputField = ({
   rightSlot,
   theme,
   pholder,
+  keyboardType,
 }: InputFieldProps) => {
   return (
     <View style={styles.fieldWrapper}>
@@ -259,9 +261,10 @@ const LoginScreen = () => {
             value={phoneNumber}
             onChangeText={setPhoneNumber}
             theme={theme}
+            keyboardType="phone-pad"
             secureTextEntry={undefined}
             rightSlot={undefined}
-            pholder="+233-XX-XXX-XXXX"
+            pholder="+233 XX XXX XXXX"
           />
 
           <Spacer style={{ height: 15 }} />
@@ -272,6 +275,7 @@ const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            keyboardType="default"
             theme={theme}
             rightSlot={
               <Pressable

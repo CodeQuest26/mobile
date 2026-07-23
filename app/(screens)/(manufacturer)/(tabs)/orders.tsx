@@ -3,6 +3,7 @@ import MainContainer from "@/components/MainContainer";
 import OrderCard from "@/components/OrderCard";
 import Colors from "@/constants/colors";
 import { api, handleApiError } from "@/services/api";
+import { useOrdersStore } from "@/store/orders";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -83,8 +84,11 @@ export default function ManufacturerOrders() {
   const [orders, setOrders] = useState<OrderCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
+
+  // ── Offline cache ──────────────────────────────────────────────────────────
+  const { manufacturerOrders: cachedRaw, setManufacturerOrders, markStale, isStale, lastSyncedAt } =
+    useOrdersStore();
 
   // Helper to map status to milestone number (0-4) and label
   const mapStatusToMilestone = (
@@ -212,12 +216,29 @@ export default function ManufacturerOrders() {
     return map;
   };
 
-  // Fetch orders from API.
+  // ── Seed from cache immediately so the screen isn't blank while loading ───
+  useEffect(() => {
+    if (cachedRaw.length === 0) return;
+    // Re-transform cached raw orders without a job-info map (titles will
+    // fall back to "Job #<id>") — good enough for an offline view.
+    const emptyJobMap = new Map<string, JobInfo>();
+    const emptyRatingMap = new Map<string, number>();
+    setOrders(
+      cachedRaw.map((o) => transformOrder(o as ApiOrder, emptyJobMap, emptyRatingMap)),
+    );
+    // Only stop the loading spinner if we have cached data so the user
+    // sees something instantly instead of a blank screen.
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Fetch orders from API ─────────────────────────────────────────────────
   const fetchOrders = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
     } else {
-      setLoading(true);
+      // Only show full-screen spinner on first load when cache is empty.
+      if (cachedRaw.length === 0) setLoading(true);
     }
     setError(null);
 
@@ -227,13 +248,14 @@ export default function ManufacturerOrders() {
       });
       const apiOrders: ApiOrder[] = response.data.content || [];
 
+      // Persist raw orders to MMKV before transforming.
+      setManufacturerOrders(apiOrders as any);
+
       const jobInfoMap = await fetchJobDetails(apiOrders.map((o) => o.jobId));
 
-      // Fetch reviews for completed orders that don't already have a rating
+      // Fetch reviews for completed orders that don't already have a rating.
       const completedWithoutRating = apiOrders.filter(
-        (o) =>
-          o.status === "COMPLETED" &&
-          o.overallRating == null,
+        (o) => o.status === "COMPLETED" && o.overallRating == null,
       );
       const ratingMap = new Map<string, number>();
       if (completedWithoutRating.length > 0) {
@@ -255,12 +277,18 @@ export default function ManufacturerOrders() {
       setOrders(transformed);
     } catch (err) {
       console.error("Error fetching orders:", err);
-      setError(handleApiError(err));
+      // Mark cache as stale so the offline banner appears, but keep the
+      // cached list visible — don't replace it with an error screen.
+      markStale();
+      if (cachedRaw.length === 0) {
+        // No cached data at all — show the error state.
+        setError(handleApiError(err));
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [cachedRaw.length, markStale, setManufacturerOrders]);
 
   useEffect(() => {
     fetchOrders();

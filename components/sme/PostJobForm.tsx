@@ -826,7 +826,6 @@ Requirements:
                   style={[
                     styles.iosDoneButton,
                     {
-                      backgroundColor: theme.onPrimary,
                       borderWidth: 1,
                       borderColor: theme.primary,
                     },

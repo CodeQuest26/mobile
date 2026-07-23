@@ -3,6 +3,10 @@ import axios from "axios";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+// Lazy-import to avoid circular dependency: auth.ts → api.ts → auth.ts.
+// The api instance is only needed inside getMe, which runs after module init.
+const getApi = () => require("@/services/api").api as import("axios").AxiosInstance;
+
 interface User {
   id: string;
   fullName: string;
@@ -41,6 +45,10 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
 
+  /** Populated by forceLogout when the session ends due to token expiry or
+   *  account suspension. Read by SessionExpiredToast to display the message. */
+  sessionExpiredMessage: string | null;
+
   // OTP verification flow
   pendingVerificationPhone: string | null;
   isVerifying: boolean;
@@ -54,11 +62,16 @@ interface AuthState {
   verifyOtp: (phoneNumber: string, otp: string) => Promise<void>;
   resendOtp: (phoneNumber: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Called by the API interceptor when a refresh definitively fails.
+   *  Clears the session and sets sessionExpiredMessage for the toast. */
+  forceLogout: (message: string) => Promise<void>;
   getMe: () => Promise<void>;
 
   setToken: (token: string | null) => void;
   setHasHydrated: (value: boolean) => void;
   clearError: () => void;
+  /** Called by SessionExpiredToast after the message has been displayed. */
+  clearSessionMessage: () => void;
 }
 
 const BASE_URL =
@@ -92,6 +105,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isAuthenticated: false,
+      sessionExpiredMessage: null,
 
       pendingVerificationPhone: null,
       isVerifying: false,
@@ -103,6 +117,8 @@ export const useAuthStore = create<AuthState>()(
       setHasHydrated: (value) => set({ hasHydrated: value }),
 
       clearError: () => set({ error: null }),
+
+      clearSessionMessage: () => set({ sessionExpiredMessage: null }),
 
       setToken: (token) => {
         set({
@@ -223,36 +239,22 @@ export const useAuthStore = create<AuthState>()(
       },
 
       /* ---------------- Current User ---------------- */
+      // Uses the api instance (not bare axios) so that the response interceptor
+      // handles 401 → silent refresh transparently, without a second manual
+      // refresh path that could conflict with the interceptor's queue.
       getMe: async () => {
         try {
           if (!get().token) return;
           set({ isLoading: true });
 
-          const { data } = await axios.get(joinUrl(BASE_URL, "users/me"), {
-            headers: { Authorization: `Bearer ${get().token}` },
-          });
-
+          const api = getApi();
+          const { data } = await api.get("users/me");
           set({ user: data });
         } catch (err) {
-          // Only a 401 proves that the access token was rejected.
-          const status = axios.isAxiosError(err)
-            ? err.response?.status
-            : undefined;
-          if (status === 401) {
-            try {
-              await get().refreshAccessToken();
-
-              const { data } = await axios.get(joinUrl(BASE_URL, "users/me"), {
-                headers: {
-                  Authorization: `Bearer ${get().token}`,
-                },
-              });
-
-              set({ user: data });
-            } catch {
-              await get().logout();
-            }
-          }
+          // The api interceptor already handles 401 → refresh → retry.
+          // Any error that bubbles here is either a network failure or a
+          // definitively failed refresh (which forceLogout already handled).
+          console.warn("getMe failed:", err);
         } finally {
           set({ isLoading: false });
         }
@@ -267,6 +269,23 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           pendingVerificationPhone: null,
           error: null,
+          sessionExpiredMessage: null,
+        });
+      },
+
+      /* ---------------- Force Logout (session expired) ---------------- */
+      // Called by the API interceptor when refresh definitively fails.
+      // Unlike logout(), this sets sessionExpiredMessage so the toast can
+      // display the server's reason (e.g. "Account suspended").
+      forceLogout: async (message) => {
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          isAuthenticated: false,
+          pendingVerificationPhone: null,
+          error: null,
+          sessionExpiredMessage: message,
         });
       },
     }),

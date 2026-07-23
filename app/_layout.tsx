@@ -1,5 +1,6 @@
 import ThemeProvider from "@/contexts/ThemeContext";
 import { useNotifications } from "@/hooks/useNotifications";
+import { SessionExpiredToast } from "@/components/common/SessionExpiredToast";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
@@ -19,6 +20,8 @@ const RootLayout = () => {
           <Stack.Screen name="(onboarding)" />
           <Stack.Screen name="(screens)" />
         </Stack>
+        {/* Session expired toast — rendered above all screens, zero extra deps */}
+        <SessionExpiredToast />
       </ThemeProvider>
     </KeyboardProvider>
   );

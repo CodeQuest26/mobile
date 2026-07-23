@@ -138,11 +138,6 @@ export default function RoleSelection() {
             style={styles.logoGradient}
           >
             <Ionicons name="rocket-outline" size={48} color={theme.onPrimary} />
-
-            {/* <Image
-              source={require("../../assets/images/icon.png")}
-              style={styles.logo}
-            /> */}
           </LinearGradient>
         </View>
 
@@ -161,7 +156,7 @@ export default function RoleSelection() {
       <View style={styles.cardsContainer}>
         <RoleCard
           roleKey="SME_OWNER"
-          title="Business Owner (SME)"
+          title="Enterprise (SME)"
           description="Partner with manufacturers, track orders, and scale your business."
           icon="business-outline"
           selectedRole={role}

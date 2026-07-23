@@ -143,39 +143,6 @@ const Slide = ({
         <View style={[styles.iconCircle, { backgroundColor: theme.primary }]}>
           <Ionicons name={item.icon as any} size={40} color={theme.onPrimary} />
         </View>
-
-        {/* Floating accent chips */}
-        {/* <View
-          style={[
-            styles.chip,
-            styles.chipTopRight,
-            {
-              backgroundColor: theme.cardBackground,
-              shadowColor: theme.primary,
-            },
-          ]}
-        >
-          <Ionicons name={item.icon as any} size={14} color={theme.primary} />
-          <Text style={[styles.chipText, { color: theme.primary }]}>
-            {item.highlight}
-          </Text>
-        </View> */}
-
-        {/* <View
-          style={[
-            styles.chip,
-            styles.chipBottomLeft,
-            {
-              backgroundColor: theme.cardBackground,
-              shadowColor: theme.primary,
-            },
-          ]}
-        >
-          <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
-          <Text style={[styles.chipText, { color: theme.text }]}>
-            {index === 0 ? "Ready" : index === 1 ? "Connected" : "Live"}
-          </Text>
-        </View> */}
       </View>
 
       {/* Text content */}
@@ -270,15 +237,6 @@ const OnboardingScreen = () => {
             {slides.length}
           </Text>
         </View>
-
-        {/* Skip */}
-        {/* {!isLast && (
-          <TouchableOpacity onPress={skip} activeOpacity={0.7}>
-            <Text style={[styles.skipText, { color: theme.textSecondary }]}>
-              Skip
-            </Text>
-          </TouchableOpacity>
-        )} */}
 
         <TouchableOpacity
           activeOpacity={0.7}
