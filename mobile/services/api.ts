@@ -82,20 +82,27 @@ const processQueue = (error: unknown, token: string | null = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const original = error.config as (InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    }) | undefined;
+    const original = error.config as
+      | (InternalAxiosRequestConfig & {
+          _retry?: boolean;
+        })
+      | undefined;
 
     const { token, refreshToken } = useAuthStore.getState();
 
     // Only treat this as "session expired" if we actually had a token.
     // A 401 with no token at all is just an unauthenticated request,
     // not a reason to attempt refresh or log the user out.
-    if (error.response?.status === 401 && original && !original._retry && token) {
+    if (
+      error.response?.status === 401 &&
+      original &&
+      !original._retry &&
+      token
+    ) {
       if (!refreshToken) {
-        await useAuthStore.getState().forceLogout(
-          'Your session has expired. Please log in again.',
-        );
+        await useAuthStore
+          .getState()
+          .forceLogout("Your session has expired. Please log in again.");
         return Promise.reject(error);
       }
 
@@ -152,15 +159,21 @@ api.interceptors.response.use(
         const refreshStatus = axios.isAxiosError(refreshError)
           ? refreshError.response?.status
           : undefined;
-        if (refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403) {
+        if (
+          refreshStatus === 400 ||
+          refreshStatus === 401 ||
+          refreshStatus === 403
+        ) {
           // Extract the server's reason (e.g. "Account suspended") so the
           // toast can show a meaningful message instead of the generic fallback.
           const serverMsg = axios.isAxiosError(refreshError)
             ? (refreshError.response?.data?.message as string | undefined)
             : undefined;
-          await useAuthStore.getState().forceLogout(
-            serverMsg ?? 'Your session has expired. Please log in again.',
-          );
+          await useAuthStore
+            .getState()
+            .forceLogout(
+              serverMsg ?? "Your session has expired. Please log in again.",
+            );
         }
         return Promise.reject(refreshError);
       } finally {

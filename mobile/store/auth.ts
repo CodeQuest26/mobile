@@ -4,8 +4,6 @@ import { Alert } from "react-native";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-// Lazy-import to avoid circular dependency: auth.ts → api.ts → auth.ts.
-// The api instance is only needed inside getMe, which runs after module init.
 const getApi = () =>
   require("@/services/api").api as import("axios").AxiosInstance;
 
@@ -100,6 +98,12 @@ const handleApiError = (error: unknown): string => {
   return "An unexpected error occurred";
 };
 
+const showTestOtpIfPresent = (otpCode?: string) => {
+  if (otpCode) {
+    Alert.alert("OTP Verification code", otpCode);
+  }
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -129,7 +133,7 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      /* ---------------- Register ---------------- */
+      // Register
       register: async (payload) => {
         try {
           set({ isLoading: true, error: null });
@@ -140,6 +144,7 @@ export const useAuthStore = create<AuthState>()(
           );
 
           console.log(data);
+          showTestOtpIfPresent(data?.otpCode);
 
           set({
             user: {
@@ -166,7 +171,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      /* ---------------- Verify OTP ---------------- */
+      // Verify OTP
       verifyOtp: async (phoneNumber, otp) => {
         try {
           set({ isVerifying: true, error: null });
@@ -206,9 +211,12 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true, error: null });
 
-          await axios.post(joinUrl(BASE_URL, "auth/resend-otp"), {
-            phoneNumber,
-          });
+          const { data } = await axios.post(
+            joinUrl(BASE_URL, "auth/resend-otp"),
+            { phoneNumber },
+          );
+
+          showTestOtpIfPresent(data?.otpCode);
         } catch (error) {
           const message = handleApiError(error);
           set({ error: message });
@@ -228,11 +236,11 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
-          Alert.alert("OTP Verification code", data?.otpCode);
+          showTestOtpIfPresent(data?.otpCode);
 
-          // Test/staging backend echoes the OTP directly in the response —
-          // remove this log before shipping a production build.
-          console.log("📱 OTP CODE (login):", data);
+          console.log("OTP CODE (login):", data);
+
+          set({ pendingVerificationPhone: phoneNumber });
         } catch (error: any) {
           const message = handleApiError(error);
           set({ error: message });
@@ -242,10 +250,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      /* ---------------- Current User ---------------- */
-      // Uses the api instance (not bare axios) so that the response interceptor
-      // handles 401 → silent refresh transparently, without a second manual
-      // refresh path that could conflict with the interceptor's queue.
+      //  current user
       getMe: async () => {
         try {
           if (!get().token) throw new Error("No session token");
@@ -255,10 +260,6 @@ export const useAuthStore = create<AuthState>()(
           const { data } = await api.get("users/me");
           set({ user: data });
         } catch (err) {
-          // The api interceptor already handles 401 → refresh → retry.
-          // If we still land here, the refresh definitively failed (or
-          // there was no token to begin with) — rethrow so callers like
-          // biometric login can react (e.g. fall back to password login).
           console.warn("getMe failed:", err);
           throw err;
         } finally {
@@ -266,23 +267,31 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      /* ---------------- Logout ---------------- */
+      //  log out
       logout: async () => {
-        set({
-          user: null,
-          token: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          pendingVerificationPhone: null,
-          error: null,
-          sessionExpiredMessage: null,
-        });
+        const refreshToken = get().refreshToken;
+
+        try {
+          if (refreshToken) {
+            const api = getApi();
+            await api.post("auth/logout", { refreshToken });
+          }
+        } catch (err) {
+          console.warn("Backend logout failed or token already invalid:", err);
+        } finally {
+          set({
+            user: null,
+            token: null,
+            refreshToken: null,
+            isAuthenticated: false,
+            pendingVerificationPhone: null,
+            error: null,
+            sessionExpiredMessage: null,
+          });
+        }
       },
 
-      /* ---------------- Force Logout (session expired) ---------------- */
-      // Called by the API interceptor when refresh definitively fails.
-      // Unlike logout(), this sets sessionExpiredMessage so the toast can
-      // display the server's reason (e.g. "Account suspended").
+      //  Force Logout (session expired) when refresh definitively fails
       forceLogout: async (message) => {
         set({
           user: null,
@@ -302,7 +311,6 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         token: state.token,
         refreshToken: state.refreshToken,
-        // DON'T persist isAuthenticated - recalculated on hydration
         pendingVerificationPhone: state.pendingVerificationPhone,
       }),
       onRehydrateStorage: () => (state, error) => {
@@ -311,11 +319,6 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        // Mutate the incoming state object directly instead of calling
-        // useAuthStore.setState — that reference isn't safely available
-        // yet at this point in the store's own initialization, and
-        // referencing it here caused "Cannot read property 'setState'
-        // of undefined".
         if (state) {
           state.isAuthenticated = !!state.token;
         }

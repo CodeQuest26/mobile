@@ -24,7 +24,7 @@ import Colors from "../../constants/colors";
 // --- Role meta ---
 const ROLE_META = {
   SME_OWNER: {
-    label: "Business Owner",
+    label: "Enterprise",
     icon: "briefcase-outline",
     tagline: "Manage your business, on the go.",
   },
@@ -181,7 +181,7 @@ const SignupScreen = () => {
         fullName: fullName.trim(),
         role: selectedRole as "SME_OWNER" | "FACTORY_OWNER",
         region: "",
-        town: "",
+        town: "", 
       });
       router.replace({
         pathname: "/OTPVerification",

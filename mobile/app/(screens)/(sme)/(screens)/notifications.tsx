@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   FlatList,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -122,21 +121,26 @@ const Notifications = () => {
           </Text>
         </TouchableOpacity>
       </View>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.listHeader}>
-          <Text style={[styles.listHeaderText, { color: theme.text }]}>
-            Recent
-          </Text>
-        </View>
 
-        <FlatList
-          data={notifications}
-          keyExtractor={(it) => it.id}
-          renderItem={renderItem}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          contentContainerStyle={{ paddingBottom: 48 }}
-        />
-      </ScrollView>
+      {/* FlatList is already a VirtualizedList and scrolls on its own —
+          it was previously nested inside a ScrollView with the same
+          (vertical) orientation, which breaks windowing/virtualization.
+          The "Recent" label that used to sit above it inside the
+          ScrollView is now passed in via ListHeaderComponent instead. */}
+      <FlatList
+        data={notifications}
+        keyExtractor={(it) => it.id}
+        renderItem={renderItem}
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={[styles.listHeaderText, { color: theme.text }]}>
+              Recent
+            </Text>
+          </View>
+        }
+        contentContainerStyle={styles.container}
+      />
     </MainContainer>
   );
 };
@@ -147,7 +151,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 32,
+    paddingBottom: 48,
   },
   header: {
     flexDirection: "row",
