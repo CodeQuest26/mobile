@@ -80,9 +80,7 @@ const SMEHome = () => {
     try {
       setLoading(true);
       setError(null);
-      // The shared client waits for auth hydration, attaches the real `token`
-      // field, and refreshes an expired session. The previous raw fetch used
-      // an `accessToken` field that the auth store does not contain.
+
       const { data } = await api.get("orders", {
         params: { page: 0, size: 50, sort: "createdAt,desc" },
       });
@@ -123,8 +121,7 @@ const SMEHome = () => {
     }
   }, []);
 
-  // Reload after returning from payment or order details so the displayed
-  // lifecycle status always comes from the backend.
+  // Reload anytime the screen is active
   useFocusEffect(
     useCallback(() => {
       void fetchOrders();

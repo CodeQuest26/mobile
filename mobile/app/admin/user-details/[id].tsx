@@ -1,7 +1,7 @@
 import MainContainer from "@/components/MainContainer";
 import Colors from "@/constants/colors";
 import { adminService } from "@/services/admin";
-import { api, handleApiError } from "@/services/api";
+import { handleApiError } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -29,6 +29,7 @@ type UserDetail = {
   phone?: string;
   role?: string;
   status?: string;
+  isActive?: boolean;
   enabled?: boolean;
   active?: boolean;
   suspended?: boolean;
@@ -65,6 +66,8 @@ const getContact = (user: UserDetail) =>
   user.phone ||
   "No contact provided";
 
+// Ordered from most-specific/confirmed field to least. `isActive` is the
+// field confirmed by the OpenAPI spec (UserSummaryResponse.isActive).
 const isUserSuspended = (user: UserDetail) => {
   if (user.suspended !== undefined) return user.suspended;
   if (user.isSuspended !== undefined) return user.isSuspended;
@@ -73,6 +76,7 @@ const isUserSuspended = (user: UserDetail) => {
     if (s === "SUSPENDED" || s === "DISABLED") return true;
     if (s === "ACTIVE" || s === "ENABLED") return false;
   }
+  if (user.isActive !== undefined) return !user.isActive;
   if (user.enabled !== undefined) return !user.enabled;
   if (user.active !== undefined) return !user.active;
   return false;
@@ -109,6 +113,9 @@ const UserDetailScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
 
+  // Always trust a successful server response over whatever was passed
+  // in via navigation params — that param is just a snapshot from the
+  // list screen and can be stale (e.g. right after a suspend/unsuspend).
   const fetchUser = async () => {
     if (!params.id) return;
 
@@ -126,7 +133,11 @@ const UserDetailScreen = () => {
 
   useEffect(() => {
     fetchUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  const resolveTargetId = () =>
+    user?.id || (user as any)?.userId || (user as any)?._id || params.id;
 
   /* ================= SUSPEND USER ACTION ================= */
   const handleSuspend = async () => {
@@ -143,25 +154,8 @@ const UserDetailScreen = () => {
           onPress: async () => {
             setUpdating(true);
             try {
-              const targetId =
-                user.id ||
-                (user as any).userId ||
-                (user as any)._id ||
-                params.id;
-              await adminService.suspendUser(targetId);
-              setUser((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      suspended: true,
-                      isSuspended: true,
-                      enabled: false,
-                      active: false,
-                      status: "SUSPENDED",
-                    }
-                  : null,
-              );
-
+              await adminService.suspendUser(resolveTargetId());
+              await fetchUser();
               Alert.alert("Success", "User suspended successfully.");
             } catch (err) {
               Alert.alert("Action Failed", handleApiError(err));
@@ -188,24 +182,8 @@ const UserDetailScreen = () => {
           onPress: async () => {
             setUpdating(true);
             try {
-              const targetId =
-                user.id ||
-                (user as any).userId ||
-                (user as any)._id ||
-                params.id;
-              await adminService.unsuspendUser(targetId);
-              setUser((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      suspended: false,
-                      isSuspended: false,
-                      enabled: true,
-                      active: true,
-                      status: "ACTIVE",
-                    }
-                  : null,
-              );
+              await adminService.unsuspendUser(resolveTargetId());
+              await fetchUser();
               Alert.alert("Success", "User unsuspended successfully.");
             } catch (err) {
               Alert.alert("Action Failed", handleApiError(err));
@@ -218,23 +196,9 @@ const UserDetailScreen = () => {
     );
   };
 
-  /* ================= ROLE UPDATE ACTION ================= */
-  const handleUpdateRole = async (newRole: string) => {
-    if (!user || updating) return;
-
-    setUpdating(true);
-    try {
-      await api.patch(`admin/users/${user.id}/role`, { role: newRole });
-      setUser((prev) => (prev ? { ...prev, role: newRole } : null));
-      Alert.alert("Success", `User role updated to ${formatRole(newRole)}.`);
-    } catch (err) {
-      Alert.alert("Action Failed", handleApiError(err));
-    } finally {
-      setUpdating(false);
-    }
-  };
-
   /* ================= DELETE USER ACTION ================= */
+  // NOTE: DELETE /api/v1/admin/users/{id} is not defined in the current
+  // OpenAPI spec. This will 404 until the backend adds it.
   const handleDeleteUser = async () => {
     if (!user) return;
 
@@ -249,12 +213,16 @@ const UserDetailScreen = () => {
           onPress: async () => {
             setUpdating(true);
             try {
+              const { api } = await import("@/services/api");
               await api.delete(`admin/users/${user.id}`);
               Alert.alert("Success", "User deleted successfully.", [
                 { text: "OK", onPress: () => router.back() },
               ]);
             } catch (err) {
-              Alert.alert("Action Failed", handleApiError(err));
+              Alert.alert(
+                "Action Failed",
+                "This endpoint isn't available yet. " + handleApiError(err),
+              );
             } finally {
               setUpdating(false);
             }
@@ -325,13 +293,14 @@ const UserDetailScreen = () => {
               style={[
                 styles.avatar,
                 {
-                  backgroundColor: suspended
+                  borderWidth:2,
+                  borderColor: suspended
                     ? theme.error
                     : theme.primary + "CC",
                 },
               ]}
             >
-              <Text style={styles.avatarText}>
+              <Text style={[styles.avatarText, {color: theme.text}]}>
                 {getDisplayName(user).charAt(0).toUpperCase()}
               </Text>
             </View>
@@ -574,7 +543,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarText: { color: "#FFF", fontSize: 32, fontWeight: "bold" },
+  avatarText: {  fontSize: 32, fontWeight: "bold" },
   verificationBadge: {
     marginTop: 8,
     paddingHorizontal: 10,

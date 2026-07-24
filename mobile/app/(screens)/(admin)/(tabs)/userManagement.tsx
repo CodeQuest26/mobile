@@ -5,8 +5,8 @@ import { adminService } from "@/services/admin";
 import { handleApiError } from "@/services/api";
 import { getAvatarColor } from "@/services/avatarColor";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -33,6 +33,7 @@ export type ManagedUser = {
   phone?: string;
   role?: string;
   status?: string;
+  isActive?: boolean; 
   enabled?: boolean;
   active?: boolean;
   suspended?: boolean;
@@ -42,52 +43,7 @@ export type ManagedUser = {
   createdAt?: string;
 };
 
-type PagedUsers = {
-  content: ManagedUser[];
-  totalElements?: number;
-  totalPages?: number;
-  number?: number;
-  page?: number;
-};
-
-type UsersResponse =
-  | ManagedUser[]
-  | PagedUsers
-  | {
-      data?: ManagedUser[] | PagedUsers;
-      users?: ManagedUser[];
-      totalPages?: number;
-      totalElements?: number;
-    }
-  | null
-  | undefined;
-
 type FilterTab = "ALL" | "ACTIVE" | "SUSPENDED";
-
-const getUsersPayload = (data: UsersResponse): UsersResponse => {
-  if (data && !Array.isArray(data) && "data" in data) {
-    return data.data;
-  }
-  return data;
-};
-
-const getUsersFromResponse = (data: UsersResponse): ManagedUser[] => {
-  const payload = getUsersPayload(data);
-
-  if (Array.isArray(payload)) return payload;
-  if (payload && !Array.isArray(payload)) {
-    if ("content" in payload && Array.isArray(payload.content)) {
-      return payload.content;
-    }
-    if ("users" in payload && Array.isArray(payload.users)) {
-      return payload.users;
-    }
-  }
-
-  return [];
-};
-
-const PAGE_SIZE = 20;
 
 export const getUserDisplayName = (user: ManagedUser) => {
   const joinedName = [user.firstName, user.lastName].filter(Boolean).join(" ");
@@ -111,6 +67,7 @@ export const isUserSuspended = (user: ManagedUser) => {
     if (s === "SUSPENDED" || s === "DISABLED") return true;
     if (s === "ACTIVE" || s === "ENABLED") return false;
   }
+  if (user.isActive !== undefined) return !user.isActive;
   if (user.enabled !== undefined) return !user.enabled;
   if (user.active !== undefined) return !user.active;
   return false;
@@ -140,128 +97,68 @@ const UserManagementScreen = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"];
 
-  const [users, setUsers] = useState<ManagedUser[]>([]);
+  
+  const [allUsers, setAllUsers] = useState<ManagedUser[]>([]);
   const [filterTab, setFilterTab] = useState<FilterTab>("ALL");
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const fetchUsers = useCallback(
-    async (
-      pageToLoad = 0,
-      append = false,
-      showLoader = true,
-      currentFilter: FilterTab = filterTab,
-    ) => {
-      try {
-        if (showLoader) setLoading(true);
-        setError(null);
+  const fetchUsers = useCallback(async (showLoader = true) => {
+    try {
+      if (showLoader) setLoading(true);
+      setError(null);
 
-        let responseData: UsersResponse = null;
+      const { data } = await adminService.getAllUsers();
+      const list: ManagedUser[] = Array.isArray(data)
+        ? data
+        : data?.content ?? [];
 
-        try {
-          if (currentFilter === "ACTIVE") {
-            const res = await adminService.getActiveUsers({
-              page: pageToLoad,
-              size: PAGE_SIZE,
-            });
-            responseData = res.data;
-          } else if (currentFilter === "SUSPENDED") {
-            const res = await adminService.getSuspendedUsers({
-              page: pageToLoad,
-              size: PAGE_SIZE,
-            });
-            responseData = res.data;
-          } else {
-            const res = await adminService.getAllUsers({
-              page: pageToLoad,
-              size: PAGE_SIZE,
-            });
-            responseData = res.data;
-          }
-        } catch (err: any) {
-          const fallbackRes = await adminService.getUsers({
-            page: pageToLoad,
-            size: PAGE_SIZE,
-          });
-          responseData = fallbackRes.data;
-        }
+      setAllUsers(list);
+    } catch (err) {
+      setError(handleApiError(err));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-        let nextUsers = getUsersFromResponse(responseData);
 
-        if (currentFilter === "ACTIVE") {
-          nextUsers = nextUsers.filter((u) => !isUserSuspended(u));
-        } else if (currentFilter === "SUSPENDED") {
-          nextUsers = nextUsers.filter((u) => isUserSuspended(u));
-        }
-
-        const payload = getUsersPayload(responseData);
-        const nextTotalPages =
-          payload && !Array.isArray(payload) && "totalPages" in payload
-            ? payload.totalPages || 1
-            : 1;
-        const nextTotalElements =
-          payload && !Array.isArray(payload) && "totalElements" in payload
-            ? payload.totalElements || nextUsers.length
-            : nextUsers.length;
-
-        setUsers((current) =>
-          append ? [...current, ...nextUsers] : nextUsers,
-        );
-        setPage(pageToLoad);
-        setTotalPages(nextTotalPages);
-        setTotalElements(nextTotalElements);
-      } catch (err) {
-        setError(handleApiError(err));
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-      }
-    },
-    [filterTab],
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsers(false);
+    }, []),
   );
-
-  useEffect(() => {
-    fetchUsers(0, false, true, filterTab);
-  }, [filterTab]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void fetchUsers(0, false, false, filterTab);
-  }, [fetchUsers, filterTab]);
-
-  const onLoadMore = useCallback(() => {
-    if (loading || loadingMore || page + 1 >= totalPages || search.trim()) {
-      return;
-    }
-
-    setLoadingMore(true);
-    void fetchUsers(page + 1, true, false, filterTab);
-  }, [fetchUsers, filterTab, loading, loadingMore, page, search, totalPages]);
+    void fetchUsers(false);
+  }, [fetchUsers]);
 
   const handleSelectFilter = (tab: FilterTab) => {
     if (tab === filterTab) return;
     setFilterTab(tab);
   };
 
-  const filteredUsers = users.filter((user) => {
-    const term = search.trim().toLowerCase();
-    return (
-      !term ||
-      getUserDisplayName(user).toLowerCase().includes(term) ||
-      user.email?.toLowerCase().includes(term) ||
-      user.emailAddress?.toLowerCase().includes(term) ||
-      user.phoneNumber?.toLowerCase().includes(term) ||
-      user.phone?.toLowerCase().includes(term) ||
-      user.role?.toLowerCase().includes(term)
-    );
-  });
+  const filteredUsers = allUsers
+    .filter((user) => {
+      if (filterTab === "ACTIVE") return !isUserSuspended(user);
+      if (filterTab === "SUSPENDED") return isUserSuspended(user);
+      return true;
+    })
+    .filter((user) => {
+      const term = search.trim().toLowerCase();
+      return (
+        !term ||
+        getUserDisplayName(user).toLowerCase().includes(term) ||
+        user.email?.toLowerCase().includes(term) ||
+        user.emailAddress?.toLowerCase().includes(term) ||
+        user.phoneNumber?.toLowerCase().includes(term) ||
+        user.phone?.toLowerCase().includes(term) ||
+        user.role?.toLowerCase().includes(term)
+      );
+    });
 
   const renderUser: ListRenderItem<ManagedUser> = ({ item }) => {
     const suspended = isUserSuspended(item);
@@ -286,18 +183,15 @@ const UserManagementScreen = () => {
           })
         }
       >
-        {/* Top Content Row */}
         <View style={styles.cardHeader}>
-          {/* Avatar Container with Status Dot */}
           <View style={styles.avatarWrapper}>
-            <View style={[styles.avatar, { backgroundColor: avatarColor.bg }]}>
-              <Text style={[styles.avatarText, { color: avatarColor.text }]}>
+            <View style={[styles.avatar, { borderWidth:1, borderColor: suspended ? theme.error: theme.primary }]}>
+              <Text style={[styles.avatarText, { color: suspended ? theme.error: theme.primary }]}>
                 {displayName.charAt(0).toUpperCase()}
               </Text>
             </View>
           </View>
 
-          {/* User Details */}
           <View style={styles.userInfoContainer}>
             <View style={styles.nameRow}>
               <Text
@@ -308,7 +202,6 @@ const UserManagementScreen = () => {
               </Text>
             </View>
 
-            {/* Email / Contact Row */}
             <View style={styles.contactRow}>
               <Ionicons
                 name="mail-outline"
@@ -323,9 +216,7 @@ const UserManagementScreen = () => {
               </Text>
             </View>
 
-            {/* Meta Tags: Role & Status Pill */}
             <View style={styles.metaRow}>
-              {/* Role Chip */}
               <View
                 style={[
                   styles.roleChip,
@@ -340,11 +231,12 @@ const UserManagementScreen = () => {
                   size={12}
                   color={theme.primary}
                 />
-
                 <Text style={[styles.roleChipText, { color: theme.text }]}>
-                  {formatRole(item.role)}
+                  {formatRole(item.role) == 'Sme Owner' ? "Enterprise" : "Manufacturer"}
                 </Text>
               </View>
+
+            
             </View>
           </View>
         </View>
@@ -361,12 +253,11 @@ const UserManagementScreen = () => {
               User Management
             </Text>
             <Text style={[styles.countText, { color: theme.textSecondary }]}>
-              {totalElements || filteredUsers.length} registered users
+              {filteredUsers.length} registered users
             </Text>
           </View>
         </View>
 
-        {/* Filter Pills */}
         <View style={styles.filterContainer}>
           {(["ALL", "ACTIVE", "SUSPENDED"] as FilterTab[]).map((tab) => {
             const isActive = filterTab === tab;
@@ -407,7 +298,6 @@ const UserManagementScreen = () => {
           })}
         </View>
 
-        {/* Search Bar */}
         <View
           style={[
             styles.searchBarContainer,
@@ -454,7 +344,7 @@ const UserManagementScreen = () => {
           </Text>
           <TouchableOpacity
             style={[styles.retryBtn, { backgroundColor: theme.primary }]}
-            onPress={() => fetchUsers(0, false, true, filterTab)}
+            onPress={() => fetchUsers(true)}
           >
             <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>
               Retry
@@ -467,18 +357,7 @@ const UserManagementScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderUser}
           contentContainerStyle={styles.list}
-          onEndReached={onLoadMore}
-          onEndReachedThreshold={0.35}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator
-                size="small"
-                color={theme.primary}
-                style={{ marginVertical: 16 }}
-              />
-            ) : null
-          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons
@@ -500,7 +379,7 @@ const UserManagementScreen = () => {
           }
         />
       )}
-      <Spacer style={{height:90}}/>
+      <Spacer style={{ height: 90 }} />
     </MainContainer>
   );
 };
@@ -576,15 +455,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 20,
   },
-  statusDot: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-  },
   userInfoContainer: {
     flex: 1,
   },
@@ -597,9 +467,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     marginRight: 6,
-  },
-  verifiedIcon: {
-    marginRight: 4,
   },
   contactRow: {
     flexDirection: "row",
@@ -627,27 +494,6 @@ const styles = StyleSheet.create({
   },
   roleChipText: {
     fontSize: 11.5,
-    fontWeight: "600",
-  },
-  statusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusChipText: {
-    fontSize: 11.5,
-    fontWeight: "700",
-  },
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-  },
-  manageText: {
-    fontSize: 13,
     fontWeight: "600",
   },
   emptyContainer: {
