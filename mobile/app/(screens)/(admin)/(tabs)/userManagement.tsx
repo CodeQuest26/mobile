@@ -1,4 +1,5 @@
 import MainContainer from "@/components/MainContainer";
+import Spacer from "@/components/Spacer";
 import Colors from "@/constants/colors";
 import { adminService } from "@/services/admin";
 import { handleApiError } from "@/services/api";
@@ -499,6 +500,7 @@ const UserManagementScreen = () => {
           }
         />
       )}
+      <Spacer style={{height:90}}/>
     </MainContainer>
   );
 };

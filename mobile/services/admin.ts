@@ -33,10 +33,24 @@ export const adminService = {
       () => api.put(`admin/users/${userId}/suspend`, { reason: reasonText }),
       () => api.post(`admin/users/${userId}/suspend`, { reason: reasonText }),
       () => api.patch(`admin/users/${userId}/suspend`, { reason: reasonText }),
-      () => api.put(`admin/users/${userId}/suspend`, null, { params: { reason: reasonText } }),
-      () => api.post(`admin/users/${userId}/suspend`, null, { params: { reason: reasonText } }),
-      () => api.patch(`admin/users/${userId}/status`, { status: "SUSPENDED", enabled: false }),
-      () => api.put(`admin/users/${userId}/status`, { status: "SUSPENDED", enabled: false }),
+      () =>
+        api.put(`admin/users/${userId}/suspend`, null, {
+          params: { reason: reasonText },
+        }),
+      () =>
+        api.post(`admin/users/${userId}/suspend`, null, {
+          params: { reason: reasonText },
+        }),
+      () =>
+        api.patch(`admin/users/${userId}/status`, {
+          status: "SUSPENDED",
+          enabled: false,
+        }),
+      () =>
+        api.put(`admin/users/${userId}/status`, {
+          status: "SUSPENDED",
+          enabled: false,
+        }),
     ];
 
     let lastError: any = null;
@@ -63,8 +77,16 @@ export const adminService = {
       () => api.put(`admin/users/${userId}/unsuspend`, {}),
       () => api.post(`admin/users/${userId}/unsuspend`, {}),
       () => api.patch(`admin/users/${userId}/unsuspend`, {}),
-      () => api.patch(`admin/users/${userId}/status`, { status: "ACTIVE", enabled: true }),
-      () => api.put(`admin/users/${userId}/status`, { status: "ACTIVE", enabled: true }),
+      () =>
+        api.patch(`admin/users/${userId}/status`, {
+          status: "ACTIVE",
+          enabled: true,
+        }),
+      () =>
+        api.put(`admin/users/${userId}/status`, {
+          status: "ACTIVE",
+          enabled: true,
+        }),
     ];
 
     let lastError: any = null;

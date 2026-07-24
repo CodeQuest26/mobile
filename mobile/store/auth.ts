@@ -1,11 +1,13 @@
 import { mmkvStorage } from "@/store/mmkv";
 import axios from "axios";
+import { Alert } from "react-native";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 // Lazy-import to avoid circular dependency: auth.ts → api.ts → auth.ts.
 // The api instance is only needed inside getMe, which runs after module init.
-const getApi = () => require("@/services/api").api as import("axios").AxiosInstance;
+const getApi = () =>
+  require("@/services/api").api as import("axios").AxiosInstance;
 
 interface User {
   id: string;
@@ -226,9 +228,11 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
+          Alert.alert("OTP Verification code", data?.otpCode);
+
           // Test/staging backend echoes the OTP directly in the response —
           // remove this log before shipping a production build.
-          console.log("📱 OTP CODE (login):", data.otpCode);
+          console.log("📱 OTP CODE (login):", data);
         } catch (error: any) {
           const message = handleApiError(error);
           set({ error: message });
@@ -244,7 +248,7 @@ export const useAuthStore = create<AuthState>()(
       // refresh path that could conflict with the interceptor's queue.
       getMe: async () => {
         try {
-          if (!get().token) return;
+          if (!get().token) throw new Error("No session token");
           set({ isLoading: true });
 
           const api = getApi();
@@ -252,9 +256,11 @@ export const useAuthStore = create<AuthState>()(
           set({ user: data });
         } catch (err) {
           // The api interceptor already handles 401 → refresh → retry.
-          // Any error that bubbles here is either a network failure or a
-          // definitively failed refresh (which forceLogout already handled).
+          // If we still land here, the refresh definitively failed (or
+          // there was no token to begin with) — rethrow so callers like
+          // biometric login can react (e.g. fall back to password login).
           console.warn("getMe failed:", err);
+          throw err;
         } finally {
           set({ isLoading: false });
         }

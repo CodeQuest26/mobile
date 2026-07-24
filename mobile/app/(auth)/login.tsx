@@ -86,6 +86,7 @@ const InputField = ({
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType as any}
           placeholderTextColor={theme.textSecondary + "80"}
           placeholder={pholder ? pholder : label}
         />
@@ -115,6 +116,10 @@ const LoginScreen = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Separate from biometrics.isAuthenticating: covers the post-sensor
+  // session-validation call (getMe), so the spinner stays visible through
+  // the whole biometric flow, not just the hardware prompt.
+  const [verifyingSession, setVerifyingSession] = useState(false);
 
   const canSubmit = phoneNumber.length >= 10 && password.length >= 8;
 
@@ -127,15 +132,15 @@ const LoginScreen = () => {
 
   const { login } = useAuthStore();
 
-  const routeForRole = (role?: string) => {
+  const destinationForRole = (role?: string) => {
     switch (role) {
-      case "SME_OWNER":
-        return "/(screens)/(sme)/(tabs)";
       case "ADMIN":
         return "/(screens)/(admin)/(tabs)";
       case "FACTORY_OWNER":
-      default:
         return "/(screens)/(manufacturer)/(tabs)";
+      case "SME_OWNER":
+      default:
+        return "/(screens)/(sme)/(tabs)";
     }
   };
 
@@ -190,15 +195,40 @@ const LoginScreen = () => {
       );
       return;
     }
-    // Biometric passed — navigate to the authenticated area directly.
-    const storedRole = storage.getString("selectedRole");
-    const destination =
-      storedRole === "ADMIN"
-        ? "/(screens)/(admin)/(tabs)"
-        : storedRole === "FACTORY_OWNER"
-          ? "/(screens)/(manufacturer)/(tabs)"
-          : "/(screens)/(sme)/(tabs)";
-    router.replace(destination as any);
+
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      // Nothing to unlock — biometrics was enabled but there's no
+      // persisted session (e.g. storage was cleared).
+      Alert.alert(
+        "Sign in required",
+        "Please sign in with your phone number and password.",
+      );
+      return;
+    }
+
+    setVerifyingSession(true);
+    try {
+      // Fingerprint/Face ID only proves it's the device owner — it does not
+      // prove the stored token is still valid. Confirm the session against
+      // the backend (api's interceptor silently refreshes an expired
+      // access token here) before letting the user into an authed screen.
+      await useAuthStore.getState().getMe();
+      const freshUser = useAuthStore.getState().user;
+      if (!freshUser) throw new Error("Could not verify session");
+
+      storage.set("selectedRole", freshUser.role);
+      router.replace(destinationForRole(freshUser.role) as any);
+    } catch (e) {
+      // Token invalid/expired and refresh failed, or revoked server-side.
+      await useAuthStore.getState().logout();
+      Alert.alert(
+        "Session expired",
+        "Please sign in again with your phone number and password.",
+      );
+    } finally {
+      setVerifyingSession(false);
+    }
   };
 
   // Auto-prompt biometric when available, enabled, and the user already has
@@ -210,6 +240,8 @@ const LoginScreen = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [biometrics.isAvailable, biometrics.isEnabled]);
+
+  const biometricBusy = biometrics.isAuthenticating || verifyingSession;
 
   return (
     <MainContainer safe style={{ backgroundColor: theme.background }}>
@@ -261,9 +293,7 @@ const LoginScreen = () => {
             value={phoneNumber}
             onChangeText={setPhoneNumber}
             theme={theme}
-            keyboardType="phone-pad"
-            secureTextEntry={undefined}
-            rightSlot={undefined}
+            keyboardType="numeric"
             pholder="+233 XX XXX XXXX"
           />
 
@@ -349,7 +379,7 @@ const LoginScreen = () => {
               <Spacer style={{ height: 16 }} />
               <TouchableOpacity
                 onPress={handleBiometricLogin}
-                disabled={biometrics.isAuthenticating}
+                disabled={biometricBusy}
                 activeOpacity={0.8}
                 style={[
                   styles.biometricButton,
@@ -359,7 +389,7 @@ const LoginScreen = () => {
                   },
                 ]}
               >
-                {biometrics.isAuthenticating ? (
+                {biometricBusy ? (
                   <ActivityIndicator size="small" color={theme.primary} />
                 ) : (
                   <Ionicons
